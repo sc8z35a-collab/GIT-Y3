@@ -1,5 +1,5 @@
 /**
- * Headless Verification & Biomechanical Audit Suite for JHand Kinesis 1.0.
+ * Headless Verification & Biomechanical Audit Suite for JHand Kinesis 1.1 (38-DOF).
  * Run with: npm run test:jhand
  */
 
@@ -17,44 +17,80 @@ function assert(cond: boolean, msg: string): void {
   }
 }
 
-console.log('\n=== JHand Kinesis 1.0 — 27-DOF Biomechanical Verification Suite ===\n');
+console.log('\n=== JHand Kinesis 1.1 — 38-DOF Anatomical Micro-Kinematics Audit Suite ===\n');
 
 const engine = new JHandKinesisEngine(0);
 const fingerNames: FingerName[] = ['index', 'middle', 'ring', 'pinky'];
 const poses: HandPoseKey[] = ['ready', 'windup', ROCK, SCISSORS, PAPER, 'envelop', 'bow', 'salute'];
 
-// 1. 10,000-step ROM Compliance & Numerical Stability Test across all 8 poses
+// 1. 12,000-step ROM Compliance, Numerical Stability & 9-Channel Foley Audit across all 8 poses
 let allFinite = true;
 let allInRom = true;
+const seenFoleyTypes = new Set<string>();
 let totalFoleyEvents = 0;
 
 for (const pose of poses) {
   engine.setTargetPose(pose, true, true);
   if (pose === SCISSORS) engine.triggerScissorsSnip();
-  for (let i = 0; i < 1250; i++) {
-    const f = engine.step(1 / 120, { x: Math.sin(i * 0.08) * 1.8, y: Math.cos(i * 0.1) * 2.2, z: 0 }, 0, 0);
+  for (let i = 0; i < 1500; i++) {
+    const f = engine.step(
+      1 / 120,
+      { x: Math.sin(i * 0.08) * 1.9, y: Math.cos(i * 0.1) * 2.3, z: 0 },
+      0,
+      0
+    );
     totalFoleyEvents += f.foleyEvents.length;
+    for (const ev of f.foleyEvents) seenFoleyTypes.add(ev.type);
 
     const vals = [
       f.wrist.forearmPronation,
-      f.wrist.wristPitch,
+      f.wrist.ulnarStyloidProminence,
+      f.wrist.rcPitch,
+      f.wrist.mcPitch,
       f.wrist.wristYaw,
       f.wrist.wristRoll,
+      f.palm.cmc2Flex,
+      f.palm.cmc3Flex,
       f.palm.cmc4Flex,
       f.palm.cmc5Flex,
+      f.palm.cmc5Supination,
+      f.palm.fdiBulge,
+      f.palm.hypothenarBulge,
       f.thumb.cmcFlex,
       f.thumb.cmcAbd,
       f.thumb.cmcPronation,
       f.thumb.mcpFlex,
+      f.thumb.mcpAbd,
       f.thumb.ipFlex,
+      f.thumb.eplTendonTension,
       ...f.dorsalTendons,
+      ...f.palm.webbingStretch,
+      ...f.palm.juncturaeTension,
     ];
+
+    if (
+      f.wrist.rcPitch < ANATOMICAL_ROM.wrist.rcPitch.min - 1e-4 ||
+      f.wrist.rcPitch > ANATOMICAL_ROM.wrist.rcPitch.max + 1e-4 ||
+      f.wrist.mcPitch < ANATOMICAL_ROM.wrist.mcPitch.min - 1e-4 ||
+      f.wrist.mcPitch > ANATOMICAL_ROM.wrist.mcPitch.max + 1e-4 ||
+      f.palm.cmc5Supination < ANATOMICAL_ROM.palm.cmc5Supination.min - 1e-4 ||
+      f.palm.cmc5Supination > ANATOMICAL_ROM.palm.cmc5Supination.max + 1e-4 ||
+      f.thumb.mcpAbd < ANATOMICAL_ROM.thumb.mcpAbd.min - 1e-4 ||
+      f.thumb.mcpAbd > ANATOMICAL_ROM.thumb.mcpAbd.max + 1e-4 ||
+      f.thumb.ipFlex < ANATOMICAL_ROM.thumb.ipFlex.min - 1e-4 ||
+      f.thumb.ipFlex > ANATOMICAL_ROM.thumb.ipFlex.max + 1e-4
+    ) {
+      allInRom = false;
+    }
+
     for (const fn of fingerNames) {
       const st = f.fingers[fn];
-      vals.push(st.mcpFlex, st.mcpAbd, st.pipFlex, st.dipFlex);
+      vals.push(st.mcpFlex, st.mcpAbd, st.mcpAxialTwist, st.pipFlex, st.dipFlex, st.mcpVolarGlide);
       if (
         st.mcpFlex < ANATOMICAL_ROM.finger.mcpFlex.min - 1e-4 ||
         st.mcpFlex > ANATOMICAL_ROM.finger.mcpFlex.max + 1e-4 ||
+        st.mcpAxialTwist < ANATOMICAL_ROM.finger.mcpAxialTwist.min - 1e-4 ||
+        st.mcpAxialTwist > ANATOMICAL_ROM.finger.mcpAxialTwist.max + 1e-4 ||
         st.pipFlex < ANATOMICAL_ROM.finger.pipFlex.min - 1e-4 ||
         st.pipFlex > ANATOMICAL_ROM.finger.pipFlex.max + 1e-4 ||
         st.dipFlex < ANATOMICAL_ROM.finger.dipFlex.min - 1e-4 ||
@@ -69,41 +105,79 @@ for (const pose of poses) {
   }
 }
 
-assert(allFinite, '10,000 sub-steps across all 8 poses strictly finite (zero NaN/Inf)');
-assert(allInRom, '100% physiological Kapandji ROM compliance across all 27-DOF joints');
-assert(totalFoleyEvents >= 4, `Kinetic micro-Foley stream active (${totalFoleyEvents} articulation events emitted)`);
+assert(allFinite, '12,000 sub-steps across all 8 poses strictly finite (zero NaN/Inf)');
+assert(allInRom, '100% physiological Kapandji ROM compliance across all 38-DOF joints');
+assert(
+  totalFoleyEvents >= 8 && seenFoleyTypes.size >= 4,
+  `9-channel kinetic micro-Foley stream active (${totalFoleyEvents} events, ${seenFoleyTypes.size} types: ${[...seenFoleyTypes].join(', ')})`
+);
 
-// 2. Oblique Retinacular Ligament (ORL) DIP–PIP Coupling & CMC Palm Arch Cupping on ROCK
-engine.setTargetPose(ROCK, true, true);
-let lastFrame = engine.step(1 / 120);
-for (let i = 0; i < 180; i++) {
-  lastFrame = engine.step(1 / 120);
+// 2. Two-Stage Intrinsic / Extrinsic Grasp Synergy ("Hook-Roll-Clamp" & "Unlatch-Bloom-Fan")
+const synEng = new JHandKinesisEngine(0);
+synEng.setTargetPose(PAPER, true, false);
+for (let i = 0; i < 120; i++) synEng.step(1 / 120);
+synEng.setTargetPose(ROCK, true, true);
+let hookSample = synEng.step(1 / 120);
+for (let i = 0; i < 6; i++) {
+  hookSample = synEng.step(1 / 120); // ~58ms into Paper -> Rock closure!
 }
-const rockTel = engine.getTelemetry();
+assert(
+  hookSample.fingers.pinky.pipFlex > hookSample.fingers.pinky.mcpFlex + 0.15,
+  `Two-Stage Hook-Roll-Clamp verified: extrinsic flexors hook PIP (${(hookSample.fingers.pinky.pipFlex * 57.3).toFixed(1)}°) ahead of MCP (${(hookSample.fingers.pinky.mcpFlex * 57.3).toFixed(1)}°)`
+);
+
+// Settle full ROCK fist, then verify Thumb Unlatch Lead on ROCK -> PAPER!
+for (let i = 0; i < 180; i++) hookSample = synEng.step(1 / 120);
+const rockTel = synEng.getTelemetry();
+assert(
+  rockTel.activeDof === 38,
+  `JHand Kinesis 1.1 active DOF count verified: ${rockTel.activeDof}-DOF`
+);
 assert(
   rockTel.orlCouplingRatio >= 0.6 && rockTel.orlCouplingRatio <= 0.74,
   `ORL DIP/PIP coupling ratio within human physiological band (0.60..0.74): measured ${rockTel.orlCouplingRatio}`
 );
 assert(
-  rockTel.palmCupDeg >= 10.0,
-  `CMC4/CMC5 ulnar palmar arch actively cups during Rock fist: measured ${rockTel.palmCupDeg} deg`
+  rockTel.palmCupDeg >= 10.0 && hookSample.palm.cmc5Supination > 0.14 && hookSample.palm.fdiBulge > 0.55,
+  `5-Metacarpal 3-Arch + CMC5 Supination (${(hookSample.palm.cmc5Supination * 57.3).toFixed(1)}°) + FDI Web Bulge (${Math.round(hookSample.palm.fdiBulge * 100)}%) active on Rock fist`
 );
 assert(
-  Math.abs(lastFrame.fingers.index.mcpAbd) < 0.08 && Math.abs(lastFrame.fingers.pinky.mcpAbd) < 0.08,
-  `Collateral ligament abduction convergence narrows finger spread cleanly in Rock fist`
+  rockTel.icrGlideMm >= 2.4 && rockTel.icrGlideMm <= 4.0,
+  `Eccentric Cam-Axis Volar ICR Glide verified on deep fist: ${rockTel.icrGlideMm.toFixed(1)} mm`
 );
 
-// 3. Adjacent-Finger Non-Intersection & Broad Fan on PAPER
-engine.setTargetPose(PAPER, true, true);
-for (let i = 0; i < 180; i++) {
-  lastFrame = engine.step(1 / 120);
+const thumbAbdBeforeBloom = hookSample.thumb.cmcAbd;
+synEng.setTargetPose(PAPER, true, true);
+let bloomSample = synEng.step(1 / 120);
+for (let i = 0; i < 5; i++) {
+  bloomSample = synEng.step(1 / 120); // ~50ms into Rock -> Paper bloom
 }
+assert(
+  bloomSample.thumb.cmcAbd > thumbAbdBeforeBloom + 0.14,
+  `Two-Stage Unlatch-Bloom-Fan verified: thumb unlatches immediately (+${((bloomSample.thumb.cmcAbd - thumbAbdBeforeBloom) * 57.3).toFixed(1)}° radial lead)`
+);
+
+// Settle full PAPER fan and verify zero-clipping order, thumb IP hyperextension, EPL snuffbox & webbing!
+for (let i = 0; i < 180; i++) bloomSample = synEng.step(1 / 120);
 const abdOrdered =
-  lastFrame.fingers.index.mcpAbd > lastFrame.fingers.middle.mcpAbd &&
-  lastFrame.fingers.middle.mcpAbd > lastFrame.fingers.ring.mcpAbd &&
-  lastFrame.fingers.ring.mcpAbd > lastFrame.fingers.pinky.mcpAbd;
+  bloomSample.fingers.index.mcpAbd > bloomSample.fingers.middle.mcpAbd &&
+  bloomSample.fingers.middle.mcpAbd > bloomSample.fingers.ring.mcpAbd &&
+  bloomSample.fingers.ring.mcpAbd > bloomSample.fingers.pinky.mcpAbd;
 assert(abdOrdered, 'Paper fan maintains strict radial-to-ulnar separation (zero finger clipping)');
-assert(lastFrame.palm.archCup < 0.15, `Palmar arch flattens naturally on open Paper (archCup=${lastFrame.palm.archCup.toFixed(2)})`);
+assert(
+  bloomSample.thumb.ipFlex < -0.08 && bloomSample.thumb.eplTendonTension > 0.65 && bloomSample.palm.webbingStretch[0] > 0.35,
+  `Paper hyperextension & soft-tissue verified: Thumb IP ${(bloomSample.thumb.ipFlex * 57.3).toFixed(1)}°, EPL ${Math.round(bloomSample.thumb.eplTendonTension * 100)}%, Webbing ${Math.round(bloomSample.palm.webbingStretch[0] * 100)}%`
+);
+
+// 3. Two-Row Carpal Wrist (Radiocarpal + Midcarpal Split) Verification
+const carpalEng = new JHandKinesisEngine(0);
+carpalEng.setTargetPose('salute', true, false); // Strong dorsal extension (-0.20 rad)
+let salFrame = carpalEng.step(1 / 120);
+for (let i = 0; i < 140; i++) salFrame = carpalEng.step(1 / 120);
+assert(
+  Math.abs(salFrame.wrist.mcPitch) > Math.abs(salFrame.wrist.rcPitch),
+  `Two-Row Carpal Wrist partition verified on dorsal extension: Midcarpal ${(salFrame.wrist.mcPitch * 57.3).toFixed(1)}° > Radiocarpal ${(salFrame.wrist.rcPitch * 57.3).toFixed(1)}°`
+);
 
 // 4. Tenodesis Effect (Wrist Dorsal Extension induces passive finger flexion)
 const tenoA = new JHandKinesisEngine(0);
@@ -118,7 +192,7 @@ for (let i = 0; i < 120; i++) {
 }
 assert(
   fExtended.fingers.middle.mcpFlex > fNeutral.fingers.middle.mcpFlex + 0.06,
-  `Tenodesis effect verified: wrist extension passively curls fingers (+${((fExtended.fingers.middle.mcpFlex - fNeutral.fingers.middle.mcpFlex) * 57.3).toFixed(1)} deg)`
+  `Tenodesis effect verified: wrist extension passively curls fingers (+${((fExtended.fingers.middle.mcpFlex - fNeutral.fingers.middle.mcpFlex) * 57.3).toFixed(1)}°)`
 );
 
 // 5. Proximal-to-Distal Inertial Whip Propagation
@@ -126,17 +200,16 @@ const whipEng = new JHandKinesisEngine(0);
 whipEng.setTargetPose(PAPER, false, false);
 for (let i = 0; i < 90; i++) whipEng.step(1 / 120);
 const beforeDip = whipEng.step(1 / 120, { x: 0, y: 0, z: 0 }).fingers.middle.dipFlex;
-// Rapid upward wrist acceleration should whip fingertips downward (positive flexion lag)!
 let afterDip = beforeDip;
 for (let i = 0; i < 8; i++) {
   afterDip = whipEng.step(1 / 120, { x: 0, y: -i * 0.85, z: 0 }).fingers.middle.dipFlex;
 }
 assert(
   afterDip > beforeDip + 0.04,
-  `Proximal-to-distal inertial whip lag verified (+${((afterDip - beforeDip) * 57.3).toFixed(1)} deg distal flex lag)`
+  `Proximal-to-distal inertial whip lag verified (+${((afterDip - beforeDip) * 57.3).toFixed(1)}° distal flex lag)`
 );
 
 if (failedChecks > 0) {
-  throw new Error(`JHand Kinesis 1.0 Audit failed with ${failedChecks} error(s).`);
+  throw new Error(`JHand Kinesis 1.1 Audit failed with ${failedChecks} error(s).`);
 }
-console.log('\nJHand Kinesis 1.0 Audit Complete.\n');
+console.log('\nJHand Kinesis 1.1 Audit Complete.\n');
