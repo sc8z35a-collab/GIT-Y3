@@ -19,7 +19,23 @@
 
 import { Move } from '../jnv1/types';
 
-export type HandPoseKey = 'ready' | 'windup' | 'envelop' | 'bow' | 'salute' | Move;
+export type HandPoseKey =
+  | 'ready'
+  | 'windup'
+  | 'envelop'
+  | 'bow'
+  | 'salute'
+  | 'guard'
+  | 'feint_flick'
+  | 'beckon'
+  | 'knuckle_crack'
+  | 'blade_edge'
+  | 'crane_poise'
+  | 'claw_charge'
+  | 'finger_gun'
+  | 'palm_meditate'
+  | 'victory_fist'
+  | Move;
 export type FingerName = 'index' | 'middle' | 'ring' | 'pinky';
 export type JHandQualityMode = 'biomech_ultra' | 'biomech_pro' | 'standard';
 

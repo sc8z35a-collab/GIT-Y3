@@ -111,6 +111,23 @@ export class JNV1Core {
     return this.pending!.seal;
   }
 
+  /**
+   * Non-cheating read-only Feint (牽制) tell generator.
+   * Reads the ALREADY SHA-256-committed next move without ever altering it,
+   * deterministically revealing ONE move that JNV1.0 did NOT seal, plus a subtle
+   * neuromuscular stance cue ('tight' | 'poised' | 'open') for 3D hand micro-tell choreography.
+   */
+  getFeintTellHint(): { ruledOutMove: Move; stanceCue: 'tight' | 'poised' | 'open' } {
+    if (!this.pending) this.commitNextMove();
+    const committed = this.pending!.chosenNpcMove;
+    const otherMoves = ([0, 1, 2] as Move[]).filter((m) => m !== committed);
+    const saltByte = parseInt(this.pending!.seal.salt.slice(0, 2), 16) || 0;
+    const ruledOutMove = otherMoves[saltByte % 2];
+    const stanceCue: 'tight' | 'poised' | 'open' =
+      committed === 0 ? 'tight' : committed === 1 ? 'poised' : 'open';
+    return { ruledOutMove, stanceCue };
+  }
+
   getLastTelemetry(): JNVRoundTelemetry | null {
     return this.lastTelemetry;
   }

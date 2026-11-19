@@ -328,6 +328,166 @@ const ANATOMICAL_POSES: Record<HandPoseKey, FullAnatomicalTarget> = {
     palmCupBias: 0.12,
     effort: 0.45,
   },
+  guard: {
+    // Martial Tegatana defensive stance: lightly cupped angled barrier, ready to counter!
+    thumb: { cmcFlex: 0.44, cmcAbd: -0.34, cmcPronation: 0.34, mcpFlex: 0.34, mcpAbd: 0.04, ipFlex: 0.2 },
+    fingers: {
+      index: { mcpFlex: 0.16, mcpAbd: 0.06, pipFlex: 0.24, dipFlex: 0.16 },
+      middle: { mcpFlex: 0.2, mcpAbd: 0.01, pipFlex: 0.28, dipFlex: 0.18 },
+      ring: { mcpFlex: 0.26, mcpAbd: -0.04, pipFlex: 0.34, dipFlex: 0.22 },
+      pinky: { mcpFlex: 0.32, mcpAbd: -0.09, pipFlex: 0.38, dipFlex: 0.24 },
+    },
+    wristPitch: -0.1,
+    wristYaw: 0.12,
+    wristRoll: 0.3,
+    forearmPronation: 0.52,
+    palmCupBias: 0.34,
+    effort: 0.56,
+  },
+  feint_flick: {
+    // Crisp high-speed feint flick: index & middle whip half-open while ulnar grip stays coiled
+    thumb: { cmcFlex: 0.3, cmcAbd: -0.18, cmcPronation: 0.18, mcpFlex: 0.18, mcpAbd: -0.02, ipFlex: 0.1 },
+    fingers: {
+      index: { mcpFlex: -0.14, mcpAbd: 0.22, pipFlex: 0.12, dipFlex: 0.06 },
+      middle: { mcpFlex: -0.06, mcpAbd: -0.1, pipFlex: 0.24, dipFlex: 0.14 },
+      ring: { mcpFlex: 1.08, mcpAbd: -0.06, pipFlex: 1.24, dipFlex: 0.8 },
+      pinky: { mcpFlex: 1.24, mcpAbd: -0.12, pipFlex: 1.38, dipFlex: 0.88 },
+    },
+    wristPitch: -0.16,
+    wristYaw: 0.18,
+    wristRoll: -0.22,
+    forearmPronation: -0.12,
+    palmCupBias: 0.42,
+    effort: 0.72,
+  },
+  beckon: {
+    // Confident supinated taunt beckon: palm rolled upward, digits curled invitingly
+    thumb: { cmcFlex: 0.28, cmcAbd: -0.06, cmcPronation: 0.12, mcpFlex: 0.22, mcpAbd: 0.0, ipFlex: 0.18 },
+    fingers: {
+      index: { mcpFlex: 0.68, mcpAbd: 0.12, pipFlex: 0.96, dipFlex: 0.62 },
+      middle: { mcpFlex: 0.78, mcpAbd: 0.02, pipFlex: 1.06, dipFlex: 0.68 },
+      ring: { mcpFlex: 0.92, mcpAbd: -0.06, pipFlex: 1.18, dipFlex: 0.76 },
+      pinky: { mcpFlex: 1.06, mcpAbd: -0.12, pipFlex: 1.26, dipFlex: 0.82 },
+    },
+    wristPitch: -0.24,
+    wristYaw: 0.05,
+    wristRoll: -0.34,
+    forearmPronation: -0.68,
+    palmCupBias: 0.46,
+    effort: 0.42,
+  },
+  knuckle_crack: {
+    // Pre-duel tension flex: deep proximal MCP roll with firm thumb opposition & taut extensor cords
+    thumb: { cmcFlex: 0.68, cmcAbd: -0.68, cmcPronation: 0.6, mcpFlex: 0.62, mcpAbd: 0.08, ipFlex: 0.56 },
+    fingers: {
+      index: { mcpFlex: 1.24, mcpAbd: 0.11, pipFlex: 1.38, dipFlex: 0.84 },
+      middle: { mcpFlex: 1.32, mcpAbd: 0.02, pipFlex: 1.44, dipFlex: 0.9 },
+      ring: { mcpFlex: 1.38, mcpAbd: -0.06, pipFlex: 1.48, dipFlex: 0.92 },
+      pinky: { mcpFlex: 1.42, mcpAbd: -0.14, pipFlex: 1.5, dipFlex: 0.94 },
+    },
+    wristPitch: 0.28,
+    wristYaw: -0.08,
+    wristRoll: 0.18,
+    forearmPronation: 0.36,
+    palmCupBias: 0.72,
+    effort: 0.88,
+  },
+  blade_edge: {
+    // Shuto vertical knife-hand chop: 4 fingers razor-aligned & compressed, thumb tightly tucked!
+    thumb: { cmcFlex: 0.58, cmcAbd: -0.46, cmcPronation: 0.48, mcpFlex: 0.48, mcpAbd: 0.1, ipFlex: 0.36 },
+    fingers: {
+      index: { mcpFlex: -0.14, mcpAbd: -0.06, pipFlex: 0.01, dipFlex: 0.0 },
+      middle: { mcpFlex: -0.14, mcpAbd: -0.02, pipFlex: 0.01, dipFlex: 0.0 },
+      ring: { mcpFlex: -0.12, mcpAbd: 0.03, pipFlex: 0.02, dipFlex: 0.0 },
+      pinky: { mcpFlex: -0.08, mcpAbd: 0.07, pipFlex: 0.02, dipFlex: 0.01 },
+    },
+    wristPitch: -0.06,
+    wristYaw: -0.12,
+    wristRoll: 0.48,
+    forearmPronation: 0.86,
+    palmCupBias: 0.22,
+    effort: 0.92,
+  },
+  crane_poise: {
+    // Tsuru-no-Kamae classical crane beak: thumb pinched cleanly to index/middle, ring/pinky fanned!
+    thumb: { cmcFlex: 0.64, cmcAbd: -0.58, cmcPronation: 0.78, mcpFlex: 0.34, mcpAbd: 0.04, ipFlex: 0.14 },
+    fingers: {
+      index: { mcpFlex: 0.88, mcpAbd: -0.06, pipFlex: 0.62, dipFlex: 0.42 },
+      middle: { mcpFlex: 0.92, mcpAbd: 0.04, pipFlex: 0.66, dipFlex: 0.44 },
+      ring: { mcpFlex: 0.12, mcpAbd: -0.14, pipFlex: 0.26, dipFlex: 0.16 },
+      pinky: { mcpFlex: -0.1, mcpAbd: -0.26, pipFlex: 0.14, dipFlex: 0.08 },
+    },
+    wristPitch: 0.44,
+    wristYaw: 0.06,
+    wristRoll: 0.12,
+    forearmPronation: 0.22,
+    palmCupBias: 0.54,
+    effort: 0.58,
+  },
+  claw_charge: {
+    // Spirit Overdrive (極一撃) coiled tiger-claw tension: MCP hyperextended, PIP/DIP fiercely hooked!
+    thumb: { cmcFlex: 0.38, cmcAbd: 0.18, cmcPronation: 0.22, mcpFlex: 0.36, mcpAbd: -0.04, ipFlex: 0.88 },
+    fingers: {
+      index: { mcpFlex: -0.22, mcpAbd: 0.26, pipFlex: 1.18, dipFlex: 0.86 },
+      middle: { mcpFlex: -0.24, mcpAbd: 0.05, pipFlex: 1.24, dipFlex: 0.92 },
+      ring: { mcpFlex: -0.2, mcpAbd: -0.12, pipFlex: 1.22, dipFlex: 0.9 },
+      pinky: { mcpFlex: -0.16, mcpAbd: -0.26, pipFlex: 1.16, dipFlex: 0.84 },
+    },
+    wristPitch: -0.26,
+    wristYaw: 0.0,
+    wristRoll: 0.04,
+    forearmPronation: -0.16,
+    palmCupBias: 0.48,
+    effort: 0.98,
+  },
+  finger_gun: {
+    // Decisive victory flourish point: index straight & poised, thumb elevated, ulnar fingers locked
+    thumb: { cmcFlex: 0.06, cmcAbd: 0.24, cmcPronation: -0.18, mcpFlex: 0.04, mcpAbd: -0.06, ipFlex: -0.14 },
+    fingers: {
+      index: { mcpFlex: -0.12, mcpAbd: 0.08, pipFlex: 0.02, dipFlex: 0.0 },
+      middle: { mcpFlex: 1.48, mcpAbd: -0.02, pipFlex: 1.66, dipFlex: 1.08 },
+      ring: { mcpFlex: 1.56, mcpAbd: -0.05, pipFlex: 1.7, dipFlex: 1.1 },
+      pinky: { mcpFlex: 1.6, mcpAbd: -0.08, pipFlex: 1.7, dipFlex: 1.08 },
+    },
+    wristPitch: -0.04,
+    wristYaw: 0.08,
+    wristRoll: 0.36,
+    forearmPronation: 0.68,
+    palmCupBias: 0.68,
+    effort: 0.78,
+  },
+  palm_meditate: {
+    // Tranquil Zen supinated open palm: serene curvature for PV intro & tea-room stillness
+    thumb: { cmcFlex: 0.14, cmcAbd: 0.12, cmcPronation: -0.12, mcpFlex: 0.1, mcpAbd: -0.02, ipFlex: 0.06 },
+    fingers: {
+      index: { mcpFlex: 0.12, mcpAbd: 0.1, pipFlex: 0.18, dipFlex: 0.12 },
+      middle: { mcpFlex: 0.16, mcpAbd: 0.01, pipFlex: 0.22, dipFlex: 0.14 },
+      ring: { mcpFlex: 0.22, mcpAbd: -0.06, pipFlex: 0.28, dipFlex: 0.18 },
+      pinky: { mcpFlex: 0.28, mcpAbd: -0.12, pipFlex: 0.32, dipFlex: 0.2 },
+    },
+    wristPitch: 0.06,
+    wristYaw: 0.0,
+    wristRoll: -0.44,
+    forearmPronation: -0.78,
+    palmCupBias: 0.24,
+    effort: 0.14,
+  },
+  victory_fist: {
+    // Proud triumphant clenched fist with strong radial tilt & firm thumb seal
+    thumb: { cmcFlex: 0.84, cmcAbd: -0.92, cmcPronation: 0.82, mcpFlex: 0.76, mcpAbd: 0.14, ipFlex: 0.68 },
+    fingers: {
+      index: { mcpFlex: 1.58, mcpAbd: 0.02, pipFlex: 1.74, dipFlex: 1.16 },
+      middle: { mcpFlex: 1.62, mcpAbd: 0.0, pipFlex: 1.76, dipFlex: 1.18 },
+      ring: { mcpFlex: 1.64, mcpAbd: -0.02, pipFlex: 1.76, dipFlex: 1.16 },
+      pinky: { mcpFlex: 1.66, mcpAbd: -0.04, pipFlex: 1.74, dipFlex: 1.14 },
+    },
+    wristPitch: -0.22,
+    wristYaw: 0.14,
+    wristRoll: -0.26,
+    forearmPronation: -0.42,
+    palmCupBias: 1.0,
+    effort: 1.0,
+  },
 };
 
 /** Irrational-frequency 1/f pink quasi-stochastic drift generator (zero cyclic repetition!) */
@@ -477,11 +637,22 @@ export class JHandKinesisEngine {
     this.idleDrumWeight = poseKey === 'ready' && !hoverMode ? 1.0 : 0.0;
 
     // Classify authentic human 2-stage grasp/release neuromotor synergy!
-    if (poseKey === ROCK || poseKey === 'windup') {
+    if (
+      poseKey === ROCK ||
+      poseKey === 'windup' ||
+      poseKey === 'victory_fist' ||
+      poseKey === 'knuckle_crack'
+    ) {
       this.activeSynergy = 'hook_roll_clamp';
-    } else if (poseKey === PAPER || poseKey === 'salute') {
+    } else if (
+      poseKey === PAPER ||
+      poseKey === 'salute' ||
+      poseKey === 'blade_edge' ||
+      poseKey === 'palm_meditate' ||
+      poseKey === 'guard'
+    ) {
       this.activeSynergy = 'unlatch_bloom_fan';
-    } else if (poseKey === SCISSORS) {
+    } else if (poseKey === SCISSORS || poseKey === 'feint_flick' || poseKey === 'finger_gun') {
       this.activeSynergy = 'clamp_fire_shear';
     } else {
       this.activeSynergy = 'neutral';
@@ -529,6 +700,10 @@ export class JHandKinesisEngine {
     }
   }
 
+  public getPoseCount(): number {
+    return Object.keys(ANATOMICAL_POSES).length;
+  }
+
   public triggerScissorsSnip(): void {
     this.scissorSnipTimer = 0.56;
     this.lastSnipPulseIdx = -1;
@@ -538,6 +713,64 @@ export class JHandKinesisEngine {
     this.thoughtPulse = 1.0;
     this.forearmPron.addTorqueImpulse(-1.15);
     this.mcPitch.addTorqueImpulse(-0.65);
+  }
+
+  /** Explosive wrist-flick feint impulse for tactical 牽制 (Feint) choreography */
+  public triggerFeintFlick(): void {
+    this.forearmPron.addTorqueImpulse(-2.6);
+    this.wristYaw.addTorqueImpulse(1.9);
+    this.rcPitch.addTorqueImpulse(-1.5);
+    this.fingers.index.mcpFlex.addTorqueImpulse(-3.4);
+    this.fingers.middle.mcpFlex.addTorqueImpulse(-2.6);
+    this.fingers.ring.pipFlex.addTorqueImpulse(2.2);
+    this.fingers.pinky.pipFlex.addTorqueImpulse(2.8);
+  }
+
+  /** Sequential pre-duel knuckle tension ripple (pinky -> index) */
+  public triggerKnuckleFlex(): void {
+    const order: FingerName[] = ['pinky', 'ring', 'middle', 'index'];
+    order.forEach((fn, idx) => {
+      const k = 1.6 + idx * 0.45;
+      this.fingers[fn].mcpFlex.addTorqueImpulse(k);
+      this.fingers[fn].pipFlex.addTorqueImpulse(k * 1.35);
+      this.fingers[fn].dipFlex.addTorqueImpulse(k * 0.9);
+    });
+    this.cmc5.addTorqueImpulse(1.2);
+    this.thumb.cmcFlex.addTorqueImpulse(1.4);
+  }
+
+  /** Celebratory post-clash rolling finger flourish wave */
+  public triggerVictoryRoll(): void {
+    this.forearmPron.addTorqueImpulse(-2.2);
+    this.mcPitch.addTorqueImpulse(-1.8);
+    this.fingers.index.mcpFlex.addTorqueImpulse(-2.2);
+    this.fingers.middle.mcpFlex.addTorqueImpulse(-1.6);
+    this.fingers.ring.mcpFlex.addTorqueImpulse(-1.1);
+    this.fingers.pinky.mcpFlex.addTorqueImpulse(-0.7);
+    this.thumb.cmcAbd.addTorqueImpulse(1.5);
+  }
+
+  /** Subtle non-cheating NPC neuromuscular micro-tell triggered on player Feint */
+  public triggerNpcTell(stanceCue: 'tight' | 'poised' | 'open'): void {
+    this.thoughtPulse = 0.85;
+    if (stanceCue === 'tight') {
+      // Subtle inward metacarpal tension ripple
+      this.cmc5.addTorqueImpulse(0.95);
+      this.fingers.ring.pipFlex.addTorqueImpulse(1.65);
+      this.fingers.pinky.pipFlex.addTorqueImpulse(1.85);
+      this.thumb.cmcFlex.addTorqueImpulse(1.1);
+    } else if (stanceCue === 'poised') {
+      // Subtle radial index/middle edge readiness twitch
+      this.fingers.index.mcpAbd.addTorqueImpulse(1.15);
+      this.fingers.middle.mcpFlex.addTorqueImpulse(-1.1);
+      this.forearmPron.addTorqueImpulse(1.1);
+    } else {
+      // Subtle palmar extension & thumb unlatch micro-twitch
+      this.thumb.cmcAbd.addTorqueImpulse(1.25);
+      this.fingers.index.mcpFlex.addTorqueImpulse(-1.25);
+      this.fingers.pinky.mcpAbd.addTorqueImpulse(-0.95);
+      this.mcPitch.addTorqueImpulse(-0.9);
+    }
   }
 
   public injectClashShock(intensity: number): void {

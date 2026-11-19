@@ -21,9 +21,28 @@ console.log('\n=== JHand Kinesis 1.1 — 38-DOF Anatomical Micro-Kinematics Audi
 
 const engine = new JHandKinesisEngine(0);
 const fingerNames: FingerName[] = ['index', 'middle', 'ring', 'pinky'];
-const poses: HandPoseKey[] = ['ready', 'windup', ROCK, SCISSORS, PAPER, 'envelop', 'bow', 'salute'];
+const poses: HandPoseKey[] = [
+  'ready',
+  'windup',
+  ROCK,
+  SCISSORS,
+  PAPER,
+  'envelop',
+  'bow',
+  'salute',
+  'guard',
+  'feint_flick',
+  'beckon',
+  'knuckle_crack',
+  'blade_edge',
+  'crane_poise',
+  'claw_charge',
+  'finger_gun',
+  'palm_meditate',
+  'victory_fist',
+];
 
-// 1. 12,000-step ROM Compliance, Numerical Stability & 9-Channel Foley Audit across all 8 poses
+// 1. 18,000-step ROM Compliance, Numerical Stability & 9-Channel Foley Audit across ALL 18 poses
 let allFinite = true;
 let allInRom = true;
 const seenFoleyTypes = new Set<string>();
@@ -32,7 +51,11 @@ let totalFoleyEvents = 0;
 for (const pose of poses) {
   engine.setTargetPose(pose, true, true);
   if (pose === SCISSORS) engine.triggerScissorsSnip();
-  for (let i = 0; i < 1500; i++) {
+  if (pose === 'feint_flick') engine.triggerFeintFlick();
+  if (pose === 'knuckle_crack') engine.triggerKnuckleFlex();
+  if (pose === 'victory_fist') engine.triggerVictoryRoll();
+  if (pose === 'guard') engine.triggerNpcTell('poised');
+  for (let i = 0; i < 1000; i++) {
     const f = engine.step(
       1 / 120,
       { x: Math.sin(i * 0.08) * 1.9, y: Math.cos(i * 0.1) * 2.3, z: 0 },
@@ -105,8 +128,8 @@ for (const pose of poses) {
   }
 }
 
-assert(allFinite, '12,000 sub-steps across all 8 poses strictly finite (zero NaN/Inf)');
-assert(allInRom, '100% physiological Kapandji ROM compliance across all 38-DOF joints');
+assert(allFinite, `18,000 sub-steps across all ${poses.length} anatomical poses strictly finite (zero NaN/Inf)`);
+assert(allInRom, `100% physiological Kapandji ROM compliance across all 38-DOF joints & ${poses.length} poses`);
 assert(
   totalFoleyEvents >= 8 && seenFoleyTypes.size >= 4,
   `9-channel kinetic micro-Foley stream active (${totalFoleyEvents} events, ${seenFoleyTypes.size} types: ${[...seenFoleyTypes].join(', ')})`

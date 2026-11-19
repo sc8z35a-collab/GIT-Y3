@@ -927,6 +927,33 @@ export class SculptedHandRig {
     this.extraRollS.impulse(-0.6 * this.mirrorSign);
   }
 
+  public triggerFeintFlick(): void {
+    this.kinesis.triggerFeintFlick();
+    this.offX.impulse(0.45 * this.mirrorSign);
+    this.extraYawS.impulse(1.35 * this.mirrorSign);
+    this.extraRollS.impulse(-1.45 * this.mirrorSign);
+  }
+
+  public triggerKnuckleFlex(): void {
+    this.kinesis.triggerKnuckleFlex();
+    this.extraPitchS.impulse(0.95);
+    this.extraRollS.impulse(0.55 * this.mirrorSign);
+  }
+
+  public triggerVictoryRoll(): void {
+    this.kinesis.triggerVictoryRoll();
+    this.offY.impulse(0.55);
+    this.extraPitchS.impulse(-1.1);
+    this.extraRollS.impulse(-0.85 * this.mirrorSign);
+  }
+
+  public triggerNpcTell(stanceCue: 'tight' | 'poised' | 'open'): void {
+    this.kinesis.triggerNpcTell(stanceCue);
+    const dir = stanceCue === 'tight' ? 0.55 : stanceCue === 'poised' ? -0.45 : 0.25;
+    this.extraRollS.impulse(dir * this.mirrorSign);
+    this.extraPitchS.impulse(stanceCue === 'open' ? -0.5 : 0.4);
+  }
+
   public triggerRecoil(intensity = 1.0, axisDir = 1): void {
     this.recoilPulse = Math.max(this.recoilPulse, intensity);
     this.recoilAxis = axisDir;

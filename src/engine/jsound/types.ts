@@ -1,27 +1,37 @@
 /**
- * ★ JSound Engin 1.1 — High-Resolution Physical-Modeling & 3D Spatial Acoustic Engine Types ★
+ * ★ JSound Engin 1.2 — Ultra-High-Resolution 192kHz 4×OS Physical-Modeling & True 3D Spatial Engine ★
  *
- * Upgraded v1.1 acoustic architecture:
- *  - 3 Quality Tiers (`ultra`: 2× 96kHz oversampled transients + 24 modes + 62-ray 4-band IR + HRTF,
- *    `pro`: 16 modes + 24-ray IR + HRTF, `lite`: 8 modes + fast IR + equal-power)
- *  - 24 Physically Calibrated Acoustic Materials (4 craft hands, 5 tabletops, percussion, bells,
- *    chimes, garden bamboo, clockwork, nails, paper/hearth micro-elements)
- *  - 4 Sleeve Textile Aerodynamic Profiles mapped directly to each craft hand preset
- *  - 8 Interactive Physical Instruments & World Soundscape Actors
+ * Upgraded v1.2 acoustic architecture (zero external audio files):
+ *  - 3 Quality Tiers:
+ *      · `ultra`: 192 kHz 4× Cascade Kaiser FIR Oversampling + 24 modes + 4th-Order 128-Ray 3D Elevation IR + Binaural HRTF + Doppler
+ *      · `pro`  : 96 kHz 2× Oversampling + 16 modes + 3rd-Order 62-Ray 3D Elevation IR + Binaural HRTF + Doppler
+ *      · `lite` : 48 kHz + 8 modes + fast 1st-Order IR + equal-power stereo
+ *  - 32 Physically Calibrated Acoustic Materials (4 craft hands, 5 tabletops, percussion, bells,
+ *    chimes, garden bamboo, Shamisen/Biwa/Sho/Mokugyo/Tamahagane steel/Atarigane/Sensu/Granite)
+ *  - 18 Pure-Physical-Modeling Instruments & World Soundscape Actors (15 interactive in Studio Deck!)
+ *  - 3 Selectable 3D Spatial Imaging Modes (`binaural_3d`, `studio_wide`, `focused`) with Mid/Side Air Width
  */
 
 import { HandMaterialPreset, StageId } from '../../graphics/GraphicsConfig';
 
 export type JSoundQualityMode = 'ultra' | 'pro' | 'lite';
+export type JSoundSpatialMode = 'binaural_3d' | 'studio_wide' | 'focused';
 
 export type AuditionInstrumentId =
   | 'taiko'
   | 'kotsuzumi'
   | 'koto'
+  | 'shamisen'
+  | 'biwa'
   | 'shakuhachi'
+  | 'shinobue'
+  | 'sho'
   | 'rin_bell'
+  | 'atarigane'
+  | 'mokugyo'
   | 'hyoshigi'
   | 'furin'
+  | 'sensu'
   | 'shishi_odoshi';
 
 export interface Vec3 {
@@ -33,6 +43,7 @@ export interface Vec3 {
 export interface JSoundSettings {
   enabled: boolean;
   quality: JSoundQualityMode;
+  spatialMode: JSoundSpatialMode;
   ambienceEnabled: boolean;
   masterVolume: number; // 0..1
 }
@@ -41,12 +52,16 @@ export interface JSoundTelemetry {
   engineName: string;
   enabled: boolean;
   quality: JSoundQualityMode;
+  spatialMode: JSoundSpatialMode;
   ambienceEnabled: boolean;
   stageId: StageId;
   stageRt60Sec: number;
   earlyRayCount: number;
   internalDspRateHz: number;
+  oversamplingFactor: number;
   soundCatalogCount: number;
+  instrumentCount: number;
+  materialCount: number;
   activeVoices: number;
   sampleRate: number;
   peakDb: number;
@@ -147,11 +162,19 @@ export type AcousticMaterialId =
   | 'bronze_nail'
   | 'pendulum_clock_tick'
   | 'hearth_charcoal_pop'
-  | 'cedar_eave_creak';
+  | 'cedar_eave_creak'
+  | 'tsugaru_shamisen_body'
+  | 'biwa_mulberry_body'
+  | 'sho_bamboo_reed'
+  | 'mokugyo_camphor'
+  | 'katana_tamahagane'
+  | 'kane_chanchiki'
+  | 'sensu_bamboo_paper'
+  | 'stone_lantern_granite';
 
 /**
- * 24 Physically Calibrated Multi-Mode Material Spectra (up to 20–24 modes in Ultra).
- * Derived from Euler-Bernoulli orthotropic wood bars, Kirchhoff bronze/glass shells,
+ * 32 Physically Calibrated Multi-Mode Material Spectra (up to 20–24 modes in Ultra).
+ * Derived from Euler-Bernoulli orthotropic wood bars, Kirchhoff bronze/glass/steel shells,
  * vitreous porcelain bells, volcanic obsidian, and traditional Japanese craft materials.
  */
 export const ACOUSTIC_MATERIALS: Record<AcousticMaterialId, ModalSpec> = {
@@ -466,6 +489,111 @@ export const ACOUSTIC_MATERIALS: Record<AcousticMaterialId, ModalSpec> = {
     surfaceGrain: 0.52,
     bodyHz: 122,
     labelJp: '檜軋み',
+  },
+  tsugaru_shamisen_body: {
+    // Stretched taut leather soundbox struck by ivory bachi plectrum!
+    fundamentalHz: 285,
+    ratios: [1.0, 1.58, 2.19, 2.94, 3.85, 4.92, 6.24, 7.82, 9.6, 11.7],
+    amps: [1.0, 0.84, 0.68, 0.52, 0.39, 0.28, 0.19, 0.13, 0.085, 0.052],
+    decays: [0.068, 0.05, 0.036, 0.026, 0.019, 0.013, 0.0095, 0.0068, 0.0048, 0.0034],
+    contactMs: 0.24,
+    surfaceGrain: 0.46,
+    bodyHz: 165,
+    pitchGlideAmt: 0.024,
+    pitchGlideMs: 8,
+    stereoParity: 0.36,
+    labelJp: '津軽三味線胴',
+  },
+  biwa_mulberry_body: {
+    // Deep carved mulberry-wood pear soundbox with resonant warm chest!
+    fundamentalHz: 196,
+    ratios: [1.0, 1.72, 2.58, 3.64, 4.88, 6.32, 8.05, 10.1, 12.4],
+    amps: [1.0, 0.78, 0.56, 0.4, 0.28, 0.19, 0.125, 0.08, 0.048],
+    decays: [0.16, 0.115, 0.082, 0.056, 0.038, 0.025, 0.017, 0.011, 0.0075],
+    contactMs: 0.42,
+    surfaceGrain: 0.4,
+    bodyHz: 112,
+    pitchGlideAmt: 0.016,
+    pitchGlideMs: 11,
+    stereoParity: 0.34,
+    labelJp: '薩摩琵琶胴',
+  },
+  sho_bamboo_reed: {
+    // Smoked susudake bamboo pipe + brass free-reed chime body
+    fundamentalHz: 660,
+    ratios: [1.0, 2.0, 3.0, 4.01, 5.02, 6.04, 7.08, 8.15],
+    amps: [1.0, 0.62, 0.48, 0.3, 0.22, 0.14, 0.085, 0.048],
+    decays: [0.45, 0.36, 0.28, 0.21, 0.15, 0.1, 0.068, 0.042],
+    contactMs: 1.8,
+    surfaceGrain: 0.16,
+    doubletSplitHz: 1.15,
+    stereoParity: 0.42,
+    labelJp: '雅楽笙竹管',
+  },
+  mokugyo_camphor: {
+    // Hollow carved camphor-wood temple slit drum (木魚) — iconic woody Helmholtz knock!
+    fundamentalHz: 428,
+    ratios: [1.0, 1.44, 2.32, 3.48, 4.95, 6.62, 8.5, 10.7],
+    amps: [1.0, 0.88, 0.52, 0.32, 0.19, 0.11, 0.062, 0.034],
+    decays: [0.115, 0.082, 0.048, 0.03, 0.019, 0.012, 0.008, 0.0052],
+    contactMs: 0.78,
+    surfaceGrain: 0.3,
+    bodyHz: 292,
+    pitchGlideAmt: 0.02,
+    pitchGlideMs: 9,
+    stereoParity: 0.32,
+    labelJp: '楠木魚',
+  },
+  katana_tamahagane: {
+    // Folded Japanese Tamahagane steel blade — crystalline singing upper harmonics!
+    fundamentalHz: 1180,
+    ratios: [1.0, 2.12, 3.42, 4.96, 6.72, 8.68, 10.85, 13.2, 15.8, 18.6, 21.7, 25.0],
+    amps: [0.86, 0.78, 0.66, 0.56, 0.46, 0.38, 0.3, 0.23, 0.17, 0.12, 0.082, 0.055],
+    decays: [0.64, 0.52, 0.41, 0.31, 0.23, 0.17, 0.125, 0.09, 0.064, 0.046, 0.032, 0.022],
+    contactMs: 0.11,
+    surfaceGrain: 0.2,
+    doubletSplitHz: 3.6,
+    stereoParity: 0.52,
+    labelJp: '玉鋼刀身',
+  },
+  kane_chanchiki: {
+    // Hand-held brass festival gong (摺鉦 / 当り鉦) struck with deer-horn shumoku!
+    fundamentalHz: 845,
+    ratios: [1.0, 1.66, 2.48, 3.52, 4.74, 6.18, 7.82, 9.65, 11.7, 13.9, 16.4, 19.1],
+    amps: [0.94, 0.84, 0.72, 0.58, 0.46, 0.35, 0.26, 0.19, 0.135, 0.092, 0.062, 0.04],
+    decays: [0.58, 0.44, 0.32, 0.23, 0.165, 0.115, 0.08, 0.055, 0.038, 0.026, 0.018, 0.012],
+    contactMs: 0.16,
+    surfaceGrain: 0.24,
+    doubletSplitHz: 4.8,
+    bodyHz: 422,
+    pitchGlideAmt: 0.014,
+    pitchGlideMs: 8,
+    stereoParity: 0.5,
+    labelJp: '摺鉦真鍮',
+  },
+  sensu_bamboo_paper: {
+    // Split Moso bamboo ribs snapping laminated gilded washi pleats open!
+    fundamentalHz: 740,
+    ratios: [1.0, 1.82, 2.86, 4.15, 5.68, 7.45, 9.5, 11.8],
+    amps: [0.92, 0.76, 0.58, 0.42, 0.3, 0.2, 0.13, 0.08],
+    decays: [0.042, 0.03, 0.022, 0.015, 0.011, 0.0075, 0.0052, 0.0036],
+    contactMs: 0.28,
+    surfaceGrain: 0.68,
+    bodyHz: 310,
+    stereoParity: 0.44,
+    labelJp: '舞扇竹和紙',
+  },
+  stone_lantern_granite: {
+    // Weathered garden granite lantern & wet river cobblestone resonance
+    fundamentalHz: 510,
+    ratios: [1.0, 1.78, 2.72, 3.88, 5.26, 6.84, 8.62, 10.6],
+    amps: [0.95, 0.72, 0.5, 0.34, 0.22, 0.14, 0.085, 0.05],
+    decays: [0.09, 0.062, 0.042, 0.028, 0.019, 0.013, 0.0085, 0.0058],
+    contactMs: 0.29,
+    surfaceGrain: 0.54,
+    bodyHz: 188,
+    stereoParity: 0.3,
+    labelJp: '御影石灯籠',
   },
 };
 

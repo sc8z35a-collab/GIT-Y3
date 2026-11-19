@@ -1,0 +1,20 @@
+{
+  "name": "JANKEN · 極 — 3D高精細じゃんけん",
+  "short_name": "JANKEN · 極",
+  "description": "3D高精細工芸じゃんけん — JNV1.0 · JHand Kinesis 1.1 · JSound Engin 1.2 · KHDR · Shadow Flame 1.0",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#14110e",
+  "theme_color": "#14110e",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23181512'/%3E%3Crect x='18' y='18' width='156' height='156' rx='24' fill='none' stroke='%23bc4b39' stroke-width='10'/%3E%3Ctext x='96' y='132' text-anchor='middle' font-family='serif' font-size='104' font-weight='700' fill='%23bc4b39'%3E%E6%A5%B5%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

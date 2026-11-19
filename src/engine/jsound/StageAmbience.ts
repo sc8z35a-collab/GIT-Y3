@@ -22,7 +22,10 @@ export type SoundscapeActorKind =
   | 'cedar_creak'
   | 'water_droplet'
   | 'hearth_pop'
-  | 'chronometer_tick';
+  | 'chronometer_tick'
+  | 'distant_mokugyo'
+  | 'distant_shamisen'
+  | 'distant_shinobue';
 
 export interface StageSoundscapeSpec {
   minIntervalSec: number;
@@ -39,24 +42,32 @@ export interface StageSoundscapeSpec {
 
 export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
   zashiki: {
-    minIntervalSec: 4.8,
-    maxIntervalSec: 9.2,
+    minIntervalSec: 4.4,
+    maxIntervalSec: 8.6,
     actors: [
       {
         kind: 'shishi_odoshi',
-        weight: 0.48,
+        weight: 0.42,
         gain: 0.14,
-        pos: { x: -3.2, y: 0.4, z: -2.4 },
+        pos: { x: -3.4, y: 0.35, z: -2.5 },
         posJitter: { x: 0.4, y: 0.1, z: 0.3 },
         labelJp: '庭・鹿威し',
       },
       {
         kind: 'furin',
-        weight: 0.52,
+        weight: 0.42,
         gain: 0.085,
-        pos: { x: 2.7, y: 1.85, z: -1.6 },
-        posJitter: { x: 0.35, y: 0.15, z: 0.25 },
+        pos: { x: 2.8, y: 2.05, z: -1.6 },
+        posJitter: { x: 0.35, y: 0.18, z: 0.25 },
         labelJp: '縁側・江戸風鈴',
+      },
+      {
+        kind: 'distant_shamisen',
+        weight: 0.16,
+        gain: 0.055,
+        pos: { x: -4.2, y: 1.1, z: -3.6 },
+        posJitter: { x: 0.5, y: 0.2, z: 0.4 },
+        labelJp: '遠音・三味線一撥',
       },
     ],
   },
@@ -66,57 +77,89 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     actors: [
       {
         kind: 'pendulum_clock',
-        weight: 1.0,
+        weight: 0.86,
         gain: 0.095,
-        pos: { x: 3.6, y: 1.5, z: -3.4 },
+        pos: { x: 3.6, y: 1.55, z: -3.4 },
         posJitter: { x: 0.1, y: 0.05, z: 0.1 },
         labelJp: '大広間・振子時計',
+      },
+      {
+        kind: 'furin',
+        weight: 0.14,
+        gain: 0.048,
+        pos: { x: -3.4, y: 2.4, z: -2.8 },
+        posJitter: { x: 0.3, y: 0.2, z: 0.3 },
+        labelJp: '窓辺・硝子響',
       },
     ],
   },
   shrine: {
-    minIntervalSec: 4.2,
-    maxIntervalSec: 8.4,
+    minIntervalSec: 3.8,
+    maxIntervalSec: 7.8,
     actors: [
       {
         kind: 'suzu_breeze',
-        weight: 0.5,
+        weight: 0.38,
         gain: 0.09,
-        pos: { x: 0.4, y: 2.2, z: -2.8 },
-        posJitter: { x: 1.2, y: 0.2, z: 0.6 },
+        pos: { x: 0.4, y: 2.35, z: -2.8 },
+        posJitter: { x: 1.2, y: 0.25, z: 0.6 },
         labelJp: '拝殿・神楽鈴風',
       },
       {
         kind: 'cedar_creak',
-        weight: 0.5,
-        gain: 0.12,
+        weight: 0.32,
+        gain: 0.11,
         pos: { x: -2.6, y: 1.7, z: -1.8 },
         posJitter: { x: 0.8, y: 0.3, z: 0.8 },
         labelJp: '檜軒・木鳴り',
+      },
+      {
+        kind: 'distant_mokugyo',
+        weight: 0.18,
+        gain: 0.075,
+        pos: { x: 3.8, y: 0.9, z: -3.8 },
+        posJitter: { x: 0.4, y: 0.15, z: 0.5 },
+        labelJp: '奥院・木魚',
+      },
+      {
+        kind: 'distant_shinobue',
+        weight: 0.12,
+        gain: 0.05,
+        pos: { x: -4.0, y: 2.1, z: -4.2 },
+        posJitter: { x: 0.8, y: 0.3, z: 0.6 },
+        labelJp: '遠境・篠笛',
       },
     ],
   },
   onsen: {
     minIntervalSec: 1.1,
-    maxIntervalSec: 2.8,
+    maxIntervalSec: 2.6,
     actors: [
       {
         kind: 'water_droplet',
-        weight: 1.0,
+        weight: 0.82,
         gain: 0.18,
         pos: { x: 0.0, y: 0.6, z: -1.4 },
         posJitter: { x: 2.6, y: 0.9, z: 1.8 },
         labelJp: '岩窟・雫滴音',
       },
+      {
+        kind: 'shishi_odoshi',
+        weight: 0.18,
+        gain: 0.12,
+        pos: { x: 3.1, y: 0.45, z: -2.4 },
+        posJitter: { x: 0.4, y: 0.1, z: 0.3 },
+        labelJp: '露天・竹鹿威し',
+      },
     ],
   },
   atelier: {
-    minIntervalSec: 2.4,
-    maxIntervalSec: 5.5,
+    minIntervalSec: 2.3,
+    maxIntervalSec: 5.2,
     actors: [
       {
         kind: 'hearth_pop',
-        weight: 0.58,
+        weight: 0.54,
         gain: 0.13,
         pos: { x: -2.8, y: 0.45, z: -2.1 },
         posJitter: { x: 0.4, y: 0.15, z: 0.3 },
@@ -124,7 +167,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'chronometer_tick',
-        weight: 0.42,
+        weight: 0.46,
         gain: 0.085,
         pos: { x: 2.2, y: 0.8, z: -1.6 },
         posJitter: { x: 0.2, y: 0.1, z: 0.2 },

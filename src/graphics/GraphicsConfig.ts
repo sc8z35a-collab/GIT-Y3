@@ -1,14 +1,70 @@
 /**
- * Graphics Configuration & Telemetry Types for JANKEN KIWAMI 3D.
+ * Graphics, Camera & Audio Configuration & Telemetry Types for JANKEN KIWAMI 3D.
  * Supports true internal render target scaling (HD / FHD / 1.5K / 2K),
- * Frame Rate pacing (60 / 120 / Unlimited), KHDR toggle, and Shadow Flame 1.0 Flash / Pro.
+ * Frame Rate pacing (60 / 120 / Unlimited), KHDR toggle, Shadow Flame 1.0 Flash / Pro,
+ * Camera Director 2.0 styles, and JSound Engin 1.2 spatialization modes.
  */
+
+import type { JSoundSpatialMode } from '../engine/jsound/types';
+
+export type { JSoundSpatialMode };
 
 export type ResolutionPresetId = 'hd' | 'fhd' | '1.5k' | '2k';
 export type FpsLimitMode = 60 | 120 | 0; // 0 = Unlimited (無制限)
 export type ShadowFlameMode = 'standard' | 'flash' | 'pro';
 export type StageId = 'zashiki' | 'salon' | 'shrine' | 'onsen' | 'atelier';
 export type HandMaterialPreset = 'hinoki_ivory' | 'bisque_porcelain' | 'obsidian_gold' | 'karakuri_bronze';
+export type CameraStyleId = 'cinematic' | 'duel_rail' | 'macro_artisan' | 'broadcast' | 'free_orbit';
+export type GameModeId = 'classic' | 'survival' | 'blitz' | 'endless';
+export type PVModeId = 'grand_trailer' | 'battle_reel' | 'craft_showcase';
+
+export interface CameraStyleSpec {
+  id: CameraStyleId;
+  labelJp: string;
+  shortJp: string;
+  descriptionJp: string;
+}
+
+export const CAMERA_STYLE_SPECS: Record<CameraStyleId, CameraStyleSpec> = {
+  cinematic: {
+    id: 'cinematic',
+    labelJp: '映画シネマ',
+    shortJp: 'シネマ',
+    descriptionJp: '動的カット・肩越し緊張構図・極一撃180°バレットタイム旋回',
+  },
+  duel_rail: {
+    id: 'duel_rail',
+    labelJp: '決闘ローアングル',
+    shortJp: '決闘',
+    descriptionJp: '盤面すれすれの低視点から両拳の激突を迫力描写',
+  },
+  macro_artisan: {
+    id: 'macro_artisan',
+    labelJp: '匠マクロ鑑賞',
+    shortJp: 'マクロ',
+    descriptionJp: '85mm相当近接で38自由度関節・木目・漆塗りを精緻描写',
+  },
+  broadcast: {
+    id: 'broadcast',
+    labelJp: '対局俯瞰',
+    shortJp: '俯瞰',
+    descriptionJp: '盤面全体と碁石スコア・両手を安定して見渡す対局視点',
+  },
+  free_orbit: {
+    id: 'free_orbit',
+    labelJp: '自由鑑賞',
+    shortJp: '自由',
+    descriptionJp: 'ドラッグ＆ピンチ操作で360°自在に鑑賞（自動カット停止）',
+  },
+};
+
+export const CAMERA_STYLE_LIST: readonly CameraStyleSpec[] = [
+  CAMERA_STYLE_SPECS.cinematic,
+  CAMERA_STYLE_SPECS.duel_rail,
+  CAMERA_STYLE_SPECS.macro_artisan,
+  CAMERA_STYLE_SPECS.broadcast,
+  CAMERA_STYLE_SPECS.free_orbit,
+];
 
 export interface ResolutionSpec {
   id: ResolutionPresetId;
@@ -113,7 +169,10 @@ export interface GraphicsSettings {
   npcHandMaterial: HandMaterialPreset;
   jhandMode: JHandModeSetting;
   jsoundQuality: JSoundModeSetting;
+  jsoundSpatialMode: JSoundSpatialMode;
   jsoundAmbience: boolean;
+  cameraStyle: CameraStyleId;
+  compactUi: boolean;
 }
 
 export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
@@ -127,7 +186,10 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   npcHandMaterial: 'karakuri_bronze',
   jhandMode: 'biomech_ultra',
   jsoundQuality: 'ultra',
+  jsoundSpatialMode: 'binaural_3d',
   jsoundAmbience: true,
+  cameraStyle: 'cinematic',
+  compactUi: false,
 };
 
 export interface RenderMetrics {
@@ -141,7 +203,9 @@ export interface RenderMetrics {
   shadowMapSize: number;
   khdrActive: boolean;
   shadowFlameMode: ShadowFlameMode;
+  cameraStyle: CameraStyleId;
   jhandDof: number;
+  jhandPoseCount: number;
   jhandPalmCupDeg: number;
   jhandOrlRatio: number;
   jhandIcrGlideMm: number;
@@ -149,7 +213,9 @@ export interface RenderMetrics {
   jhandSynergyJp: string;
   jsoundRt60Sec: number;
   jsoundEarlyRays: number;
+  jsoundOversampling: number;
   jsoundDspRateKhz: number;
+  jsoundSpatialMode: JSoundSpatialMode;
   jsoundVoices: number;
   jsoundPeakDb: number;
   jsoundMaterialPair: string;
@@ -167,16 +233,26 @@ export function computeRenderDimensions(
   maxTextureSize = 4096
 ): { width: number; height: number } {
   const spec = RESOLUTION_PRESETS[preset];
-  const aspect = Math.max(0.5, Math.min(3.0, viewportWidth / Math.max(1, viewportHeight)));
+  const aspect = Math.max(0.42, Math.min(3.0, viewportWidth / Math.max(1, viewportHeight)));
 
   let height = spec.nominalHeight;
   let width = Math.round(height * aspect);
+
+  // If portrait mobile, preserve crisp width resolution so hands stay razor sharp!
+  if (aspect < 0.85) {
+    width = Math.min(maxTextureSize, Math.round(spec.nominalHeight * 0.85));
+    height = Math.round(width / aspect);
+  }
 
   // If ultra-wide, cap width proportionally to preserve nominal pixel budget
   const maxW = Math.min(maxTextureSize, Math.round(spec.nominalWidth * 1.35));
   if (width > maxW) {
     width = maxW;
     height = Math.round(width / aspect);
+  }
+  if (height > maxTextureSize) {
+    height = maxTextureSize;
+    width = Math.round(height * aspect);
   }
 
   // Ensure even dimensions for crisp half-res KHDR luminance passes

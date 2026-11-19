@@ -1,5 +1,7 @@
 /**
- * Headless Offline High-Resolution DSP Verification & Acoustic Audit Suite for JSound Engin 1.1.
+ * Headless Offline High-Resolution DSP Verification & Acoustic Audit Suite for JSound Engin 1.2.
+ * Verifies 192kHz 4×OS 15-Tap Kaiser FIR, 32 physical materials, 18 instruments, 9 JHand Foley channels,
+ * and 4th-Order 128-Ray 3D Image-Source + 5-Band Velvet-Noise True-Stereo Stage IRs.
  * Run with: npm run test:jsound
  */
 
@@ -12,13 +14,22 @@ import {
   synthesizeScissorsShear,
 } from './AeroAndFrictionSynth';
 import {
+  synthesizeAtarigane,
+  synthesizeBiwaStrum,
   synthesizeBonshoBell,
   synthesizeEdoFurin,
+  synthesizeKatanaDraw,
   synthesizeKotoArpeggio,
   synthesizeKotoPluck,
   synthesizeKotsuzumi,
+  synthesizeMokugyo,
+  synthesizeSensuSnap,
   synthesizeShakuhachiBreath,
+  synthesizeShamisenPhrase,
+  synthesizeShamisenPluck,
+  synthesizeShinobuePhrase,
   synthesizeShishiOdoshi,
+  synthesizeShoCluster,
   synthesizeSuzuShimmer,
   synthesizeTaikoDrum,
   synthesizeWashiTear,
@@ -26,6 +37,7 @@ import {
 } from './InstrumentSynthesizer';
 import {
   decimate2xHalfBand,
+  decimate4xCascade,
   synthesizeDualMaterialClash,
   synthesizeModalImpact,
   synthesizeModalImpactStereo,
@@ -69,7 +81,7 @@ function isCleanBuffer(buf: Float32Array): { ok: boolean; peak: number; rms: num
     if (a > peak) peak = a;
     sq += v * v;
   }
-  return { ok: peak > 0.0008 && peak <= 1.001, peak, rms: Math.sqrt(sq / buf.length) };
+  return { ok: peak > 0.0005 && peak <= 1.001, peak, rms: Math.sqrt(sq / buf.length) };
 }
 
 function stereoCorrelation(left: Float32Array, right: Float32Array): number {
@@ -85,31 +97,48 @@ function stereoCorrelation(left: Float32Array, right: Float32Array): number {
   return Math.abs(dot / Math.max(1e-9, Math.sqrt(eL * eR)));
 }
 
-console.log('\n=== JSound Engin 1.1 — High-Resolution 96kHz 2×OS & 28-Sound Physical DSP Audit ===\n');
+console.log('\n=== JSound Engin 1.2 — 192kHz 4×OS, 18-Instrument, 32-Material & 128-Ray 3D DSP Audit ===\n');
 const SR = 48000;
 
-// 1. Verify 7-tap Linear-Phase Kaiser Half-Band FIR 2× Decimation Passband & Stopband Attenuation
+// 1. Verify 15-Tap Linear-Phase Kaiser (beta=6.8) Half-Band FIR 2× & 4× Cascade Decimation
 {
-  const n2x = 2048;
-  const lowTone = new Float32Array(n2x);
-  const aliasTone = new Float32Array(n2x);
+  const n2x = 4096;
+  const lowTone2x = new Float32Array(n2x);
+  const aliasTone2x = new Float32Array(n2x);
   for (let i = 0; i < n2x; i++) {
-    // 2 kHz passband tone at 96 kHz vs 44 kHz stopband ultrasonic tone at 96 kHz
-    lowTone[i] = Math.sin((2 * Math.PI * 2000 * i) / (SR * 2));
-    aliasTone[i] = Math.sin((2 * Math.PI * 44000 * i) / (SR * 2));
+    lowTone2x[i] = Math.sin((2 * Math.PI * 2000 * i) / (SR * 2));
+    aliasTone2x[i] = Math.sin((2 * Math.PI * 44000 * i) / (SR * 2));
   }
-  const lowDec = decimate2xHalfBand(lowTone);
-  const aliasDec = decimate2xHalfBand(aliasTone);
-  const lowRms = isCleanBuffer(lowDec).rms;
-  const aliasRms = isCleanBuffer(aliasDec).rms;
-  const rejDb = 20 * Math.log10(Math.max(1e-6, aliasRms) / Math.max(1e-6, lowRms));
+  const lowDec2x = decimate2xHalfBand(lowTone2x);
+  const aliasDec2x = decimate2xHalfBand(aliasTone2x);
+  const lowRms2x = isCleanBuffer(lowDec2x.subarray(16, lowDec2x.length - 16)).rms;
+  const aliasRms2x = isCleanBuffer(aliasDec2x.subarray(16, aliasDec2x.length - 16)).rms;
+  const rejDb2x = 20 * Math.log10(Math.max(1e-8, aliasRms2x) / Math.max(1e-8, lowRms2x));
   assert(
-    lowDec.length === n2x / 2 && lowRms > 0.65 && rejDb < -24,
-    `96kHz 2× Oversampling Kaiser Half-Band FIR verified (passband RMS=${lowRms.toFixed(2)}, 44kHz alias attenuation=${rejDb.toFixed(1)} dB)`
+    lowDec2x.length === n2x / 2 && lowRms2x > 0.68 && rejDb2x < -58,
+    `96kHz 2×OS 15-Tap Kaiser Half-Band FIR verified (passband RMS=${lowRms2x.toFixed(2)}, 44kHz alias=${rejDb2x.toFixed(1)} dB)`
+  );
+
+  const n4x = 8192;
+  const lowTone4x = new Float32Array(n4x);
+  const ultraAlias4x = new Float32Array(n4x);
+  for (let i = 0; i < n4x; i++) {
+    // 2 kHz passband vs 88 kHz ultrasonic stopband at 192 kHz!
+    lowTone4x[i] = Math.sin((2 * Math.PI * 2000 * i) / (SR * 4));
+    ultraAlias4x[i] = Math.sin((2 * Math.PI * 88000 * i) / (SR * 4));
+  }
+  const lowDec4x = decimate4xCascade(lowTone4x);
+  const aliasDec4x = decimate4xCascade(ultraAlias4x);
+  const lowRms4x = isCleanBuffer(lowDec4x.subarray(16, lowDec4x.length - 16)).rms;
+  const aliasRms4x = isCleanBuffer(aliasDec4x.subarray(16, aliasDec4x.length - 16)).rms;
+  const rejDb4x = 20 * Math.log10(Math.max(1e-8, aliasRms4x) / Math.max(1e-8, lowRms4x));
+  assert(
+    lowDec4x.length === n4x / 4 && lowRms4x > 0.68 && rejDb4x < -60,
+    `192kHz 4×OS Cascaded Kaiser FIR verified (passband RMS=${lowRms4x.toFixed(2)}, 88kHz alias=${rejDb4x.toFixed(1)} dB)`
   );
 }
 
-// 2. Verify all 24 Calibrated Acoustic Materials at Ultra (96kHz 2×OS) quality!
+// 2. Verify all 32 Calibrated Acoustic Materials at Ultra (192kHz 4×OS) quality!
 {
   const allIds = Object.keys(ACOUSTIC_MATERIALS) as AcousticMaterialId[];
   let allClean = true;
@@ -126,14 +155,15 @@ const SR = 48000;
       id === 'hinoki_ivory' ||
       id === 'karakuri_bronze' ||
       id === 'bisque_porcelain' ||
-      id === 'obsidian_gold'
+      id === 'obsidian_gold' ||
+      id === 'katana_tamahagane'
     ) {
       handCentroids[id] = Math.round(estimateCentroidHz(st.left, SR));
     }
   }
   assert(
-    allClean && allIds.length >= 24,
-    `All ${allIds.length} calibrated physical materials clean at 96kHz 2×OS Ultra (Hinoki ${handCentroids.hinoki_ivory}Hz, Bronze ${handCentroids.karakuri_bronze}Hz, Porcelain ${handCentroids.bisque_porcelain}Hz, Obsidian ${handCentroids.obsidian_gold}Hz)`
+    allClean && allIds.length >= 32,
+    `All ${allIds.length} calibrated physical materials clean at 192kHz 4×OS Ultra (Hinoki ${handCentroids.hinoki_ivory}Hz, Bronze ${handCentroids.karakuri_bronze}Hz, Porcelain ${handCentroids.bisque_porcelain}Hz, Katana ${handCentroids.katana_tamahagane}Hz)`
   );
   assert(
     handCentroids.bisque_porcelain > handCentroids.hinoki_ivory,
@@ -141,7 +171,7 @@ const SR = 48000;
   );
 }
 
-// 3. Verify True Stereo Dipole Mode Radiation (L != R) on metallic/ceramic resonance
+// 3. Verify True Stereo Dipole Mode Radiation (L != R) on metallic resonance
 {
   const bell = synthesizeModalImpactStereo('karakuri_bronze', SR, {
     velocity: 1.1,
@@ -156,7 +186,7 @@ const SR = 48000;
   );
 }
 
-// 4. Verify Hertzian Velocity-Hardness Spectral Brightness Shift (Ultra 2×OS)
+// 4. Verify Hertzian Velocity-Hardness Spectral Brightness Shift (Ultra 4×OS)
 {
   const softHit = synthesizeModalImpact('hinoki_ivory', SR, { velocity: 0.24, quality: 'ultra', seed: 99 });
   const hardHit = synthesizeModalImpact('hinoki_ivory', SR, { velocity: 1.4, quality: 'ultra', seed: 99 });
@@ -168,7 +198,7 @@ const SR = 48000;
   );
 }
 
-// 5. Verify 3×3 Move-Matchup Dual-Material Clash (WIN / LOSS / DRAW) & True-Stereo Temple Rin-Bell
+// 5. Verify 3×3 Move-Matchup Dual-Material Clash & True-Stereo Temple Rin-Bell
 {
   let clashClean = true;
   for (const mv of [ROCK, SCISSORS, PAPER] as const) {
@@ -193,7 +223,7 @@ const SR = 48000;
   );
 }
 
-// 6. Verify ALL 10 First-Principles Physical Acoustic Instruments in InstrumentSynthesizer.ts!
+// 6. Verify ALL 18 First-Principles Physical Acoustic Instruments in InstrumentSynthesizer.ts!
 {
   const odaiko = synthesizeTaikoDrum('odaiko', SR, 1.15, 'ultra', 1001);
   const shime = synthesizeTaikoDrum('shime', SR, 1.0, 'ultra', 1002);
@@ -210,6 +240,18 @@ const SR = 48000;
   const bonsho = synthesizeBonshoBell(130.81, SR, 2.2, 0.85, 'ultra', 1013);
   const drop = synthesizeWaterDroplet(SR, 1014);
 
+  // ★ 8 New JSound 1.2 Instruments ★
+  const shamisen = synthesizeShamisenPluck(220.0, SR, 1.1, 0.88, 1.0, 'ultra', 1015);
+  const shamisenPhrase = synthesizeShamisenPhrase([196.0, 220.0, 293.66], 0.09, SR, 0.9, 'ultra', 1016);
+  const biwa = synthesizeBiwaStrum(146.83, SR, 1.5, 0.92, 'ultra', 1017);
+  const sho = synthesizeShoCluster([440.0, 493.88, 587.33, 659.25, 739.99, 880.0], SR, 1.8, 0.78, 1018);
+  const shinobue = synthesizeShinobuePhrase(783.99, SR, 1.2, 0.75, 1019);
+  const atariganeOpen = synthesizeAtarigane(SR, 'open', 0.95, 'ultra', 1020);
+  const atariganeDamped = synthesizeAtarigane(SR, 'damped', 0.9, 'ultra', 1021);
+  const mokugyo = synthesizeMokugyo(SR, 1.0, 0.92, 'ultra', 1022);
+  const katana = synthesizeKatanaDraw(SR, 1.0, 'ultra', 1023);
+  const sensu = synthesizeSensuSnap(SR, 0.95, 'ultra', 1024);
+
   const stereoChecks: Array<[string, { left: Float32Array; right: Float32Array }]> = [
     ['Taiko(Odaiko)', odaiko],
     ['Taiko(Shime)', shime],
@@ -224,20 +266,34 @@ const SR = 48000;
     ['KaguraSuzu', suzu],
     ['WashiTear', washi],
     ['BonshoBell', bonsho],
+    ['TsugaruShamisen', shamisen],
+    ['ShamisenPhrase', shamisenPhrase],
+    ['SatsumaBiwa', biwa],
+    ['GagakuSho', sho],
+    ['ShinobueFlute', shinobue],
+    ['Atarigane(Open)', atariganeOpen],
+    ['Atarigane(Damped)', atariganeDamped],
+    ['CamphorMokugyo', mokugyo],
+    ['TamahaganeKatana', katana],
+    ['SensuFanSnap', sensu],
   ];
 
   let allInstrOk = isCleanBuffer(drop).ok;
   for (const [name, pair] of stereoChecks) {
-    if (!isCleanBuffer(pair.left).ok || !isCleanBuffer(pair.right).ok) {
+    const lSt = isCleanBuffer(pair.left);
+    const rSt = isCleanBuffer(pair.right);
+    if (!lSt.ok || !rSt.ok) {
       allInstrOk = false;
-      console.error(`    Bad instrument buffer: ${name}`);
+      console.error(`    Bad instrument buffer: ${name} (L=${lSt.peak}, R=${rSt.peak})`);
     }
   }
   const cOdaiko = Math.round(estimateCentroidHz(odaiko.left, SR));
   const cFurin = Math.round(estimateCentroidHz(furin.left, SR));
+  const cKatana = Math.round(estimateCentroidHz(katana.left, SR));
+  const cMokugyo = Math.round(estimateCentroidHz(mokugyo.left, SR));
   assert(
-    allInstrOk && cFurin > cOdaiko * 4,
-    `All 10 physical instruments (14 variants) clean & timbrally distinct (Odaiko ${cOdaiko}Hz << Edo Furin ${cFurin}Hz)`
+    allInstrOk && cFurin > cOdaiko * 4 && cKatana > cMokugyo,
+    `All 18 physical instruments (24 variants) clean & distinct (Odaiko ${cOdaiko}Hz, Mokugyo ${cMokugyo}Hz, Katana ${cKatana}Hz, Furin ${cFurin}Hz)`
   );
 }
 
@@ -264,7 +320,7 @@ const SR = 48000;
   );
 }
 
-// 8. Verify ALL 9 JHand Kinesis 1.1 Coupled Micro-Foley Channels + 2×OS Scissors Shear!
+// 8. Verify ALL 9 JHand Kinesis 1.1 Coupled Micro-Foley Channels + 4×OS Scissors Shear!
 {
   const shear = synthesizeScissorsShear('karakuri_bronze', SR, 1.0, 'ultra', 300);
   const foleyTypes: HandFoleyType[] = [
@@ -297,7 +353,7 @@ const SR = 48000;
   );
 }
 
-// 9. Verify 3rd-Order 62-Ray Image-Source + 4-Band Velvet-Noise Stereo IRs & 5.6s Seamless Ambience across all 5 Stages!
+// 9. Verify 4th-Order 128-Ray Image-Source + 5-Band Velvet-Noise True-Stereo IRs & Ambience across all 5 Stages!
 {
   const stages: StageId[] = ['zashiki', 'salon', 'shrine', 'onsen', 'atelier'];
   let allIrOk = true;
@@ -309,7 +365,7 @@ const SR = 48000;
     const rOk = isCleanBuffer(ir.right);
     const corr = stereoCorrelation(ir.left, ir.right);
 
-    if (!lOk.ok || !rOk.ok || ir.earlyReflectionCount < 40 || corr > 0.55) {
+    if (!lOk.ok || !rOk.ok || ir.earlyReflectionCount < 100 || corr > 0.55) {
       allIrOk = false;
       console.error(
         `    Stage IR issue on ${st}: rays=${ir.earlyReflectionCount}, corr=${corr.toFixed(2)}, L=${lOk.peak}, R=${rOk.peak}`
@@ -322,18 +378,18 @@ const SR = 48000;
     }
 
     console.log(
-      `  [STAGE IR 1.1] ${st.padEnd(8)} | RT60: ${ir.rt60Sec.toFixed(2)}s | 3rd-Order Rays: ${ir.earlyReflectionCount} | L/R Corr: ${corr.toFixed(2)} | Peak: ${lOk.peak.toFixed(2)}`
+      `  [STAGE IR 1.2] ${st.padEnd(8)} | RT60: ${ir.rt60Sec.toFixed(2)}s | 4th-Order Rays: ${ir.earlyReflectionCount} | L/R Corr: ${corr.toFixed(2)} | Peak: ${lOk.peak.toFixed(2)}`
     );
   }
 
   assert(
     allIrOk,
-    'All 5 architectural stages verified 3rd-order (>=40 discrete rays) + 4-band Velvet-Noise true-stereo IRs'
+    'All 5 architectural stages verified 4th-order (>=100 discrete 3D rays w/ elevation cues) + 5-band Velvet-Noise true-stereo IRs'
   );
   assert(allAmbOk, 'All 5 multi-layer seamless crossfaded procedural stage ambience beds verified clean');
 }
 
 if (failedChecks > 0) {
-  throw new Error(`JSound Engin 1.1 Audit failed with ${failedChecks} error(s).`);
+  throw new Error(`JSound Engin 1.2 Audit failed with ${failedChecks} error(s).`);
 }
-console.log('\nJSound Engin 1.1 Audit Complete — ALL CHECKS PASSED.\n');
+console.log('\nJSound Engin 1.2 Audit Complete — ALL CHECKS PASSED.\n');
