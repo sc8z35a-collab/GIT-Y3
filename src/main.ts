@@ -234,4 +234,23 @@ class JankenKiwamiApp {
   }
 }
 
-new JankenKiwamiApp();
+try {
+  new JankenKiwamiApp();
+} catch (error) {
+  console.error('[JANKEN · 極] Initialization failed:', error);
+  const uiLayer = document.getElementById('ui-layer');
+  if (uiLayer) {
+    const message = error instanceof Error ? error.message : String(error);
+    uiLayer.innerHTML = `
+      <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:#14110e;color:#f4ebd9;font-family:'Noto Sans JP',sans-serif;">
+        <div style="max-width:520px;padding:24px 28px;border:1px solid rgba(201,164,98,0.45);border-radius:12px;background:rgba(28,23,19,0.96);box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+          <h1 style="margin:0 0 10px;font-family:'Shippori Mincho',serif;font-size:22px;color:#e5c27b;">JANKEN · 極 — 起動エラー</h1>
+          <p style="margin:0 0 12px;font-size:14px;line-height:1.7;color:#d8cbb8;">
+            3D描画エンジン（WebGL2）の初期化に失敗しました。ハードウェアアクセラレーションが有効なブラウザで再読み込みしてください。
+          </p>
+          <pre style="margin:0;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,0.4);color:#e69b86;font-size:12px;white-space:pre-wrap;word-break:break-word;">${message.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c)}</pre>
+        </div>
+      </div>
+    `;
+  }
+}
