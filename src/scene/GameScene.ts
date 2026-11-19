@@ -27,6 +27,8 @@ import {
   FpsLimitMode,
   GraphicsSettings,
   HandMaterialPreset,
+  JHandModeSetting,
+  JSoundModeSetting,
   RenderMetrics,
   ResolutionPresetId,
   SHADOW_FLAME_SPECS,
@@ -79,11 +81,12 @@ export class GameScene {
   private baseExposure = 0.92;
   private lightImpactPulse = 0;
 
-  // Dual 21-Bone Articulated Sculptural Hands
+  // Dual 27-DOF JHand Kinesis 1.0 Sculptural Hands
   private readonly playerHand: SculptedHandRig;
   private readonly npcHand: SculptedHandRig;
   private readonly tmpLeftPalm = new THREE.Vector3();
   private readonly tmpRightPalm = new THREE.Vector3();
+  private readonly tmpCamForward = new THREE.Vector3();
 
   private settings: GraphicsSettings = { ...DEFAULT_GRAPHICS_SETTINGS };
   private currentShadowMapSize = 2048;
@@ -180,8 +183,11 @@ export class GameScene {
     this.hemiLight = new THREE.HemisphereLight(0xdbe8f8, 0x73593f, 0.82);
     this.scene.add(this.hemiLight);
 
-    // Stage Builder + Persistent Diegetic Props
+    // Stage Builder + Persistent Diegetic Props + Real-Time Go-Stone Acoustic Bounce!
     this.stageBuilder = new StageBuilder(this.textures);
+    this.stageBuilder.onStoneBounce = (side, velocity, pos) => {
+      this.sound.playGoStoneImpact(side, velocity, pos);
+    };
     this.scene.add(this.stageBuilder.stageGroup);
     this.scene.add(this.stageBuilder.propsGroup);
 
@@ -189,18 +195,30 @@ export class GameScene {
     this.atmosphere = new AtmosphereEffects();
     this.scene.add(this.atmosphere.group);
 
-    // Dual 21-Bone Sculpted Hands positioned cleanly over the central brass medallion
+    // Dual 27-DOF JHand Kinesis 1.0 Sculpted Hands positioned cleanly over the central brass medallion
     this.playerHand = new SculptedHandRig(this.textures, this.settings.playerHandMaterial, true);
     this.playerHand.root.position.set(-0.66, 0.25, 0.22);
     this.playerHand.root.rotation.set(0.08, Math.PI * 0.45, 0.0);
+    this.playerHand.onFoley = (ev, wp) => {
+      this.sound.playHandFoley(ev, 'player', { x: wp.x, y: wp.y, z: wp.z });
+    };
     this.scene.add(this.playerHand.root);
 
     this.npcHand = new SculptedHandRig(this.textures, this.settings.npcHandMaterial, false);
     this.npcHand.root.position.set(0.66, 0.25, 0.08);
     this.npcHand.root.rotation.set(0.08, -Math.PI * 0.45, 0.0);
+    this.npcHand.onFoley = (ev, wp) => {
+      this.sound.playHandFoley(ev, 'npc', { x: wp.x, y: wp.y, z: wp.z });
+    };
     this.scene.add(this.npcHand.root);
 
-    // Apply initial stage, KHDR, and Shadow Flame settings + graceful opening entrance!
+    // Apply initial stage, KHDR, Shadow Flame, JHand Kinesis, and JSound Engin 1.0 settings!
+    this.sound.setHandMaterials(this.settings.playerHandMaterial, this.settings.npcHandMaterial);
+    this.sound.setQualityMode(this.settings.jsoundQuality);
+    this.sound.setAmbienceEnabled(this.settings.jsoundAmbience);
+    this.playerHand.setKinesisMode(this.settings.jhandMode);
+    this.npcHand.setKinesisMode(this.settings.jhandMode);
+
     this.applyStage(this.settings.stage, false);
     this.applyShadowFlame(this.settings.shadowFlame);
     this.applyKHDR(this.settings.khdrEnabled, this.settings.khdrSplitCompare);
@@ -240,9 +258,27 @@ export class GameScene {
     this.khdr.enableSSCS = SHADOW_FLAME_SPECS[mode].enableSSCS;
   }
 
+  public setJHandMode(mode: JHandModeSetting): void {
+    this.settings.jhandMode = mode;
+    this.playerHand.setKinesisMode(mode);
+    this.npcHand.setKinesisMode(mode);
+  }
+
+  public setJSoundQuality(quality: JSoundModeSetting): void {
+    this.settings.jsoundQuality = quality;
+    this.sound.setQualityMode(quality);
+  }
+
+  public setJSoundAmbience(enabled: boolean): void {
+    this.settings.jsoundAmbience = enabled;
+    this.sound.setAmbienceEnabled(enabled);
+  }
+
   public applyStage(stageId: StageId, withRevealSweep = true): void {
     this.settings.stage = stageId;
     const def = this.stageBuilder.buildStage(stageId);
+    // Morph JSound Engin 1.0 architectural Convolution IR + living stage ambience!
+    this.sound.setStage(stageId);
 
     this.scene.environment = this.hdriBuilder.getEnvironment(stageId);
     this.scene.background = new THREE.Color(def.backgroundColor);
@@ -284,16 +320,16 @@ export class GameScene {
     this.settings.npcHandMaterial = npcMat;
     this.playerHand.setMaterialPreset(playerMat);
     this.npcHand.setMaterialPreset(npcMat);
-    // Subtle flourish turn to showcase the freshly swapped material!
+    // Sync JSound Engin 1.0 coupled material acoustics immediately!
+    this.sound.setHandMaterials(playerMat, npcMat);
+    // Subtle flourish turn + tactile sample click to showcase freshly swapped craft material!
     this.playerHand.addMotionImpulse(0, 0.45, 0, -0.8, 1.4);
     this.npcHand.addMotionImpulse(0, 0.45, 0, -0.8, -1.4);
   }
 
   public setTableScores(playerWins: number, npcWins: number): void {
-    const dropped = this.stageBuilder.setScores(playerWins, npcWins);
-    if (dropped) {
-      this.sound.playGoStoneBounce();
-    }
+    // StageBuilder ballistic Go-stones automatically stream every physical bounce into JSound Engin 1.0!
+    this.stageBuilder.setScores(playerWins, npcWins);
   }
 
   public syncJNVClockwork(confidence: number, volatility: number, pulse = false): void {
@@ -602,7 +638,7 @@ export class GameScene {
       winner.targetExtraPitch = -0.08;
       winner.targetExtraYaw = 0.12 * dir;
       winner.triggerScissorsSnip();
-      this.sound.playScissorsDoubleSnip();
+      // Synchronized physical blade shear is streamed directly from JHand Kinesis 1.0 -> JSound Engin 1.0
     } else if (winMove === PAPER) {
       // Regal enveloping crown descent over the defeated fist!
       winner.setTargetPose('envelop', false, true);
@@ -703,6 +739,14 @@ export class GameScene {
       this.atmosphere.update(simDt, this.settings.stage);
       this.cameraDirector.update(rawDt); // Camera glides smoothly even through hit-stop!
 
+      // Sync 3D HRTF AudioListener pose in JSound Engin 1.0 with live Cinema Camera!
+      this.cameraDirector.camera.getWorldDirection(this.tmpCamForward);
+      const camPos = this.cameraDirector.camera.position;
+      this.sound.setListenerPose(
+        { x: camPos.x, y: camPos.y, z: camPos.z },
+        { x: this.tmpCamForward.x, y: this.tmpCamForward.y, z: this.tmpCamForward.z }
+      );
+
       // Reset WebGL draw stats & execute KHDR + Shadow Flame multi-pass render!
       this.renderer.info.reset();
       this.khdr.render(this.scene, this.cameraDirector.camera, this.sunWorldDir, this.elapsedSec);
@@ -718,6 +762,8 @@ export class GameScene {
         const sorted = [...this.frameTimesMs].sort((a, b) => b - a);
         const p99Ms = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.02))] || avgMs;
         const dim = this.khdr.getDimensions();
+        const jhandT = this.playerHand.getKinesisTelemetry();
+        const jsoundT = this.sound.getTelemetry();
 
         this.onMetrics({
           fps: Math.round(1000 / Math.max(0.5, avgMs)),
@@ -730,6 +776,13 @@ export class GameScene {
           shadowMapSize: this.currentShadowMapSize,
           khdrActive: this.settings.khdrEnabled,
           shadowFlameMode: this.settings.shadowFlame,
+          jhandDof: jhandT.activeDof,
+          jhandPalmCupDeg: jhandT.palmCupDeg,
+          jhandOrlRatio: jhandT.orlCouplingRatio,
+          jsoundRt60Sec: jsoundT.stageRt60Sec,
+          jsoundVoices: jsoundT.activeVoices,
+          jsoundPeakDb: jsoundT.peakDb,
+          jsoundMaterialPair: jsoundT.materialPairJp,
         });
       }
     };

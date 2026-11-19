@@ -1,32 +1,35 @@
 /**
- * ★ Ultra-High-Detail 21-Bone Articulated Anatomical 3D Hand Rig (AAA Spring Kinematics) ★
+ * ★ Ultra-High-Detail 27-DOF Anatomical 3D Hand Rig — Powered by JHand Kinesis 1.0 ★
  *
- * Sculpted using custom organic LatheGeometry phalanx profiles, rounded knuckle
- * joints, watchmaker brass hinge pins, curved clearcoat fingernails, anatomical palm
- * musculature (thenar & hypothenar mounds + dorsal metacarpal ridges), articulated
- * wrist, forearm, and tailored fabric sleeve cuff using extracted user-atlas PBR textures.
- *
- * Motion & Kinematics Architecture:
- *  - True 2nd-Order Critically/Under-Damped Harmonic Springs (`Spring1D`) on all 21 bones,
- *    wrist attitude, and 3D world translation — delivers authentic mass, whip-crack snap,
- *    elastic overshoot, and silky organic settle!
- *  - Per-Finger Staggered Cascade Wave (e.g., Paper fans out sequentially thumb→pinky,
- *    Rock snaps fingers closed before the thumb locks across the knuckles!)
- *  - Living Idle Choreography (counter-phased breathing + contemplative finger-drumming
- *    wave + JNV1.0 clockwork-seal micro-tells)
- *  - Signature Move Flourishes:
- *      · SCISSORS double-snip blade articulation
- *      · ROCK heavy downward pronation crush
- *      · PAPER sweeping enveloping crown arc
- *      · Ceremonial Match Victory salute & respectful defeat bow
+ * Driven directly by our proprietary 6-layer biomechanical solver (`JHandKinesisEngine`):
+ *  - Independent Forearm Pronation/Supination Pivot (`forearmPivot`) twisting the sleeve
+ *    cuff & radioulnar wrist organically before the Radiocarpal Wrist Pivot (`wristPivot`)
+ *  - Articulated Ulnar Palmar Arch (`cmc4Pivot`, `cmc5Pivot`) physically cupping the 4th
+ *    and 5th metacarpals + hypothenar mound during Rock/Scissors and flattening on Paper
+ *  - Dynamic Sculpted Thenar Eminence (`thenarMesh`) swelling & shifting with Thumb Kapandji
+ *    opposition (`thenarBulge`)
+ *  - 4 Dynamic Dorsal Extensor Tendon Cords (`dorsalTendonMeshes`) that visibly elevate,
+ *    tighten, and catch KHDR warm highlights proportionally to real-time finger extensor tension
+ *  - Anatomical Scaphoid Convergence Roll on every finger + precision condyle joint collars
+ *  - Real-time kinetic micro-Foley stream (`onFoley`) routed directly to JSound Engin 1.0!
  */
 
 import * as THREE from 'three';
-import { Move, PAPER, ROCK, SCISSORS } from '../engine/jnv1/types';
+import { JHandKinesisEngine } from '../engine/jhand/BiomechanicsSolver';
+import {
+  FingerName,
+  HandFoleyEvent,
+  HandPoseKey,
+  JHandQualityMode,
+  JHandSolvedFrame,
+  JHandTelemetry,
+} from '../engine/jhand/types';
 import { HandMaterialPreset } from '../graphics/GraphicsConfig';
 import { TextureAtlasLoader } from '../graphics/TextureAtlasLoader';
 
-/** Second-order damped harmonic spring for organic overshoot & physical weight */
+export type { HandPoseKey } from '../engine/jhand/types';
+
+/** Second-order damped harmonic spring for world-space arm translation & external choreography */
 class Spring1D {
   public value: number;
   public velocity = 0;
@@ -45,7 +48,6 @@ class Spring1D {
   }
 
   public step(target: number, stiffness: number, damping: number, dt: number): number {
-    // Semi-implicit Euler sub-stepped twice for unconditional stability even at high stiffness
     const subDt = dt * 0.5;
     for (let i = 0; i < 2; i++) {
       const force = (target - this.value) * stiffness;
@@ -71,138 +73,9 @@ interface ThumbJoints {
   tipAnchor: THREE.Object3D;
 }
 
-interface FingerPose {
-  mcpX: number;
-  mcpY: number;
-  pipX: number;
-  dipX: number;
-}
-
-interface ThumbPose {
-  cmcX: number;
-  cmcY: number;
-  cmcZ: number;
-  mcpX: number;
-  ipX: number;
-}
-
-interface FullHandPose {
-  thumb: ThumbPose;
-  index: FingerPose;
-  middle: FingerPose;
-  ring: FingerPose;
-  pinky: FingerPose;
-  wristPitch: number;
-  wristYaw: number;
-  wristRoll: number;
-}
-
-interface FingerSprings {
-  mcpX: Spring1D;
-  mcpY: Spring1D;
-  pipX: Spring1D;
-  dipX: Spring1D;
-}
-
-interface ThumbSprings {
-  cmcX: Spring1D;
-  cmcY: Spring1D;
-  cmcZ: Spring1D;
-  mcpX: Spring1D;
-  ipX: Spring1D;
-}
-
-export type HandPoseKey = 'ready' | 'windup' | 'envelop' | 'bow' | 'salute' | Move;
-
-const POSES: Record<HandPoseKey, FullHandPose> = {
-  ready: {
-    thumb: { cmcX: 0.42, cmcY: -0.42, cmcZ: 0.35, mcpX: 0.32, ipX: 0.28 },
-    index: { mcpX: 0.44, mcpY: 0.09, pipX: 0.52, dipX: 0.3 },
-    middle: { mcpX: 0.52, mcpY: 0.01, pipX: 0.6, dipX: 0.34 },
-    ring: { mcpX: 0.62, mcpY: -0.05, pipX: 0.7, dipX: 0.4 },
-    pinky: { mcpX: 0.72, mcpY: -0.11, pipX: 0.76, dipX: 0.44 },
-    wristPitch: 0.14,
-    wristYaw: 0.0,
-    wristRoll: 0.34,
-  },
-  windup: {
-    thumb: { cmcX: 0.74, cmcY: -0.78, cmcZ: 0.62, mcpX: 0.7, ipX: 0.62 },
-    index: { mcpX: 1.52, mcpY: 0.02, pipX: 1.62, dipX: 0.96 },
-    middle: { mcpX: 1.56, mcpY: 0.0, pipX: 1.65, dipX: 0.98 },
-    ring: { mcpX: 1.6, mcpY: -0.02, pipX: 1.66, dipX: 0.98 },
-    pinky: { mcpX: 1.62, mcpY: -0.04, pipX: 1.66, dipX: 0.96 },
-    wristPitch: 0.2,
-    wristYaw: 0.0,
-    wristRoll: 0.6,
-  },
-  [ROCK]: {
-    thumb: { cmcX: 0.82, cmcY: -0.86, cmcZ: 0.72, mcpX: 0.76, ipX: 0.68 },
-    index: { mcpX: 1.58, mcpY: 0.01, pipX: 1.68, dipX: 1.02 },
-    middle: { mcpX: 1.62, mcpY: 0.0, pipX: 1.7, dipX: 1.04 },
-    ring: { mcpX: 1.64, mcpY: -0.02, pipX: 1.72, dipX: 1.04 },
-    pinky: { mcpX: 1.66, mcpY: -0.04, pipX: 1.7, dipX: 1.02 },
-    wristPitch: 0.05,
-    wristYaw: 0.0,
-    wristRoll: 0.44,
-  },
-  [SCISSORS]: {
-    thumb: { cmcX: 0.86, cmcY: -0.94, cmcZ: 0.64, mcpX: 0.76, ipX: 0.7 },
-    index: { mcpX: -0.09, mcpY: 0.3, pipX: 0.04, dipX: 0.03 },
-    middle: { mcpX: -0.06, mcpY: -0.26, pipX: 0.05, dipX: 0.04 },
-    ring: { mcpX: 1.58, mcpY: -0.06, pipX: 1.7, dipX: 1.02 },
-    pinky: { mcpX: 1.62, mcpY: -0.1, pipX: 1.7, dipX: 1.0 },
-    wristPitch: 0.1,
-    wristYaw: 0.1,
-    wristRoll: 0.76, // Sculpted angled V-blade presentation toward camera!
-  },
-  [PAPER]: {
-    thumb: { cmcX: 0.08, cmcY: 0.18, cmcZ: -0.22, mcpX: 0.04, ipX: 0.02 },
-    index: { mcpX: -0.14, mcpY: 0.28, pipX: 0.03, dipX: 0.02 },
-    middle: { mcpX: -0.14, mcpY: 0.06, pipX: 0.02, dipX: 0.02 },
-    ring: { mcpX: -0.12, mcpY: -0.14, pipX: 0.04, dipX: 0.03 },
-    pinky: { mcpX: -0.08, mcpY: -0.32, pipX: 0.06, dipX: 0.04 },
-    wristPitch: 0.06,
-    wristYaw: 0.0,
-    wristRoll: 0.24,
-  },
-  envelop: {
-    // Paper victory enveloping crown posture curving gracefully over Rock
-    thumb: { cmcX: 0.24, cmcY: -0.1, cmcZ: 0.08, mcpX: 0.22, ipX: 0.18 },
-    index: { mcpX: 0.28, mcpY: 0.22, pipX: 0.34, dipX: 0.26 },
-    middle: { mcpX: 0.26, mcpY: 0.04, pipX: 0.32, dipX: 0.24 },
-    ring: { mcpX: 0.3, mcpY: -0.12, pipX: 0.36, dipX: 0.28 },
-    pinky: { mcpX: 0.34, mcpY: -0.26, pipX: 0.38, dipX: 0.3 },
-    wristPitch: 0.22,
-    wristYaw: 0.0,
-    wristRoll: 0.08,
-  },
-  bow: {
-    // Respectful defeated hand resting lightly downward
-    thumb: { cmcX: 0.56, cmcY: -0.5, cmcZ: 0.42, mcpX: 0.46, ipX: 0.38 },
-    index: { mcpX: 0.78, mcpY: 0.05, pipX: 0.82, dipX: 0.52 },
-    middle: { mcpX: 0.84, mcpY: 0.0, pipX: 0.86, dipX: 0.54 },
-    ring: { mcpX: 0.9, mcpY: -0.04, pipX: 0.9, dipX: 0.56 },
-    pinky: { mcpX: 0.96, mcpY: -0.08, pipX: 0.92, dipX: 0.58 },
-    wristPitch: 0.34,
-    wristYaw: 0.0,
-    wristRoll: 0.2,
-  },
-  salute: {
-    // Ceremonial open-palm Match Victory presentation
-    thumb: { cmcX: 0.16, cmcY: 0.12, cmcZ: -0.14, mcpX: 0.08, ipX: 0.05 },
-    index: { mcpX: -0.06, mcpY: 0.18, pipX: 0.08, dipX: 0.06 },
-    middle: { mcpX: -0.04, mcpY: 0.03, pipX: 0.1, dipX: 0.08 },
-    ring: { mcpX: 0.02, mcpY: -0.08, pipX: 0.16, dipX: 0.12 },
-    pinky: { mcpX: 0.1, mcpY: -0.2, pipX: 0.22, dipX: 0.16 },
-    wristPitch: -0.22,
-    wristYaw: 0.16,
-    wristRoll: -0.26, // Turned gently palm-upward toward sunlight!
-  },
-};
-
 /**
  * Create a smooth organically tapered phalanx segment using LatheGeometry
- * rotated so it extends from y=0 to y=length along +Z.
+ * rotated so it extends from z=0 to z=length along +Z.
  */
 function createOrganicPhalanxGeo(
   length: number,
@@ -211,66 +84,59 @@ function createOrganicPhalanxGeo(
   isDistal: boolean
 ): THREE.BufferGeometry {
   const pts: THREE.Vector2[] = [];
-  const steps = 12;
+  const steps = 14;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     let r = THREE.MathUtils.lerp(baseRadius, tipRadius, t);
     if (!isDistal) {
-      r *= 1.0 - 0.08 * Math.sin(t * Math.PI);
-      if (t < 0.12) r *= 0.85 + (t / 0.12) * 0.15;
-      if (t > 0.88) r *= 0.85 + ((1 - t) / 0.12) * 0.15;
+      // Subtle anatomical waist narrowing mid-shaft + condylar flare near joints
+      r *= 1.0 - 0.085 * Math.sin(t * Math.PI);
+      if (t < 0.14) r *= 0.88 + (t / 0.14) * 0.12;
+      if (t > 0.86) r *= 0.88 + ((1 - t) / 0.14) * 0.12;
     } else {
-      if (t > 0.65) {
-        const dt = (t - 0.65) / 0.35;
+      if (t > 0.62) {
+        const dt = (t - 0.62) / 0.38;
         r *= Math.sqrt(Math.max(0.0, 1.0 - dt * dt));
       } else {
-        r *= 1.0 + 0.04 * Math.sin(t * Math.PI);
+        r *= 1.0 + 0.045 * Math.sin(t * Math.PI);
       }
     }
     pts.push(new THREE.Vector2(Math.max(0.001, r), t * length));
   }
-  const geo = new THREE.LatheGeometry(pts, 20);
+  const geo = new THREE.LatheGeometry(pts, 22);
   geo.rotateX(Math.PI / 2);
   geo.computeVertexNormals();
   return geo;
 }
 
-function createFingerSprings(p: FingerPose): FingerSprings {
-  return {
-    mcpX: new Spring1D(p.mcpX),
-    mcpY: new Spring1D(p.mcpY),
-    pipX: new Spring1D(p.pipX),
-    dipX: new Spring1D(p.dipX),
-  };
-}
-
-function createThumbSprings(p: ThumbPose): ThumbSprings {
-  return {
-    cmcX: new Spring1D(p.cmcX),
-    cmcY: new Spring1D(p.cmcY),
-    cmcZ: new Spring1D(p.cmcZ),
-    mcpX: new Spring1D(p.mcpX),
-    ipX: new Spring1D(p.ipX),
-  };
-}
-
 export class SculptedHandRig {
   public readonly root = new THREE.Group();
   public readonly motionGroup = new THREE.Group();
+  /** Independent forearm pronation/supination pivot (radius/ulna twist!) */
+  public readonly forearmPivot = new THREE.Group();
+  /** Radiocarpal wrist pivot inside forearmPivot */
   public readonly wristPivot = new THREE.Group();
   public readonly palmCenterAnchor = new THREE.Object3D();
   public readonly strikeTipAnchor = new THREE.Object3D();
 
+  /** Proprietary 27-DOF Biomechanical Articulation Solver */
+  public readonly kinesis: JHandKinesisEngine;
+
+  /** Real-time kinetic micro-Foley callback routed to JSound Engin 1.0 */
+  public onFoley?: (event: HandFoleyEvent, worldPos: THREE.Vector3) => void;
+
   private readonly mirrorSign: number; // +1 right hand (player), -1 mirrored (NPC)
   private readonly textures: TextureAtlasLoader;
 
+  // Articulated anatomical sub-segments driven by JHand Kinesis 1.0!
+  private readonly cmc4Pivot = new THREE.Group();
+  private readonly cmc5Pivot = new THREE.Group();
+  private thenarMesh!: THREE.Mesh;
+  private dorsalTendonMeshes: THREE.Mesh[] = [];
+  private dorsalTendonBaseY: number[] = [];
+
   private readonly thumb: ThumbJoints;
-  private readonly fingers: {
-    index: FingerJoints;
-    middle: FingerJoints;
-    ring: FingerJoints;
-    pinky: FingerJoints;
-  };
+  private readonly fingers: Record<FingerName, FingerJoints>;
 
   private primaryMat!: THREE.MeshPhysicalMaterial;
   private jointMat!: THREE.MeshPhysicalMaterial;
@@ -284,25 +150,7 @@ export class SculptedHandRig {
   private readonly sleeveMeshes: THREE.Mesh[] = [];
   private readonly trimMeshes: THREE.Mesh[] = [];
 
-  // Second-order spring bank for every articulated joint
-  private targetPose: FullHandPose = structuredClone(POSES.ready);
-  private currentPoseKey: HandPoseKey = 'ready';
-  private readonly thumbS: ThumbSprings;
-  private readonly fingerS: {
-    index: FingerSprings;
-    middle: FingerSprings;
-    ring: FingerSprings;
-    pinky: FingerSprings;
-  };
-  private readonly wristPitchS: Spring1D;
-  private readonly wristYawS: Spring1D;
-  private readonly wristRollS: Spring1D;
-
-  // Per-finger staggered cascade timers for sequential unfurl/lock
-  private fingerCascadeDelays = { thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0 };
-  private poseElapsed = 1.0;
-
-  // World-space second-order springs for arm motion & follow-through
+  // World-space second-order springs for arm translation & choreography overlays
   public targetOffset = new THREE.Vector3();
   private readonly offX = new Spring1D(0);
   private readonly offY = new Spring1D(0);
@@ -314,19 +162,16 @@ export class SculptedHandRig {
   private readonly extraYawS = new Spring1D(0);
   private readonly extraRollS = new Spring1D(0);
 
-  private jointStiffness = 220;
-  private jointDamping = 21;
   private motionStiffness = 195;
   private motionDamping = 19;
 
-  // Alive idle & dramatic kinetic overlays
+  // Kinetic overlays
   private idlePhase = 0;
   private idleDrummingWeight = 1.0;
   private recoilPulse = 0;
   private recoilAxis = 1;
-  private scissorSnipTimer = 0;
-  private thoughtPulse = 0;
   private isHoverPreviewing = false;
+  private readonly tmpWorldPos = new THREE.Vector3();
 
   constructor(
     textures: TextureAtlasLoader,
@@ -335,40 +180,38 @@ export class SculptedHandRig {
   ) {
     this.textures = textures;
     this.mirrorSign = isRightHand ? 1 : -1;
-    this.idlePhase = isRightHand ? 0.0 : 1.7; // Counter-phase natural breathing
+    this.idlePhase = isRightHand ? 0.0 : 1.7;
+    this.kinesis = new JHandKinesisEngine(this.idlePhase);
 
     this.root.add(this.motionGroup);
-    this.motionGroup.add(this.wristPivot);
+    this.motionGroup.add(this.forearmPivot);
+    this.forearmPivot.add(this.wristPivot);
 
     this.createMaterials(materialPreset);
     this.buildForearmAndCuff();
-    this.buildSculptedPalm();
+    this.buildSculptedAnatomicalPalm();
 
     this.thumb = this.buildThumb();
+
+    // Index & Middle mount to rigid radial metacarpal core; Ring & Pinky mount to flexing CMC4/CMC5 pivots!
+    const indexJ = this.buildFinger(this.wristPivot, 0.088 * this.mirrorSign, 0.008, 0.258, [0.105, 0.068, 0.056], 0.0245);
+    const middleJ = this.buildFinger(this.wristPivot, 0.028 * this.mirrorSign, 0.012, 0.268, [0.118, 0.076, 0.06], 0.0252);
+    // CMC4 pivot rests at carpal base of 4th metacarpal (-0.024, 0.002, 0.075)
+    const ringJ = this.buildFinger(this.cmc4Pivot, -0.008 * this.mirrorSign, 0.006, 0.18, [0.108, 0.07, 0.056], 0.024);
+    // CMC5 pivot rests at carpal base of 5th metacarpal (-0.062, -0.006, 0.075)
+    const pinkyJ = this.buildFinger(this.cmc5Pivot, -0.024 * this.mirrorSign, 0.002, 0.157, [0.086, 0.054, 0.048], 0.021);
+
     this.fingers = {
-      index: this.buildFinger(0.088 * this.mirrorSign, 0.008, 0.258, [0.105, 0.068, 0.056], 0.0245),
-      middle: this.buildFinger(0.028 * this.mirrorSign, 0.012, 0.268, [0.118, 0.076, 0.06], 0.0252),
-      ring: this.buildFinger(-0.032 * this.mirrorSign, 0.008, 0.255, [0.108, 0.07, 0.056], 0.024),
-      pinky: this.buildFinger(-0.086 * this.mirrorSign, -0.004, 0.232, [0.086, 0.054, 0.048], 0.021),
+      index: indexJ,
+      middle: middleJ,
+      ring: ringJ,
+      pinky: pinkyJ,
     };
 
     this.palmCenterAnchor.position.set(0, -0.01, 0.16);
     this.wristPivot.add(this.palmCenterAnchor);
     this.strikeTipAnchor.position.set(0, 0.02, 0.36);
     this.wristPivot.add(this.strikeTipAnchor);
-
-    // Initialize springs from ready pose
-    const p = POSES.ready;
-    this.thumbS = createThumbSprings(p.thumb);
-    this.fingerS = {
-      index: createFingerSprings(p.index),
-      middle: createFingerSprings(p.middle),
-      ring: createFingerSprings(p.ring),
-      pinky: createFingerSprings(p.pinky),
-    };
-    this.wristPitchS = new Spring1D(p.wristPitch);
-    this.wristYawS = new Spring1D(p.wristYaw);
-    this.wristRollS = new Spring1D(p.wristRoll);
 
     this.root.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
@@ -377,7 +220,9 @@ export class SculptedHandRig {
       }
     });
 
-    this.writeCurrentSpringsToRig(0, 0);
+    // Apply initial biomechanical frame cleanly
+    const initial = this.kinesis.step(1 / 120);
+    this.applySolvedFrameToRig(initial, 0);
   }
 
   private createMaterials(preset: HandMaterialPreset): void {
@@ -589,6 +434,14 @@ export class SculptedHandRig {
     this.trimMeshes.forEach((m) => (m.material = this.trimMat));
   }
 
+  public setKinesisMode(mode: JHandQualityMode): void {
+    this.kinesis.setQualityMode(mode);
+  }
+
+  public getKinesisTelemetry(): JHandTelemetry {
+    return this.kinesis.getTelemetry();
+  }
+
   private regPrimary(geo: THREE.BufferGeometry): THREE.Mesh {
     const m = new THREE.Mesh(geo, this.primaryMat);
     this.primaryMeshes.push(m);
@@ -601,19 +454,29 @@ export class SculptedHandRig {
     return m;
   }
 
+  /**
+   * Forearm & Kimono/Velvet Sleeve attach to `forearmPivot` so radius/ulna pronation
+   * organically twists the forearm cuff & carpal joint collar!
+   */
   private buildForearmAndCuff(): void {
     const wristGeo = new THREE.CylinderGeometry(0.094, 0.106, 0.11, 24);
     wristGeo.rotateX(Math.PI / 2);
     wristGeo.scale(1.16, 0.78, 1.0);
     const wristMesh = this.regPrimary(wristGeo);
     wristMesh.position.set(0, -0.004, -0.04);
-    this.wristPivot.add(wristMesh);
+    this.forearmPivot.add(wristMesh);
+
+    // Radiocarpal articular gimbal ring bridging forearmPivot and wristPivot
+    const carpalBall = this.regJoint(new THREE.SphereGeometry(0.072, 20, 14));
+    carpalBall.scale.set(1.22, 0.74, 0.65);
+    carpalBall.position.set(0, -0.002, 0.008);
+    this.wristPivot.add(carpalBall);
 
     const collarGeo = new THREE.TorusGeometry(0.096, 0.011, 14, 32);
     collarGeo.scale(1.18, 0.82, 1.0);
     const collar = this.regJoint(collarGeo);
     collar.position.set(0, -0.004, -0.088);
-    this.wristPivot.add(collar);
+    this.forearmPivot.add(collar);
 
     const sleevePts = [
       new THREE.Vector2(0.112, 0.0),
@@ -628,7 +491,7 @@ export class SculptedHandRig {
     const sleeve = new THREE.Mesh(sleeveGeo, this.sleeveMat);
     sleeve.position.set(0, -0.005, -0.092);
     this.sleeveMeshes.push(sleeve);
-    this.wristPivot.add(sleeve);
+    this.forearmPivot.add(sleeve);
 
     for (const zOff of [-0.115, -0.145]) {
       const bandGeo = new THREE.TorusGeometry(0.118, 0.0065, 12, 32);
@@ -636,53 +499,109 @@ export class SculptedHandRig {
       const band = new THREE.Mesh(bandGeo, this.trimMat);
       band.position.set(0, -0.005, zOff);
       this.trimMeshes.push(band);
-      this.wristPivot.add(band);
+      this.forearmPivot.add(band);
     }
   }
 
-  private buildSculptedPalm(): void {
-    const palmCore = this.regPrimary(new THREE.SphereGeometry(0.135, 32, 24));
-    palmCore.scale.set(0.96, 0.44, 1.12);
-    palmCore.position.set(0, 0.0, 0.128);
+  /**
+   * Sculpted Anatomical Palm with:
+   *  - Rigid Radial Metacarpal Core (Index & Middle base)
+   *  - Articulated CMC4 & CMC5 Ulnar Palm Segments (physically cup inward on fists!)
+   *  - Dynamic Thenar Eminence Musculature (bulges with thumb opposition!)
+   *  - 4 Visible Dorsal Extensor Tendon Cords (elevate & tense dynamically with finger action!)
+   */
+  private buildSculptedAnatomicalPalm(): void {
+    const s = this.mirrorSign;
+
+    // 1. Radial/Central Palm Core
+    const palmCore = this.regPrimary(new THREE.SphereGeometry(0.128, 32, 24));
+    palmCore.scale.set(0.86, 0.44, 1.12);
+    palmCore.position.set(0.018 * s, 0.0, 0.128);
     this.wristPivot.add(palmCore);
 
-    const knuckleBarGeo = new THREE.CapsuleGeometry(0.036, 0.168, 12, 20);
-    knuckleBarGeo.rotateZ(Math.PI / 2);
-    knuckleBarGeo.scale(1.0, 0.92, 1.05);
-    const knuckleBar = this.regPrimary(knuckleBarGeo);
-    knuckleBar.position.set(0.002 * this.mirrorSign, 0.006, 0.236);
-    this.wristPivot.add(knuckleBar);
+    // Radial knuckle bar spanning index & middle metacarpal heads
+    const radialKnuckleGeo = new THREE.CapsuleGeometry(0.035, 0.095, 12, 20);
+    radialKnuckleGeo.rotateZ(Math.PI / 2);
+    radialKnuckleGeo.scale(1.0, 0.92, 1.04);
+    const radialKnuckle = this.regPrimary(radialKnuckleGeo);
+    radialKnuckle.position.set(0.056 * s, 0.008, 0.238);
+    this.wristPivot.add(radialKnuckle);
 
-    const thenar = this.regPrimary(new THREE.SphereGeometry(0.072, 24, 18));
-    thenar.scale.set(0.88, 0.72, 1.24);
-    thenar.position.set(0.074 * this.mirrorSign, -0.022, 0.094);
-    thenar.rotation.y = 0.24 * this.mirrorSign;
-    this.wristPivot.add(thenar);
+    // 2. Articulated CMC4 Segment (4th Metacarpal - Ring Finger base)
+    this.cmc4Pivot.position.set(-0.024 * s, 0.002, 0.075);
+    this.wristPivot.add(this.cmc4Pivot);
+    const meta4Geo = new THREE.CapsuleGeometry(0.028, 0.138, 10, 16);
+    meta4Geo.rotateX(Math.PI / 2);
+    meta4Geo.scale(1.15, 0.92, 1.0);
+    const meta4 = this.regPrimary(meta4Geo);
+    meta4.position.set(-0.008 * s, 0.004, 0.096);
+    this.cmc4Pivot.add(meta4);
 
-    const hypo = this.regPrimary(new THREE.SphereGeometry(0.058, 22, 16));
-    hypo.scale.set(0.76, 0.68, 1.38);
-    hypo.position.set(-0.078 * this.mirrorSign, -0.018, 0.115);
-    this.wristPivot.add(hypo);
+    // 3. Articulated CMC5 Segment (5th Metacarpal + Hypothenar Mound - Pinky base!)
+    this.cmc5Pivot.position.set(-0.062 * s, -0.006, 0.075);
+    this.wristPivot.add(this.cmc5Pivot);
+    const meta5Geo = new THREE.CapsuleGeometry(0.026, 0.122, 10, 16);
+    meta5Geo.rotateX(Math.PI / 2);
+    meta5Geo.scale(1.12, 0.95, 1.0);
+    const meta5 = this.regPrimary(meta5Geo);
+    meta5.position.set(-0.018 * s, 0.0, 0.084);
+    this.cmc5Pivot.add(meta5);
 
-    const ridgeXs = [0.08, 0.026, -0.028, -0.078];
-    for (const rx of ridgeXs) {
-      const ridgeGeo = new THREE.CapsuleGeometry(0.014, 0.145, 8, 12);
+    const hypo = this.regPrimary(new THREE.SphereGeometry(0.054, 22, 16));
+    hypo.scale.set(0.76, 0.72, 1.38);
+    hypo.position.set(-0.022 * s, -0.016, 0.044);
+    this.cmc5Pivot.add(hypo);
+
+    // 4. Dynamic Thenar Eminence (visibly swells & rotates with thumb Kapandji opposition!)
+    this.thenarMesh = this.regPrimary(new THREE.SphereGeometry(0.072, 24, 18));
+    this.thenarMesh.scale.set(0.88, 0.72, 1.24);
+    this.thenarMesh.position.set(0.074 * s, -0.022, 0.094);
+    this.thenarMesh.rotation.y = 0.24 * s;
+    this.wristPivot.add(this.thenarMesh);
+
+    // 5. Four Dynamic Dorsal Extensor Tendon Cords (visibly tighten & lift in real time!)
+    const tendonDefs: Array<{ parent: THREE.Group; x: number; y: number; z: number; len: number; yaw: number }> = [
+      { parent: this.wristPivot, x: 0.068 * s, y: 0.041, z: 0.148, len: 0.142, yaw: 0.14 * s },
+      { parent: this.wristPivot, x: 0.022 * s, y: 0.045, z: 0.152, len: 0.148, yaw: 0.04 * s },
+      { parent: this.cmc4Pivot, x: -0.008 * s, y: 0.037, z: 0.082, len: 0.132, yaw: -0.04 * s },
+      { parent: this.cmc5Pivot, x: -0.016 * s, y: 0.032, z: 0.074, len: 0.118, yaw: -0.11 * s },
+    ];
+    this.dorsalTendonMeshes = [];
+    this.dorsalTendonBaseY = [];
+
+    for (const td of tendonDefs) {
+      // Sculpted dorsal metacarpal ridge
+      const ridgeGeo = new THREE.CapsuleGeometry(0.0125, td.len, 8, 12);
       ridgeGeo.rotateX(Math.PI / 2);
       const ridge = this.regPrimary(ridgeGeo);
-      ridge.position.set(rx * this.mirrorSign, 0.038, 0.148);
-      this.wristPivot.add(ridge);
+      ridge.position.set(td.x, td.y - 0.005, td.z);
+      ridge.rotation.y = td.yaw;
+      td.parent.add(ridge);
+
+      // Gleaming inlaid extensor tendon cord riding right on top of the ridge!
+      const cordGeo = new THREE.CapsuleGeometry(0.0046, td.len * 0.92, 6, 12);
+      cordGeo.rotateX(Math.PI / 2);
+      const cord = this.regJoint(cordGeo);
+      cord.position.set(td.x, td.y + 0.005, td.z);
+      cord.rotation.y = td.yaw;
+      td.parent.add(cord);
+
+      this.dorsalTendonMeshes.push(cord);
+      this.dorsalTendonBaseY.push(td.y + 0.005);
     }
 
-    const crest = this.regJoint(new THREE.CylinderGeometry(0.032, 0.036, 0.012, 24));
-    crest.position.set(0, 0.054, 0.125);
+    // 6. Precision Horological Dorsal Medallion Crest
+    const crest = this.regJoint(new THREE.CylinderGeometry(0.031, 0.035, 0.011, 24));
+    crest.position.set(0.008 * s, 0.052, 0.118);
     this.wristPivot.add(crest);
-    const crestRing = this.regJoint(new THREE.TorusGeometry(0.042, 0.0045, 10, 28));
+    const crestRing = this.regJoint(new THREE.TorusGeometry(0.041, 0.0042, 10, 28));
     crestRing.rotateX(Math.PI / 2);
-    crestRing.position.set(0, 0.056, 0.125);
+    crestRing.position.set(0.008 * s, 0.054, 0.118);
     this.wristPivot.add(crestRing);
   }
 
   private buildFinger(
+    parent: THREE.Group,
     x: number,
     y: number,
     z: number,
@@ -693,15 +612,20 @@ export class SculptedHandRig {
 
     const mcp = new THREE.Group();
     mcp.position.set(x, y, z);
-    this.wristPivot.add(mcp);
+    parent.add(mcp);
 
-    const mcpKnuckle = this.regJoint(new THREE.SphereGeometry(baseRadius * 1.08, 18, 14));
+    // Anatomical MCP Condyle Knuckle + Dual-Side Horological Pivot Pin + Articular Collar
+    const mcpKnuckle = this.regJoint(new THREE.SphereGeometry(baseRadius * 1.1, 20, 14));
     mcpKnuckle.scale.set(1.06, 0.96, 1.0);
     mcp.add(mcpKnuckle);
 
-    const mcpPin = this.regJoint(new THREE.CylinderGeometry(baseRadius * 0.36, baseRadius * 0.36, baseRadius * 2.25, 14));
+    const mcpPin = this.regJoint(new THREE.CylinderGeometry(baseRadius * 0.34, baseRadius * 0.34, baseRadius * 2.3, 14));
     mcpPin.rotateZ(Math.PI / 2);
     mcp.add(mcpPin);
+
+    const mcpCollar = this.regJoint(new THREE.TorusGeometry(baseRadius * 0.96, baseRadius * 0.11, 8, 20));
+    mcpCollar.position.set(0, 0, baseRadius * 0.55);
+    mcp.add(mcpCollar);
 
     mcp.add(this.regPrimary(createOrganicPhalanxGeo(l1, baseRadius, baseRadius * 0.87, false)));
 
@@ -709,8 +633,8 @@ export class SculptedHandRig {
     pip.position.set(0, 0, l1);
     mcp.add(pip);
 
-    pip.add(this.regJoint(new THREE.SphereGeometry(baseRadius * 0.92, 16, 12)));
-    const pipPin = this.regJoint(new THREE.CylinderGeometry(baseRadius * 0.28, baseRadius * 0.28, baseRadius * 1.95, 12));
+    pip.add(this.regJoint(new THREE.SphereGeometry(baseRadius * 0.93, 18, 12)));
+    const pipPin = this.regJoint(new THREE.CylinderGeometry(baseRadius * 0.27, baseRadius * 0.27, baseRadius * 1.98, 12));
     pipPin.rotateZ(Math.PI / 2);
     pip.add(pipPin);
 
@@ -720,9 +644,10 @@ export class SculptedHandRig {
     dip.position.set(0, 0, l2);
     pip.add(dip);
 
-    dip.add(this.regJoint(new THREE.SphereGeometry(baseRadius * 0.8, 16, 12)));
+    dip.add(this.regJoint(new THREE.SphereGeometry(baseRadius * 0.81, 16, 12)));
     dip.add(this.regPrimary(createOrganicPhalanxGeo(l3, baseRadius * 0.76, baseRadius * 0.66, true)));
 
+    // Sculpted Curved Clearcoat Fingernail
     const nailGeo = new THREE.SphereGeometry(baseRadius * 0.62, 14, 10);
     nailGeo.scale(0.95, 0.26, 1.35);
     const nail = new THREE.Mesh(nailGeo, this.nailMat);
@@ -744,7 +669,7 @@ export class SculptedHandRig {
     cmc.position.set(0.102 * this.mirrorSign, -0.016, 0.088);
     this.wristPivot.add(cmc);
 
-    cmc.add(this.regJoint(new THREE.SphereGeometry(baseR * 1.12, 18, 14)));
+    cmc.add(this.regJoint(new THREE.SphereGeometry(baseR * 1.14, 18, 14)));
     const lMeta = 0.095;
     cmc.add(this.regPrimary(createOrganicPhalanxGeo(lMeta, baseR * 1.08, baseR * 0.94, false)));
 
@@ -782,17 +707,11 @@ export class SculptedHandRig {
     return { cmc, mcp, ip, tipAnchor };
   }
 
-  /**
-   * Set spring dynamics for snappy vs ceremonial arm travel.
-   */
   public setMotionDynamics(stiffness: number, damping: number): void {
     this.motionStiffness = stiffness;
     this.motionDamping = damping;
   }
 
-  /**
-   * Immediately place hand offset off-stage so it glides in smoothly on opening / stage change!
-   */
   public triggerEntranceSlide(sideOffsetX: number): void {
     this.offX.snap(sideOffsetX);
     this.offY.snap(0.24);
@@ -806,9 +725,6 @@ export class SculptedHandRig {
     this.setMotionDynamics(105, 16.5);
   }
 
-  /**
-   * Inject kinetic velocity directly into hand position/wrist for snappy martial-arts whip-strike!
-   */
   public addMotionImpulse(vx: number, vy: number, vz: number, pitchV = 0, rollV = 0): void {
     this.offX.impulse(vx);
     this.offY.impulse(vy);
@@ -817,60 +733,24 @@ export class SculptedHandRig {
     this.extraRollS.impulse(rollV);
   }
 
-  /**
-   * Set target 21-bone posture with optional per-finger staggered wave cascade and spring snap!
-   */
   public setTargetPose(
     poseKey: HandPoseKey,
     snappy = false,
     cascadeWave = true,
     hoverMode = false
   ): void {
-    this.currentPoseKey = poseKey;
-    this.targetPose = structuredClone(POSES[poseKey]);
     this.isHoverPreviewing = hoverMode;
     this.idleDrummingWeight = poseKey === 'ready' && !hoverMode ? 1.0 : 0.0;
-
-    if (snappy) {
-      // Crisp under-damped spring gives authentic whip-crack overshoot on clash reveal!
-      this.jointStiffness = 520;
-      this.jointDamping = 24;
-    } else if (hoverMode) {
-      this.jointStiffness = 260;
-      this.jointDamping = 24;
-    } else {
-      this.jointStiffness = 190;
-      this.jointDamping = 21;
-    }
-
-    this.poseElapsed = 0;
-    if (cascadeWave) {
-      if (poseKey === PAPER || poseKey === 'salute') {
-        // Fan out gracefully from thumb -> pinky!
-        this.fingerCascadeDelays = { thumb: 0.0, index: 0.018, middle: 0.038, ring: 0.058, pinky: 0.08 };
-      } else if (poseKey === ROCK || poseKey === 'windup') {
-        // Curl pinky -> index tightly first, then thumb snaps shut over knuckles!
-        this.fingerCascadeDelays = { pinky: 0.0, ring: 0.012, middle: 0.024, index: 0.036, thumb: 0.068 };
-      } else if (poseKey === SCISSORS) {
-        // Ring/pinky lock immediately, V-blades flick open sharply!
-        this.fingerCascadeDelays = { ring: 0.0, pinky: 0.0, thumb: 0.012, index: 0.015, middle: 0.032 };
-      } else {
-        this.fingerCascadeDelays = { thumb: 0, index: 0.015, middle: 0.03, ring: 0.045, pinky: 0.06 };
-      }
-    } else {
-      this.fingerCascadeDelays = { thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0 };
-    }
+    this.kinesis.setTargetPose(poseKey, snappy, cascadeWave, hoverMode);
   }
 
-  /** Trigger signature Scissors double-snip blade motion on victory! */
   public triggerScissorsSnip(): void {
-    this.scissorSnipTimer = 0.56;
+    this.kinesis.triggerScissorsSnip();
   }
 
-  /** Trigger subtle JNV1.0 cognitive seal micro-tell (wrist cock + thoughtful finger ripple) */
   public triggerThoughtTell(): void {
-    this.thoughtPulse = 1.0;
-    this.extraRollS.impulse(-0.65 * this.mirrorSign);
+    this.kinesis.triggerThoughtTell();
+    this.extraRollS.impulse(-0.6 * this.mirrorSign);
   }
 
   public triggerRecoil(intensity = 1.0, axisDir = 1): void {
@@ -880,102 +760,73 @@ export class SculptedHandRig {
     this.offY.impulse(intensity * 0.45);
     this.extraPitchS.impulse(-intensity * 2.2);
     this.extraRollS.impulse(axisDir * intensity * 1.9);
+    this.kinesis.injectClashShock(intensity);
   }
 
-  private writeCurrentSpringsToRig(breath: number, drumPhase: number): void {
+  private applySolvedFrameToRig(solved: JHandSolvedFrame, breath: number): void {
     const s = this.mirrorSign;
 
-    // Scissors Victory Double-Snip angular modulation on index & middle blades!
-    let snipSpread = 0;
-    let snipPitch = 0;
-    if (this.scissorSnipTimer > 0 && this.currentPoseKey === SCISSORS) {
-      // Two razor-crisp scissor snips (close -> snap wide -> close -> snap wide)
-      const p = (0.56 - this.scissorSnipTimer) / 0.56; // 0..1
-      const snipWave = Math.sin(p * Math.PI * 4.0);
-      const closeAmt = Math.max(0, snipWave) * Math.exp(-p * 0.9);
-      snipSpread = -closeAmt * 0.24;
-      snipPitch = closeAmt * 0.09;
+    // 1. Forearm Pronation/Supination Twist + Radiocarpal Wrist Attitude
+    const wristThoughtRoll = Math.sin(this.idlePhase * 0.85) * 0.028 * this.idleDrummingWeight;
+    this.forearmPivot.rotation.set(
+      0,
+      0,
+      (solved.wrist.forearmPronation + wristThoughtRoll) * s + this.extraRollS.value * 0.55
+    );
+    this.wristPivot.rotation.set(
+      solved.wrist.wristPitch + this.extraPitchS.value + breath * 0.026,
+      solved.wrist.wristYaw * s + this.extraYawS.value,
+      solved.wrist.wristRoll * s + this.extraRollS.value * 0.45
+    );
+
+    // 2. Dynamic Palmar Metacarpal Arch (CMC4 & CMC5 ulnar palm cupping!)
+    // Positive cmc4/cmc5 curls ring & pinky palm segments inward around the transverse arch!
+    this.cmc4Pivot.rotation.set(solved.palm.cmc4Flex * 0.72, 0, solved.palm.cmc4Flex * 0.55 * s);
+    this.cmc5Pivot.rotation.set(solved.palm.cmc5Flex * 0.85, 0, solved.palm.cmc5Flex * 0.82 * s);
+
+    // 3. Dynamic Sculpted Thenar Eminence Musculature Bulge
+    const tb = solved.palm.thenarBulge;
+    this.thenarMesh.scale.set(0.86 + tb * 0.16, 0.7 + tb * 0.22, 1.22 + tb * 0.06);
+    this.thenarMesh.position.set(
+      (0.074 - tb * 0.009) * s,
+      -0.022 - tb * 0.008,
+      0.094 + tb * 0.008
+    );
+
+    // 4. Four Visible Dorsal Extensor Tendon Cords (visibly rise & tauten with tension!)
+    for (let i = 0; i < this.dorsalTendonMeshes.length; i++) {
+      const tension = solved.dorsalTendons[i];
+      const cord = this.dorsalTendonMeshes[i];
+      cord.position.y = this.dorsalTendonBaseY[i] + tension * 0.0042;
+      cord.scale.set(0.88 + tension * 0.34, 0.85 + tension * 0.45, 1.0);
     }
 
-    // Subtle contemplative finger-drumming ripple in idle 'ready' stance
-    const drumAmp = this.idleDrummingWeight * 0.065;
-    const thoughtBoost = this.thoughtPulse * 0.09;
-
-    const wristThoughtRoll = Math.sin(this.idlePhase * 0.85) * 0.03 * this.idleDrummingWeight;
-    this.wristPivot.rotation.set(
-      this.wristPitchS.value + this.extraPitchS.value + breath * 0.028,
-      this.wristYawS.value * s + this.extraYawS.value,
-      (this.wristRollS.value + wristThoughtRoll) * s + this.extraRollS.value
-    );
-
+    // 5. 5-DOF Saddle-Joint Thumb with True Kapandji Opposition Pronation
     this.thumb.cmc.rotation.set(
-      this.thumbS.cmcX.value,
-      (0.68 + this.thumbS.cmcY.value) * s,
-      (-0.62 - this.thumbS.cmcZ.value) * s
+      solved.thumb.cmcFlex,
+      (0.68 + solved.thumb.cmcAbd) * s,
+      (-0.62 - solved.thumb.cmcPronation) * s
     );
-    this.thumb.mcp.rotation.set(this.thumbS.mcpX.value, 0, 0);
-    this.thumb.ip.rotation.set(this.thumbS.ipX.value, 0, 0);
+    this.thumb.mcp.rotation.set(solved.thumb.mcpFlex, 0, 0);
+    this.thumb.ip.rotation.set(solved.thumb.ipFlex, 0, 0);
 
-    const applyF = (
-      j: FingerJoints,
-      fs: FingerSprings,
-      waveIdx: number,
-      extraSpread = 0,
-      extraCurl = 0
-    ) => {
-      const wave =
-        Math.pow(Math.max(0, Math.sin(drumPhase - waveIdx * 0.65)), 3) * (drumAmp + thoughtBoost);
-      const micro = breath * (0.015 + waveIdx * 0.005) + wave + extraCurl;
-      j.mcp.rotation.set(fs.mcpX.value + micro, (fs.mcpY.value + extraSpread) * s, 0);
-      j.pip.rotation.set(fs.pipX.value + micro * 0.85, 0, 0);
-      j.dip.rotation.set(fs.dipX.value + micro * 0.55, 0, 0);
-    };
-
-    applyF(this.fingers.index, this.fingerS.index, 0, snipSpread, snipPitch);
-    applyF(this.fingers.middle, this.fingerS.middle, 1, -snipSpread, -snipPitch * 0.6);
-    applyF(this.fingers.ring, this.fingerS.ring, 2);
-    applyF(this.fingers.pinky, this.fingerS.pinky, 3);
+    // 6. All 4 Fingers with ORL DIP–PIP Coupling + Scaphoid Convergence Roll!
+    const fNames: FingerName[] = ['index', 'middle', 'ring', 'pinky'];
+    for (const fn of fNames) {
+      const j = this.fingers[fn];
+      const st = solved.fingers[fn];
+      j.mcp.rotation.set(st.mcpFlex, st.mcpAbd * s, st.convergenceRoll * s);
+      j.pip.rotation.set(st.pipFlex, 0, 0);
+      j.dip.rotation.set(st.dipFlex, 0, 0);
+    }
   }
 
   public update(dt: number): void {
     const safeDt = Math.min(dt, 0.05);
     this.idlePhase += safeDt * 1.85;
-    this.poseElapsed += safeDt;
     this.recoilPulse = Math.max(0, this.recoilPulse - safeDt * 4.4);
-    this.thoughtPulse = Math.max(0, this.thoughtPulse - safeDt * 1.6);
-    if (this.scissorSnipTimer > 0) {
-      this.scissorSnipTimer = Math.max(0, this.scissorSnipTimer - safeDt);
-    }
 
-    const kJ = this.jointStiffness;
-    const dJ = this.jointDamping;
-
-    const stepFinger = (fs: FingerSprings, tgt: FingerPose, delay: number) => {
-      if (this.poseElapsed < delay) return;
-      fs.mcpX.step(tgt.mcpX, kJ, dJ, safeDt);
-      fs.mcpY.step(tgt.mcpY, kJ, dJ, safeDt);
-      fs.pipX.step(tgt.pipX, kJ, dJ, safeDt);
-      fs.dipX.step(tgt.dipX, kJ, dJ, safeDt);
-    };
-
-    stepFinger(this.fingerS.index, this.targetPose.index, this.fingerCascadeDelays.index);
-    stepFinger(this.fingerS.middle, this.targetPose.middle, this.fingerCascadeDelays.middle);
-    stepFinger(this.fingerS.ring, this.targetPose.ring, this.fingerCascadeDelays.ring);
-    stepFinger(this.fingerS.pinky, this.targetPose.pinky, this.fingerCascadeDelays.pinky);
-
-    if (this.poseElapsed >= this.fingerCascadeDelays.thumb) {
-      this.thumbS.cmcX.step(this.targetPose.thumb.cmcX, kJ, dJ, safeDt);
-      this.thumbS.cmcY.step(this.targetPose.thumb.cmcY, kJ, dJ, safeDt);
-      this.thumbS.cmcZ.step(this.targetPose.thumb.cmcZ, kJ, dJ, safeDt);
-      this.thumbS.mcpX.step(this.targetPose.thumb.mcpX, kJ, dJ, safeDt);
-      this.thumbS.ipX.step(this.targetPose.thumb.ipX, kJ, dJ, safeDt);
-    }
-
-    this.wristPitchS.step(this.targetPose.wristPitch, kJ * 0.85, dJ * 0.92, safeDt);
-    this.wristYawS.step(this.targetPose.wristYaw, kJ * 0.85, dJ * 0.92, safeDt);
-    this.wristRollS.step(this.targetPose.wristRoll, kJ * 0.85, dJ * 0.92, safeDt);
-
-    // Step world-space motion springs
+    // Step world-space motion springs first so we feed real wrist linear velocity into JHand Kinesis 1.0!
     const kM = this.motionStiffness;
     const dM = this.motionDamping;
     this.offX.step(this.targetOffset.x, kM, dM, safeDt);
@@ -995,8 +846,23 @@ export class SculptedHandRig {
       this.offZ.value + Math.cos(this.idlePhase * 0.7) * 0.006 * this.idleDrummingWeight
     );
 
-    const drumPhase = this.idlePhase * 1.15;
-    this.writeCurrentSpringsToRig(breath, drumPhase);
+    // Step 27-DOF JHand Kinesis 1.0 Biomechanics Engine!
+    const solved = this.kinesis.step(
+      safeDt,
+      { x: this.offX.velocity, y: this.offY.velocity, z: this.offZ.velocity },
+      this.extraPitchS.value,
+      this.extraRollS.value * this.mirrorSign
+    );
+
+    this.applySolvedFrameToRig(solved, breath);
+
+    // Stream live micro-Foley articulation events directly to JSound Engin 1.0!
+    if (this.onFoley && solved.foleyEvents.length > 0) {
+      this.palmCenterAnchor.getWorldPosition(this.tmpWorldPos);
+      for (const ev of solved.foleyEvents) {
+        this.onFoley(ev, this.tmpWorldPos);
+      }
+    }
   }
 
   public getPalmWorldPosition(out: THREE.Vector3): THREE.Vector3 {

@@ -28,6 +28,8 @@ import {
   FpsLimitMode,
   GraphicsSettings,
   HandMaterialPreset,
+  JHandModeSetting,
+  JSoundModeSetting,
   RESOLUTION_LIST,
   RenderMetrics,
   ResolutionPresetId,
@@ -52,6 +54,9 @@ export interface GameUIHandlers {
   onChangeShadowFlame: (mode: ShadowFlameMode) => void;
   onChangeStage: (stage: StageId) => void;
   onChangeHandMaterials: (playerMat: HandMaterialPreset, npcMat: HandMaterialPreset) => void;
+  onChangeJHandMode: (mode: JHandModeSetting) => void;
+  onChangeJSoundQuality: (quality: JSoundModeSetting) => void;
+  onToggleJSoundAmbience: (enabled: boolean) => void;
   onChangePersona: (persona: JNVPersonaId) => void;
   onToggleSound: () => boolean;
 }
@@ -218,14 +223,14 @@ export class GameUI {
 
         <!-- Sculpted Brass & Lacquer Icon Medallions -->
         <nav class="top-actions" aria-label="設定">
-          <button class="icon-medallion" id="btn-graphics" data-tip="映像・舞台 (G)" aria-label="映像・舞台設定">
+          <button class="icon-medallion" id="btn-graphics" data-tip="映像・関節・音響 (G)" aria-label="映像・関節・音響設定">
             ${NAV_ICONS.graphics}
           </button>
           <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 解析 (J)" aria-label="JNV1.0 解析">
             ${NAV_ICONS.inspector}
             <span class="medallion-seal-dot"></span>
           </button>
-          <button class="icon-medallion" id="btn-sound" data-tip="音響 ON/OFF" aria-label="音響切替">
+          <button class="icon-medallion" id="btn-sound" data-tip="JSound Engin 1.0 ON/OFF" aria-label="音響切替">
             ${NAV_ICONS.soundOn}
           </button>
           <button class="icon-medallion" id="btn-reset-match" data-tip="最初から" aria-label="試合をリセット">
@@ -289,12 +294,12 @@ export class GameUI {
         </button>
       </footer>
 
-      <!-- Left Slide-Out Drawer: Graphics Studio -->
-      <aside class="drawer left" id="drawer-graphics" aria-label="映像・舞台設定">
+      <!-- Left Slide-Out Drawer: Graphics · JHand · JSound Studio -->
+      <aside class="drawer left" id="drawer-graphics" aria-label="映像・関節・音響設定">
         <div class="drawer-header">
           <div class="drawer-title">
-            <h2>映像 · 舞台</h2>
-            <span class="drawer-badge">KHDR / SF 1.0</span>
+            <h2>映像 · 関節 · 音響</h2>
+            <span class="drawer-badge">JHand / JSound</span>
           </div>
           <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
@@ -636,6 +641,24 @@ export class GameUI {
         <div class="metric-box"><div class="k">Draw / Tri</div><div class="v">${m.drawCalls} / ${(m.triangles / 1000).toFixed(1)}k</div></div>
       `;
     }
+
+    const jhandEl = this.graphicsBodyEl.querySelector('#live-jhand-stats');
+    if (jhandEl) {
+      jhandEl.innerHTML = `
+        <div class="metric-box"><div class="k">手掌アーチ角 (CMC4/5)</div><div class="v gold">${m.jhandPalmCupDeg.toFixed(1)}°</div></div>
+        <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${Math.round(m.jhandOrlRatio * 100)}% (${m.jhandDof}-DOF)</div></div>
+      `;
+    }
+
+    const jsoundEl = this.graphicsBodyEl.querySelector('#live-jsound-stats');
+    if (jsoundEl) {
+      const peakStr = m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`;
+      jsoundEl.innerHTML = `
+        <div class="metric-box"><div class="k">空間残響 RT60</div><div class="v gold">${m.jsoundRt60Sec.toFixed(2)}s</div></div>
+        <div class="metric-box"><div class="k">Voices / Peak</div><div class="v">${m.jsoundVoices}ch · ${peakStr}</div></div>
+        <div class="metric-box wide"><div class="k">物理衝突素材ペア</div><div class="v">${m.jsoundMaterialPair}</div></div>
+      `;
+    }
   }
 
   public syncSettings(settings: GraphicsSettings): void {
@@ -688,6 +711,7 @@ export class GameUI {
   // LEFT DRAWER: ULTRA-CLEAN VISUAL GRAPHICS & STAGE STUDIO
   // ===========================================================================
   private renderGraphicsDrawer(): void {
+    const prevScroll = this.graphicsBodyEl.scrollTop;
     const s = this.currentSettings;
     const m = this.lastMetrics;
     const fpsOptions: Array<{ v: FpsLimitMode; label: string }> = [
@@ -760,6 +784,46 @@ export class GameUI {
           `
             )
             .join('')}
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><span class="section-title">JHand Kinesis 1.0</span><span class="section-meta">${s.jhandMode === 'biomech_pro' ? '27-DOF 生体関節' : '21-DOF 標準'}</span></div>
+        <div class="pill-grid cols-2">
+          <button class="pill-btn ${s.jhandMode === 'biomech_pro' ? 'active' : ''}" data-jhand="biomech_pro">
+            <span>極 27-DOF</span>
+            <span class="sub">ORL連成+手掌アーチ</span>
+          </button>
+          <button class="pill-btn ${s.jhandMode === 'standard' ? 'active' : ''}" data-jhand="standard">
+            <span>標準 21-DOF</span>
+            <span class="sub">基本バネ関節</span>
+          </button>
+        </div>
+        <div class="metric-grid" id="live-jhand-stats">
+          <div class="metric-box"><div class="k">手掌アーチ角 (CMC4/5)</div><div class="v gold">${m ? `${m.jhandPalmCupDeg.toFixed(1)}°` : '—'}</div></div>
+          <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${m ? `${Math.round(m.jhandOrlRatio * 100)}% (${m.jhandDof}-DOF)` : '—'}</div></div>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><span class="section-title">JSound Engin 1.0</span><span class="section-meta">${s.jsoundQuality === 'pro' ? 'HRTF + 建築IR' : '軽量物理合成'}</span></div>
+        <div class="pill-grid cols-2">
+          <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
+            <span>1.0 Pro</span>
+            <span class="sub">HRTF + 畳み込みIR</span>
+          </button>
+          <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
+            <span>1.0 Lite</span>
+            <span class="sub">軽量モーダル合成</span>
+          </button>
+        </div>
+        <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
+          <span>${s.jsoundAmbience ? '✓ 舞台環境音 ON（室鳴・風・湯滝）' : '舞台環境音 OFF'}</span>
+        </button>
+        <div class="metric-grid" id="live-jsound-stats">
+          <div class="metric-box"><div class="k">空間残響 RT60</div><div class="v gold">${m ? `${m.jsoundRt60Sec.toFixed(2)}s` : '—'}</div></div>
+          <div class="metric-box"><div class="k">Voices / Peak</div><div class="v">${m ? `${m.jsoundVoices}ch · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
+          <div class="metric-box wide"><div class="k">物理衝突素材ペア</div><div class="v">${m ? m.jsoundMaterialPair : '—'}</div></div>
         </div>
       </section>
 
@@ -851,6 +915,15 @@ export class GameUI {
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-sf]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeShadowFlame(b.dataset.sf as ShadowFlameMode));
     });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-jhand]').forEach((b) => {
+      b.addEventListener('click', () => this.handlers.onChangeJHandMode(b.dataset.jhand as JHandModeSetting));
+    });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-jsound]').forEach((b) => {
+      b.addEventListener('click', () => this.handlers.onChangeJSoundQuality(b.dataset.jsound as JSoundModeSetting));
+    });
+    this.graphicsBodyEl.querySelector('#btn-jsound-ambience')!.addEventListener('click', () => {
+      this.handlers.onToggleJSoundAmbience(!this.currentSettings.jsoundAmbience);
+    });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-stage]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeStage(b.dataset.stage as StageId));
     });
@@ -876,6 +949,8 @@ export class GameUI {
       if (this.lastMetrics) this.updateRenderMetrics(this.lastMetrics);
       this.renderGraphicsDrawer();
     });
+
+    this.graphicsBodyEl.scrollTop = prevScroll;
   }
 
   // ===========================================================================

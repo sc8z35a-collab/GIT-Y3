@@ -213,6 +213,13 @@ export class StageBuilder {
   // Animated water planes (Koi Pond / Onsen)
   private animatedWaterMaps: THREE.Texture[] = [];
 
+  /** Real-time physics bounce callback routed directly into JSound Engin 1.0 */
+  public onStoneBounce?: (
+    side: 'player' | 'npc',
+    velocity: number,
+    pos: { x: number; y: number; z: number }
+  ) => void;
+
   constructor(textures: TextureAtlasLoader) {
     this.textures = textures;
     this.buildPersistentTabletopProps();
@@ -1179,15 +1186,27 @@ export class StageBuilder {
     );
 
     // Ballistic gravity + elastic bounce for physical Go-stone victory counters!
-    const stepStone = (mesh: THREE.Mesh, velArr: number[], targetY: number, idx: number) => {
+    const stepStone = (
+      mesh: THREE.Mesh,
+      velArr: number[],
+      targetY: number,
+      idx: number,
+      side: 'player' | 'npc'
+    ) => {
       if (!mesh.visible) return;
       if (mesh.position.y > targetY + 0.0005 || Math.abs(velArr[idx]) > 0.01) {
         velArr[idx] -= 7.2 * safeDt;
         mesh.position.y += velArr[idx] * safeDt;
         if (mesh.position.y <= targetY) {
           mesh.position.y = targetY;
-          if (Math.abs(velArr[idx]) > 0.24) {
-            velArr[idx] = Math.abs(velArr[idx]) * 0.42; // Crisp ceramic bounce!
+          const impactSpeed = Math.abs(velArr[idx]);
+          if (impactSpeed > 0.16 && this.onStoneBounce) {
+            const wp = new THREE.Vector3();
+            mesh.getWorldPosition(wp);
+            this.onStoneBounce(side, Math.min(1.25, impactSpeed / 2.2), { x: wp.x, y: wp.y, z: wp.z });
+          }
+          if (impactSpeed > 0.24) {
+            velArr[idx] = impactSpeed * 0.42; // Crisp ceramic/bronze bounce!
           } else {
             velArr[idx] = 0;
           }
@@ -1196,8 +1215,8 @@ export class StageBuilder {
     };
 
     for (let i = 0; i < this.playerTokens.length; i++) {
-      stepStone(this.playerTokens[i], this.playerTokenVelY, this.playerTokenYTargets[i], i);
-      stepStone(this.npcTokens[i], this.npcTokenVelY, this.npcTokenYTargets[i], i);
+      stepStone(this.playerTokens[i], this.playerTokenVelY, this.playerTokenYTargets[i], i, 'player');
+      stepStone(this.npcTokens[i], this.npcTokenVelY, this.npcTokenYTargets[i], i, 'npc');
     }
 
     // Subtle organic water surface drift on Koi Pond / Onsen caustics
