@@ -70,29 +70,30 @@ class JankenKiwamiApp {
         this.ui.syncSettings(this.scene.getSettings());
       },
       onChangeStage: (stage) => {
-        this.sound.playWoodTap(640);
         this.scene.applyStage(stage, true);
         this.ui.syncSettings(this.scene.getSettings());
       },
       onChangeHandMaterials: (playerMat, npcMat) => {
-        this.sound.playWoodTap(700);
         this.scene.setHandMaterials(playerMat, npcMat);
         this.ui.syncSettings(this.scene.getSettings());
       },
       onChangeJHandMode: (mode) => {
-        this.sound.playWoodTap(mode === 'biomech_pro' ? 880 : 620);
+        this.sound.playWoodTap(mode === 'biomech_ultra' ? 940 : mode === 'biomech_pro' ? 780 : 600);
         this.scene.setJHandMode(mode);
         this.ui.syncSettings(this.scene.getSettings());
       },
       onChangeJSoundQuality: (quality) => {
         this.scene.setJSoundQuality(quality);
-        this.sound.playWoodTap(quality === 'pro' ? 900 : 600);
+        this.sound.playWoodTap(quality === 'ultra' ? 960 : quality === 'pro' ? 800 : 600);
         this.ui.syncSettings(this.scene.getSettings());
       },
       onToggleJSoundAmbience: (enabled) => {
         this.scene.setJSoundAmbience(enabled);
         this.sound.playWoodTap(enabled ? 820 : 520);
         this.ui.syncSettings(this.scene.getSettings());
+      },
+      onAuditionSound: (instrument) => {
+        this.sound.playAuditionSound(instrument);
       },
       onChangePersona: (personaId: JNVPersonaId) => {
         this.sound.playClockworkLock();

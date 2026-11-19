@@ -305,6 +305,7 @@ export class GameScene {
     if (withRevealSweep) {
       this.cameraDirector.triggerStageReveal();
       this.triggerOpeningEntrance();
+      this.sound.playStageTransition(stageId);
     }
   }
 
@@ -316,19 +317,26 @@ export class GameScene {
   }
 
   public setHandMaterials(playerMat: HandMaterialPreset, npcMat: HandMaterialPreset): void {
+    const playerChanged = playerMat !== this.settings.playerHandMaterial;
+    const npcChanged = npcMat !== this.settings.npcHandMaterial;
     this.settings.playerHandMaterial = playerMat;
     this.settings.npcHandMaterial = npcMat;
     this.playerHand.setMaterialPreset(playerMat);
     this.npcHand.setMaterialPreset(npcMat);
-    // Sync JSound Engin 1.0 coupled material acoustics immediately!
+    // Sync JSound Engin 1.1 coupled material & sleeve-textile acoustics immediately!
     this.sound.setHandMaterials(playerMat, npcMat);
-    // Subtle flourish turn + tactile sample click to showcase freshly swapped craft material!
+    if (playerChanged) {
+      this.sound.playMaterialPreview(playerMat, 'player');
+    } else if (npcChanged) {
+      this.sound.playMaterialPreview(npcMat, 'npc');
+    }
+    // Subtle flourish turn to showcase freshly swapped craft material!
     this.playerHand.addMotionImpulse(0, 0.45, 0, -0.8, 1.4);
     this.npcHand.addMotionImpulse(0, 0.45, 0, -0.8, -1.4);
   }
 
   public setTableScores(playerWins: number, npcWins: number): void {
-    // StageBuilder ballistic Go-stones automatically stream every physical bounce into JSound Engin 1.0!
+    // StageBuilder ballistic Go-stones automatically stream every physical bounce into JSound Engin 1.1!
     this.stageBuilder.setScores(playerWins, npcWins);
   }
 
@@ -360,7 +368,7 @@ export class GameScene {
   }
 
   /**
-   * Rich tactile hover anticipation on the Player's 3D hand when hovering Rock/Scissors/Paper!
+   * Rich tactile hover anticipation on the Player's 3D hand + JSound 1.1 preview cue!
    */
   public previewHoverMove(move: Move | null): void {
     if (this.isAnimatingRound) return;
@@ -376,6 +384,7 @@ export class GameScene {
       this.playerHand.targetOffset.set(0.055, 0.048, 0.015);
       this.playerHand.targetExtraPitch = -0.09;
       this.playerHand.targetExtraRoll = move === SCISSORS ? 0.12 : move === PAPER ? -0.1 : 0.04;
+      this.sound.playHoverPreview(move);
     }
   }
 
@@ -458,7 +467,7 @@ export class GameScene {
       this.npcHand.addMotionImpulse(0.35, 1.35, 0, -1.5, 0);
 
       this.stageBuilder.syncJNVClockwork(0.85, 0.9, true);
-      this.sound.playBeat(1);
+      this.sound.playBeat(1, isMatchDecidingPoint, isAikoFollowup);
       callbacks.onBeat?.(beat1Label, 1);
     });
 
@@ -485,25 +494,27 @@ export class GameScene {
         this.playerHand.addMotionImpulse(-0.55, 1.75, 0, -2.0, 0);
         this.npcHand.addMotionImpulse(0.55, 1.75, 0, -2.0, 0);
 
-        this.sound.playBeat(2);
+        this.sound.playBeat(2, isMatchDecidingPoint, isAikoFollowup);
         callbacks.onBeat?.(beat2Label, 2);
       });
 
-      // === PRE-STRIKE WHIP RELEASE (t = 0.54s): Silk Whoosh right before impact ===
+      // === PRE-STRIKE WHIP RELEASE (t = 0.54s): Dual Craft-Sleeve Strouhal Whoosh right before impact ===
       addCue(0.54, () => {
-        this.sound.playWhoosh(1.25, 1.25);
+        this.sound.playWhoosh(1.25, 1.24, { x: -0.24, y: 0.34, z: 0.12 }, 'player');
+        this.sound.playWhoosh(1.18, 1.2, { x: 0.24, y: 0.34, z: 0.12 }, 'npc');
       });
     } else {
       addCue(0.22, () => {
         this.cameraDirector.setMood('apex');
-        this.sound.playWhoosh(1.2, 1.35);
+        this.sound.playWhoosh(1.22, 1.34, { x: -0.22, y: 0.34, z: 0.12 }, 'player');
+        this.sound.playWhoosh(1.16, 1.3, { x: 0.22, y: 0.34, z: 0.12 }, 'npc');
       });
     }
 
     const revealAt = isAikoFollowup ? 0.32 : 0.61;
     const winnerMove = outcome === 'LOSS' ? npcMove : playerMove;
 
-    // === BEAT 3 (PON!!): Explosive Forward Lunge + 21-Bone Articulation + Hit-Stop + VFX ===
+    // === BEAT 3 (PON!!): Explosive Forward Lunge + 38-DOF Articulation + Hit-Stop + VFX ===
     addCue(revealAt, () => {
       this.cameraDirector.setMood('clash');
       const dirX = outcome === 'WIN' ? 1 : outcome === 'LOSS' ? -1 : 0;
@@ -522,7 +533,7 @@ export class GameScene {
       this.playerHand.setTargetPose(playerMove, true, true);
       this.npcHand.setTargetPose(npcMove, true, true);
 
-      this.sound.playClashImpact(outcome, winnerMove);
+      this.sound.playClashImpact(outcome, winnerMove, isMatchDecidingPoint);
       this.atmosphere.emitClashBurst(outcome, winnerMove, new THREE.Vector3(0, 0.3, 0.08));
 
       // Trigger Cinema Hit-Stop Time Dilation (brief dramatic slow-mo freeze-frame right on impact!)
@@ -779,10 +790,16 @@ export class GameScene {
           jhandDof: jhandT.activeDof,
           jhandPalmCupDeg: jhandT.palmCupDeg,
           jhandOrlRatio: jhandT.orlCouplingRatio,
+          jhandIcrGlideMm: jhandT.icrGlideMm,
+          jhandFdiPct: jhandT.fdiBulgePct,
+          jhandSynergyJp: jhandT.synergyPhaseJp,
           jsoundRt60Sec: jsoundT.stageRt60Sec,
+          jsoundEarlyRays: jsoundT.earlyRayCount,
+          jsoundDspRateKhz: Math.round(jsoundT.internalDspRateHz / 1000),
           jsoundVoices: jsoundT.activeVoices,
           jsoundPeakDb: jsoundT.peakDb,
           jsoundMaterialPair: jsoundT.materialPairJp,
+          jsoundLastEventJp: jsoundT.lastAcousticEventJp,
         });
       }
     };

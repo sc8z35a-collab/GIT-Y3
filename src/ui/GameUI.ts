@@ -12,6 +12,7 @@
  *  - Slide-out Drawers: Visual PBR-Thumbnail Graphics Studio + Clean JNV1.0 Cognitive Inspector
  */
 
+import { AuditionInstrumentId } from '../audio/SoundEngine';
 import { runJNV1Benchmark, BenchmarkBotResult } from '../engine/jnv1/benchmark';
 import { JNV_PERSONA_LIST } from '../engine/jnv1/personas';
 import {
@@ -57,9 +58,21 @@ export interface GameUIHandlers {
   onChangeJHandMode: (mode: JHandModeSetting) => void;
   onChangeJSoundQuality: (quality: JSoundModeSetting) => void;
   onToggleJSoundAmbience: (enabled: boolean) => void;
+  onAuditionSound: (instrument: AuditionInstrumentId) => void;
   onChangePersona: (persona: JNVPersonaId) => void;
   onToggleSound: () => boolean;
 }
+
+const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> = [
+  { id: 'taiko', label: '大太鼓' },
+  { id: 'kotsuzumi', label: '小鼓' },
+  { id: 'koto', label: '十三絃箏' },
+  { id: 'shakuhachi', label: '尺八' },
+  { id: 'rin_bell', label: 'おりん' },
+  { id: 'hyoshigi', label: '拍子木' },
+  { id: 'furin', label: '江戸風鈴' },
+  { id: 'shishi_odoshi', label: '鹿威し' },
+];
 
 const HAND_MATERIAL_OPTIONS: Array<{ id: HandMaterialPreset; label: string; swatch: string }> = [
   { id: 'hinoki_ivory', label: '檜象牙', swatch: 'linear-gradient(135deg, #f5e6ce 0%, #d4b282 100%)' },
@@ -230,7 +243,7 @@ export class GameUI {
             ${NAV_ICONS.inspector}
             <span class="medallion-seal-dot"></span>
           </button>
-          <button class="icon-medallion" id="btn-sound" data-tip="JSound Engin 1.0 ON/OFF" aria-label="音響切替">
+          <button class="icon-medallion" id="btn-sound" data-tip="JSound Engin 1.1 ON/OFF" aria-label="音響切替">
             ${NAV_ICONS.soundOn}
           </button>
           <button class="icon-medallion" id="btn-reset-match" data-tip="最初から" aria-label="試合をリセット">
@@ -294,12 +307,12 @@ export class GameUI {
         </button>
       </footer>
 
-      <!-- Left Slide-Out Drawer: Graphics · JHand · JSound Studio -->
+      <!-- Left Slide-Out Drawer: Graphics · JHand 1.1 · JSound 1.1 Studio -->
       <aside class="drawer left" id="drawer-graphics" aria-label="映像・関節・音響設定">
         <div class="drawer-header">
           <div class="drawer-title">
             <h2>映像 · 関節 · 音響</h2>
-            <span class="drawer-badge">JHand / JSound</span>
+            <span class="drawer-badge">1.1 Ultra</span>
           </div>
           <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
@@ -645,8 +658,10 @@ export class GameUI {
     const jhandEl = this.graphicsBodyEl.querySelector('#live-jhand-stats');
     if (jhandEl) {
       jhandEl.innerHTML = `
-        <div class="metric-box"><div class="k">手掌アーチ角 (CMC4/5)</div><div class="v gold">${m.jhandPalmCupDeg.toFixed(1)}°</div></div>
-        <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${Math.round(m.jhandOrlRatio * 100)}% (${m.jhandDof}-DOF)</div></div>
+        <div class="metric-box"><div class="k">手掌アーチ / 自由度</div><div class="v gold">${m.jhandPalmCupDeg.toFixed(1)}° · ${m.jhandDof}DOF</div></div>
+        <div class="metric-box"><div class="k">ICRカム滑動 / FDI筋</div><div class="v">${m.jhandIcrGlideMm.toFixed(2)}mm · ${m.jhandFdiPct}%</div></div>
+        <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${Math.round(m.jhandOrlRatio * 100)}%</div></div>
+        <div class="metric-box"><div class="k">二段階協調相</div><div class="v">${m.jhandSynergyJp}</div></div>
       `;
     }
 
@@ -654,9 +669,10 @@ export class GameUI {
     if (jsoundEl) {
       const peakStr = m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`;
       jsoundEl.innerHTML = `
-        <div class="metric-box"><div class="k">空間残響 RT60</div><div class="v gold">${m.jsoundRt60Sec.toFixed(2)}s</div></div>
-        <div class="metric-box"><div class="k">Voices / Peak</div><div class="v">${m.jsoundVoices}ch · ${peakStr}</div></div>
-        <div class="metric-box wide"><div class="k">物理衝突素材ペア</div><div class="v">${m.jsoundMaterialPair}</div></div>
+        <div class="metric-box"><div class="k">内部DSP / 反射光線</div><div class="v gold">${m.jsoundDspRateKhz}kHz · ${m.jsoundEarlyRays} Rays</div></div>
+        <div class="metric-box"><div class="k">残響 RT60 / Peak</div><div class="v">${m.jsoundRt60Sec.toFixed(2)}s · ${peakStr}</div></div>
+        <div class="metric-box"><div class="k">衝突素材ペア</div><div class="v">${m.jsoundMaterialPair}</div></div>
+        <div class="metric-box"><div class="k">直近発音 (${m.jsoundVoices}ch)</div><div class="v">${m.jsoundLastEventJp}</div></div>
       `;
     }
   }
@@ -788,42 +804,61 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">JHand Kinesis 1.0</span><span class="section-meta">${s.jhandMode === 'biomech_pro' ? '27-DOF 生体関節' : '21-DOF 標準'}</span></div>
-        <div class="pill-grid cols-2">
+        <div class="section-head"><span class="section-title">JHand Kinesis 1.1</span><span class="section-meta">${s.jhandMode === 'biomech_ultra' ? '38-DOF 極致生体' : s.jhandMode === 'biomech_pro' ? '27-DOF 連成関節' : '21-DOF 標準'}</span></div>
+        <div class="pill-grid cols-3">
+          <button class="pill-btn ${s.jhandMode === 'biomech_ultra' ? 'active' : ''}" data-jhand="biomech_ultra">
+            <span>極 38-DOF</span>
+            <span class="sub">二列手根+ICR</span>
+          </button>
           <button class="pill-btn ${s.jhandMode === 'biomech_pro' ? 'active' : ''}" data-jhand="biomech_pro">
-            <span>極 27-DOF</span>
-            <span class="sub">ORL連成+手掌アーチ</span>
+            <span>27-DOF</span>
+            <span class="sub">ORL+手掌</span>
           </button>
           <button class="pill-btn ${s.jhandMode === 'standard' ? 'active' : ''}" data-jhand="standard">
-            <span>標準 21-DOF</span>
-            <span class="sub">基本バネ関節</span>
+            <span>21-DOF</span>
+            <span class="sub">標準バネ</span>
           </button>
         </div>
         <div class="metric-grid" id="live-jhand-stats">
-          <div class="metric-box"><div class="k">手掌アーチ角 (CMC4/5)</div><div class="v gold">${m ? `${m.jhandPalmCupDeg.toFixed(1)}°` : '—'}</div></div>
-          <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${m ? `${Math.round(m.jhandOrlRatio * 100)}% (${m.jhandDof}-DOF)` : '—'}</div></div>
+          <div class="metric-box"><div class="k">手掌アーチ / 自由度</div><div class="v gold">${m ? `${m.jhandPalmCupDeg.toFixed(1)}° · ${m.jhandDof}DOF` : '—'}</div></div>
+          <div class="metric-box"><div class="k">ICRカム滑動 / FDI筋</div><div class="v">${m ? `${m.jhandIcrGlideMm.toFixed(2)}mm · ${m.jhandFdiPct}%` : '—'}</div></div>
+          <div class="metric-box"><div class="k">ORL 連成比</div><div class="v">${m ? `${Math.round(m.jhandOrlRatio * 100)}%` : '—'}</div></div>
+          <div class="metric-box"><div class="k">二段階協調相</div><div class="v">${m ? m.jhandSynergyJp : '—'}</div></div>
         </div>
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">JSound Engin 1.0</span><span class="section-meta">${s.jsoundQuality === 'pro' ? 'HRTF + 建築IR' : '軽量物理合成'}</span></div>
-        <div class="pill-grid cols-2">
+        <div class="section-head"><span class="section-title">JSound Engin 1.1</span><span class="section-meta">${s.jsoundQuality === 'ultra' ? '96kHz 2×OS · 62 Rays' : s.jsoundQuality === 'pro' ? '48kHz · HRTF IR' : '軽量物理合成'}</span></div>
+        <div class="pill-grid cols-3">
+          <button class="pill-btn ${s.jsoundQuality === 'ultra' ? 'active' : ''}" data-jsound="ultra">
+            <span>1.1 Ultra</span>
+            <span class="sub">96kHz·62Ray</span>
+          </button>
           <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
-            <span>1.0 Pro</span>
-            <span class="sub">HRTF + 畳み込みIR</span>
+            <span>1.1 Pro</span>
+            <span class="sub">HRTF·24Ray</span>
           </button>
           <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
-            <span>1.0 Lite</span>
-            <span class="sub">軽量モーダル合成</span>
+            <span>1.1 Lite</span>
+            <span class="sub">軽量合成</span>
           </button>
         </div>
         <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
-          <span>${s.jsoundAmbience ? '✓ 舞台環境音 ON（室鳴・風・湯滝）' : '舞台環境音 OFF'}</span>
+          <span>${s.jsoundAmbience ? '✓ 空間環境音 ON（室鳴・鹿威し・風鈴・湯滝）' : '空間環境音 OFF'}</span>
         </button>
+        <div class="swatch-row-label">物理楽器試聴（現舞台の空間残響で発音）</div>
+        <div class="audition-grid">
+          ${AUDITION_INSTRUMENTS.map(
+            (inst) => `
+            <button class="audition-btn" data-audition="${inst.id}">${inst.label}</button>
+          `
+          ).join('')}
+        </div>
         <div class="metric-grid" id="live-jsound-stats">
-          <div class="metric-box"><div class="k">空間残響 RT60</div><div class="v gold">${m ? `${m.jsoundRt60Sec.toFixed(2)}s` : '—'}</div></div>
-          <div class="metric-box"><div class="k">Voices / Peak</div><div class="v">${m ? `${m.jsoundVoices}ch · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
-          <div class="metric-box wide"><div class="k">物理衝突素材ペア</div><div class="v">${m ? m.jsoundMaterialPair : '—'}</div></div>
+          <div class="metric-box"><div class="k">内部DSP / 反射光線</div><div class="v gold">${m ? `${m.jsoundDspRateKhz}kHz · ${m.jsoundEarlyRays} Rays` : '—'}</div></div>
+          <div class="metric-box"><div class="k">残響 RT60 / Peak</div><div class="v">${m ? `${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
+          <div class="metric-box"><div class="k">衝突素材ペア</div><div class="v">${m ? m.jsoundMaterialPair : '—'}</div></div>
+          <div class="metric-box"><div class="k">直近発音 (${m ? m.jsoundVoices : 0}ch)</div><div class="v">${m ? m.jsoundLastEventJp : '—'}</div></div>
         </div>
       </section>
 
@@ -923,6 +958,12 @@ export class GameUI {
     });
     this.graphicsBodyEl.querySelector('#btn-jsound-ambience')!.addEventListener('click', () => {
       this.handlers.onToggleJSoundAmbience(!this.currentSettings.jsoundAmbience);
+    });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-audition]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.pulseEl(b, 'struck');
+        this.handlers.onAuditionSound(b.dataset.audition as AuditionInstrumentId);
+      });
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-stage]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeStage(b.dataset.stage as StageId));

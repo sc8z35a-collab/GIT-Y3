@@ -1141,6 +1141,41 @@ body,
   flex-shrink: 0;
 }
 
+/* JSound Engin 1.1 Compact 4x2 Physical Instrument Audition Deck (Zero Neon!) */
+.audition-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.audition-btn {
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: rgba(255, 248, 232, 0.04);
+  border: 1px solid var(--hairline);
+  color: var(--washi-secondary);
+  font-family: var(--font-serif);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
+}
+
+.audition-btn:hover {
+  border-color: var(--gold-border-strong);
+  background: rgba(212, 175, 104, 0.14);
+  color: var(--gold-bright);
+}
+
+.audition-btn:active,
+.audition-btn.struck {
+  border-color: var(--gold-bright);
+  background: rgba(212, 175, 104, 0.28);
+  color: #fffaf0;
+  transform: scale(0.95);
+}
+
 /* JNV1.0 Inspector Cards */
 .persona-grid {
   display: grid;
@@ -1265,7 +1300,8 @@ body,
 }
 
 .metric-box {
-  padding: 7px 9px;
+  min-width: 0;
+  padding: 7px 8px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--hairline);
@@ -1274,14 +1310,19 @@ body,
 .metric-box .k {
   font-size: 9.5px;
   color: var(--washi-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-box .v {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 11.5px;
+  line-height: 1.3;
   font-weight: 600;
   color: var(--washi-primary);
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .metric-box.wide {

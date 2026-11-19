@@ -99,8 +99,8 @@ export const SHADOW_FLAME_SPECS: Record<ShadowFlameMode, ShadowFlameSpec> = {
   },
 };
 
-export type JHandModeSetting = 'biomech_pro' | 'standard';
-export type JSoundModeSetting = 'pro' | 'lite';
+export type JHandModeSetting = 'biomech_ultra' | 'biomech_pro' | 'standard';
+export type JSoundModeSetting = 'ultra' | 'pro' | 'lite';
 
 export interface GraphicsSettings {
   resolution: ResolutionPresetId;
@@ -125,8 +125,8 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   stage: 'zashiki',
   playerHandMaterial: 'hinoki_ivory',
   npcHandMaterial: 'karakuri_bronze',
-  jhandMode: 'biomech_pro',
-  jsoundQuality: 'pro',
+  jhandMode: 'biomech_ultra',
+  jsoundQuality: 'ultra',
   jsoundAmbience: true,
 };
 
@@ -144,10 +144,16 @@ export interface RenderMetrics {
   jhandDof: number;
   jhandPalmCupDeg: number;
   jhandOrlRatio: number;
+  jhandIcrGlideMm: number;
+  jhandFdiPct: number;
+  jhandSynergyJp: string;
   jsoundRt60Sec: number;
+  jsoundEarlyRays: number;
+  jsoundDspRateKhz: number;
   jsoundVoices: number;
   jsoundPeakDb: number;
   jsoundMaterialPair: string;
+  jsoundLastEventJp: string;
 }
 
 /**

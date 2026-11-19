@@ -1,17 +1,138 @@
 /**
- * ★ JSound Engin 1.0 — Living Procedural Stage Ambience Synthesizer ★
+ * ★ JSound Engin 1.1 — Living Procedural Stage Ambience & 3D World Soundscape Actors ★
  *
- * Synthesizes seamless, zero-loop-click stereo acoustic room beds tailored to
- * each of the 5 architectural stages:
- *  - zashiki : Sunlit tatami stillness + soft garden air breathing through shoji
- *  - salon   : Grand marble room air warmth + subtle spatial shimmer
- *  - shrine  : Open cedar canopy breeze + hushed courtyard air
- *  - onsen   : Multi-layered limestone waterfall + foamy thermal stream + water droplets
- *  - atelier : Warm vaulted brick studio presence
+ * Upgraded v1.1 Multi-Layered Stereo Room Beds (`5.6s` equal-power circular crossfaded loops)
+ * PLUS Living Non-Repeating 3D Spatial Soundscape Micro-Actor Specifications for all 5 stages:
+ *  - zashiki : Sunlit tatami stillness + shoji paper breeze + garden Shishi-odoshi & Edo Furin!
+ *  - salon   : Grand marble room air bloom + distant antique pendulum clock tick-tock!
+ *  - shrine  : Open cedar canopy wind gusts + Kagura-Suzu eave shimmer + gentle cedar creak!
+ *  - onsen   : 3-layer limestone waterfall + thermal steam hiss + 3D spatial stalactite droplets!
+ *  - atelier : Warm brick vault room presence + hearth charcoal crackle + watchmaker chronometer!
  */
 
 import { StageId } from '../../graphics/GraphicsConfig';
 import { createSeededRng } from './ModalSynthesizer';
+import { Vec3 } from './types';
+
+export type SoundscapeActorKind =
+  | 'shishi_odoshi'
+  | 'furin'
+  | 'pendulum_clock'
+  | 'suzu_breeze'
+  | 'cedar_creak'
+  | 'water_droplet'
+  | 'hearth_pop'
+  | 'chronometer_tick';
+
+export interface StageSoundscapeSpec {
+  minIntervalSec: number;
+  maxIntervalSec: number;
+  actors: Array<{
+    kind: SoundscapeActorKind;
+    weight: number;
+    gain: number;
+    pos: Vec3;
+    posJitter: Vec3;
+    labelJp: string;
+  }>;
+}
+
+export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
+  zashiki: {
+    minIntervalSec: 4.8,
+    maxIntervalSec: 9.2,
+    actors: [
+      {
+        kind: 'shishi_odoshi',
+        weight: 0.48,
+        gain: 0.14,
+        pos: { x: -3.2, y: 0.4, z: -2.4 },
+        posJitter: { x: 0.4, y: 0.1, z: 0.3 },
+        labelJp: '庭・鹿威し',
+      },
+      {
+        kind: 'furin',
+        weight: 0.52,
+        gain: 0.085,
+        pos: { x: 2.7, y: 1.85, z: -1.6 },
+        posJitter: { x: 0.35, y: 0.15, z: 0.25 },
+        labelJp: '縁側・江戸風鈴',
+      },
+    ],
+  },
+  salon: {
+    minIntervalSec: 2.2,
+    maxIntervalSec: 4.0,
+    actors: [
+      {
+        kind: 'pendulum_clock',
+        weight: 1.0,
+        gain: 0.095,
+        pos: { x: 3.6, y: 1.5, z: -3.4 },
+        posJitter: { x: 0.1, y: 0.05, z: 0.1 },
+        labelJp: '大広間・振子時計',
+      },
+    ],
+  },
+  shrine: {
+    minIntervalSec: 4.2,
+    maxIntervalSec: 8.4,
+    actors: [
+      {
+        kind: 'suzu_breeze',
+        weight: 0.5,
+        gain: 0.09,
+        pos: { x: 0.4, y: 2.2, z: -2.8 },
+        posJitter: { x: 1.2, y: 0.2, z: 0.6 },
+        labelJp: '拝殿・神楽鈴風',
+      },
+      {
+        kind: 'cedar_creak',
+        weight: 0.5,
+        gain: 0.12,
+        pos: { x: -2.6, y: 1.7, z: -1.8 },
+        posJitter: { x: 0.8, y: 0.3, z: 0.8 },
+        labelJp: '檜軒・木鳴り',
+      },
+    ],
+  },
+  onsen: {
+    minIntervalSec: 1.1,
+    maxIntervalSec: 2.8,
+    actors: [
+      {
+        kind: 'water_droplet',
+        weight: 1.0,
+        gain: 0.18,
+        pos: { x: 0.0, y: 0.6, z: -1.4 },
+        posJitter: { x: 2.6, y: 0.9, z: 1.8 },
+        labelJp: '岩窟・雫滴音',
+      },
+    ],
+  },
+  atelier: {
+    minIntervalSec: 2.4,
+    maxIntervalSec: 5.5,
+    actors: [
+      {
+        kind: 'hearth_pop',
+        weight: 0.58,
+        gain: 0.13,
+        pos: { x: -2.8, y: 0.45, z: -2.1 },
+        posJitter: { x: 0.4, y: 0.15, z: 0.3 },
+        labelJp: '暖炉・備長炭爆ぜ',
+      },
+      {
+        kind: 'chronometer_tick',
+        weight: 0.42,
+        gain: 0.085,
+        pos: { x: 2.2, y: 0.8, z: -1.6 },
+        posJitter: { x: 0.2, y: 0.1, z: 0.2 },
+        labelJp: '書斎・精密時計',
+      },
+    ],
+  },
+};
 
 /**
  * Generate a seamlessly loopable (equal-power circular crossfaded) stereo room-tone buffer.
@@ -19,10 +140,10 @@ import { createSeededRng } from './ModalSynthesizer';
 export function generateStageAmbienceBuffer(
   stageId: StageId,
   sampleRate: number,
-  durationSec = 4.2
+  durationSec = 5.6
 ): { left: Float32Array; right: Float32Array } {
   const n = Math.floor(sampleRate * durationSec);
-  const fadeN = Math.floor(sampleRate * 0.45);
+  const fadeN = Math.floor(sampleRate * 0.52);
   const total = n + fadeN;
 
   const rawL = new Float32Array(total);
@@ -30,20 +151,19 @@ export function generateStageAmbienceBuffer(
 
   const seed =
     stageId === 'zashiki'
-      ? 1101
+      ? 11011
       : stageId === 'salon'
-      ? 2202
+      ? 22022
       : stageId === 'shrine'
-      ? 3303
+      ? 33033
       : stageId === 'onsen'
-      ? 4404
-      : 5505;
+      ? 44044
+      : 55055;
   const rng = createSeededRng(seed);
 
-  // Paul Kellet refined Pink Noise state (Left & Right decorrelated)
   let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0, b6L = 0;
   let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0, b6R = 0;
-  let lpL = 0, lpR = 0, lp2L = 0, lp2R = 0;
+  let lpL = 0, lpR = 0, lp2L = 0, lp2R = 0, lp3L = 0, lp3R = 0;
 
   const nextPinkL = () => {
     const w = rng() * 2 - 1;
@@ -71,7 +191,7 @@ export function generateStageAmbienceBuffer(
   };
 
   const twoPi = Math.PI * 2;
-  const loopOmega = twoPi / durationSec; // Exact integer harmonics keep modulation seamless!
+  const loopOmega = twoPi / durationSec;
 
   for (let i = 0; i < total; i++) {
     const t = i / sampleRate;
@@ -79,57 +199,69 @@ export function generateStageAmbienceBuffer(
     const pR = nextPinkR();
 
     if (stageId === 'onsen') {
-      // Multi-band Limestone Waterfall + Thermal Stream Foam!
-      const swellL = 0.84 + 0.16 * Math.sin(loopOmega * t * 1.0 + 0.4) * Math.cos(loopOmega * t * 2.0);
-      const swellR = 0.84 + 0.16 * Math.sin(loopOmega * t * 1.0 + 1.8) * Math.cos(loopOmega * t * 3.0);
+      // 3-Layer Limestone Waterfall (Deep Plunge + Mid Stream + Thermal Steam Mist!)
+      const swellL = 0.84 + 0.16 * Math.sin(loopOmega * t + 0.4) * Math.cos(loopOmega * t * 2);
+      const swellR = 0.84 + 0.16 * Math.sin(loopOmega * t + 1.8) * Math.cos(loopOmega * t * 3);
       lpL += (pL - lpL) * 0.095;
       lpR += (pR - lpR) * 0.095;
-      lp2L += (pL - lp2L) * 0.015;
-      lp2R += (pR - lp2R) * 0.015;
-      const foamL = (pL - lpL) * 0.32;
-      const foamR = (pR - lpR) * 0.32;
-      rawL[i] = (lpL * 0.85 + lp2L * 0.65 + foamL) * swellL;
-      rawR[i] = (lpR * 0.85 + lp2R * 0.65 + foamR) * swellR;
+      lp2L += (pL - lp2L) * 0.016;
+      lp2R += (pR - lp2R) * 0.016;
+      lp3L += (pL - lp3L) * 0.34;
+      lp3R += (pR - lp3R) * 0.34;
+      const foamL = (lp3L - lpL) * 0.32;
+      const foamR = (lp3R - lpR) * 0.32;
+      const steamL = (pL - lp3L) * 0.14;
+      const steamR = (pR - lp3R) * 0.14;
+      rawL[i] = (lpL * 0.85 + lp2L * 0.65 + foamL + steamL) * swellL;
+      rawR[i] = (lpR * 0.85 + lp2R * 0.65 + foamR + steamR) * swellR;
     } else if (stageId === 'shrine') {
-      // Open Cedar Courtyard Breeze
-      const gust = 0.58 + 0.42 * Math.sin(loopOmega * t * 1.0 + 0.3) * Math.sin(loopOmega * t * 2.0 + 0.7);
-      lpL += (pL - lpL) * 0.065;
-      lpR += (pR - lpR) * 0.065;
-      const leafL = (pL - lpL) * 0.24 * gust;
-      const leafR = (pR - lpR) * 0.24 * gust;
-      rawL[i] = lpL * 0.55 + leafL;
-      rawR[i] = lpR * 0.55 + leafR;
+      // Open Cedar Courtyard Breeze + Distant Pine Canopy Whisper
+      const gust = 0.56 + 0.44 * Math.sin(loopOmega * t + 0.3) * Math.sin(loopOmega * t * 2 + 0.7);
+      lpL += (pL - lpL) * 0.062;
+      lpR += (pR - lpR) * 0.062;
+      const leafL = (pL - lpL) * 0.26 * gust;
+      const leafR = (pR - lpR) * 0.26 * gust;
+      rawL[i] = lpL * 0.56 + leafL;
+      rawR[i] = lpR * 0.56 + leafR;
     } else if (stageId === 'salon') {
-      // Grand Marble Room Air Tone (ultra-clean low warm bloom)
+      // Grand Marble Room Air Presence (silky warm acoustic depth)
       lpL += (pL - lpL) * 0.032;
       lpR += (pR - lpR) * 0.032;
       const breath = 0.9 + 0.1 * Math.sin(loopOmega * t);
-      rawL[i] = lpL * 0.72 * breath;
-      rawR[i] = lpR * 0.72 * breath;
+      rawL[i] = lpL * 0.74 * breath;
+      rawR[i] = lpR * 0.74 * breath;
+    } else if (stageId === 'atelier') {
+      // Warm Vaulted Brick Studio + Gentle Hearth Draft Hum
+      lpL += (pL - lpL) * 0.048;
+      lpR += (pR - lpR) * 0.048;
+      lp2L += (pL - lp2L) * 0.012;
+      lp2R += (pR - lp2R) * 0.012;
+      const draft = 0.84 + 0.16 * Math.sin(loopOmega * t * 2 + 0.6);
+      rawL[i] = (lpL * 0.55 + lp2L * 0.5) * draft;
+      rawR[i] = (lpR * 0.55 + lp2R * 0.5) * draft;
     } else {
-      // Zashiki / Atelier quiet warm interior air breath
+      // Zashiki sunlit shoji breeze
       lpL += (pL - lpL) * 0.042;
       lpR += (pR - lpR) * 0.042;
-      const breeze = 0.82 + 0.18 * Math.sin(loopOmega * t * 1.0);
+      const breeze = 0.8 + 0.2 * Math.sin(loopOmega * t);
       rawL[i] = lpL * 0.68 * breeze;
       rawR[i] = lpR * 0.68 * breeze;
     }
   }
 
-  // Add realistic tiny water-droplet bubble pings into Onsen ambience (Minnaert bubble chirp!)
+  // Embed soft background bubble texture into Onsen bed (in addition to live 3D HRTF droplets!)
   if (stageId === 'onsen') {
     const dropCount = 14;
     for (let d = 0; d < dropCount; d++) {
-      const start = Math.floor((0.15 + rng() * (durationSec - 0.35)) * sampleRate);
-      const baseF = 850 + rng() * 1400;
+      const start = Math.floor((0.18 + rng() * (durationSec - 0.4)) * sampleRate);
+      const baseF = 850 + rng() * 1450;
       const dropLen = Math.floor(sampleRate * 0.032);
-      const pan = rng(); // 0..1
-      const gL = Math.cos(pan * Math.PI * 0.5) * 0.14;
-      const gR = Math.sin(pan * Math.PI * 0.5) * 0.14;
+      const pan = rng();
+      const gL = Math.cos(pan * Math.PI * 0.5) * 0.12;
+      const gR = Math.sin(pan * Math.PI * 0.5) * 0.12;
       let ph = 0;
       for (let k = 0; k < dropLen && start + k < total; k++) {
         const u = k / dropLen;
-        // Minnaert rising bubble pitch sweep!
         const f = baseF * (1 + u * 0.58);
         ph += (twoPi * f) / sampleRate;
         const env = Math.sin(Math.PI * u) * Math.exp(-u * 3.2);
@@ -140,7 +272,7 @@ export function generateStageAmbienceBuffer(
     }
   }
 
-  // Equal-power circular crossfade overlap for 100% click-free infinite loop!
+  // Equal-power circular crossfade overlap for 100% click-free infinite loop
   const left = new Float32Array(n);
   const right = new Float32Array(n);
   for (let i = 0; i < n; i++) {
