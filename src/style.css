@@ -1284,7 +1284,12 @@ body,
   margin-top: 2px;
 }
 
+.metric-box.wide {
+  grid-column: span 2;
+}
+
 .metric-box .v.good { color: var(--jade); }
+.metric-box .v.gold { color: var(--gold-bright); }
 .metric-box .v.warn { color: #e2806e; }
 
 .expert-list {
