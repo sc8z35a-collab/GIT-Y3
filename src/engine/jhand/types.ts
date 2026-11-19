@@ -35,7 +35,71 @@ export type HandPoseKey =
   | 'finger_gun'
   | 'palm_meditate'
   | 'victory_fist'
+  | 'lotus_mudra'
+  | 'sword_seal'
+  | 'tiger_palm'
+  | 'iron_knuckle'
+  | 'tea_whisk'
+  | 'fan_hold'
+  | 'brush_grip'
+  | 'koto_pluck'
+  | 'snap_ready'
+  | 'snap_release'
+  | 'peace_tilt'
+  | 'open_offer'
+  | 'fist_pump'
+  | 'defeat_slump'
+  | 'stealth_curl'
+  | 'wave_flourish'
+  | 'counter_parry'
+  | 'zen_circle'
   | Move;
+
+export interface HandPoseMeta {
+  key: HandPoseKey;
+  labelJp: string;
+  category: 'core' | 'martial' | 'craft' | 'expressive';
+}
+
+export const HAND_POSE_CATALOG: HandPoseMeta[] = [
+  { key: 'ready', labelJp: '自然構え', category: 'core' },
+  { key: 'windup', labelJp: '溜め拳', category: 'core' },
+  { key: 0, labelJp: '剛拳（グー）', category: 'core' },
+  { key: 1, labelJp: '双刃（チョキ）', category: 'core' },
+  { key: 2, labelJp: '開掌（パー）', category: 'core' },
+  { key: 'envelop', labelJp: '包摂掌', category: 'core' },
+  { key: 'bow', labelJp: '一礼', category: 'expressive' },
+  { key: 'salute', labelJp: '敬礼掌', category: 'expressive' },
+  { key: 'guard', labelJp: '手刀防御', category: 'martial' },
+  { key: 'feint_flick', labelJp: '牽制弾き', category: 'martial' },
+  { key: 'beckon', labelJp: '手招き', category: 'expressive' },
+  { key: 'knuckle_crack', labelJp: '拳鳴らし', category: 'martial' },
+  { key: 'blade_edge', labelJp: '貫手・手刀', category: 'martial' },
+  { key: 'crane_poise', labelJp: '鶴の構え', category: 'martial' },
+  { key: 'claw_charge', labelJp: '虎爪・極気迫', category: 'martial' },
+  { key: 'finger_gun', labelJp: '一指極め', category: 'expressive' },
+  { key: 'palm_meditate', labelJp: '静寂開掌', category: 'craft' },
+  { key: 'victory_fist', labelJp: '勝鬨拳', category: 'expressive' },
+  { key: 'lotus_mudra', labelJp: '蓮華印', category: 'craft' },
+  { key: 'sword_seal', labelJp: '剣印（九字）', category: 'martial' },
+  { key: 'tiger_palm', labelJp: '虎掌打', category: 'martial' },
+  { key: 'iron_knuckle', labelJp: '鳳眼拳', category: 'martial' },
+  { key: 'tea_whisk', labelJp: '茶筅持ち', category: 'craft' },
+  { key: 'fan_hold', labelJp: '舞扇構え', category: 'craft' },
+  { key: 'brush_grip', labelJp: '筆執り', category: 'craft' },
+  { key: 'koto_pluck', labelJp: '箏爪弾き', category: 'craft' },
+  { key: 'snap_ready', labelJp: '指パッチン溜', category: 'expressive' },
+  { key: 'snap_release', labelJp: '指弾き開放', category: 'expressive' },
+  { key: 'peace_tilt', labelJp: '斜め双刃', category: 'expressive' },
+  { key: 'open_offer', labelJp: '献上掌', category: 'craft' },
+  { key: 'fist_pump', labelJp: '凱旋握拳', category: 'expressive' },
+  { key: 'defeat_slump', labelJp: '脱力垂手', category: 'expressive' },
+  { key: 'stealth_curl', labelJp: '忍び構え', category: 'martial' },
+  { key: 'wave_flourish', labelJp: '歌舞伎波動', category: 'expressive' },
+  { key: 'counter_parry', labelJp: '受け流し', category: 'martial' },
+  { key: 'zen_circle', labelJp: '禅円相', category: 'craft' },
+];
+
 export type FingerName = 'index' | 'middle' | 'ring' | 'pinky';
 export type JHandQualityMode = 'biomech_ultra' | 'biomech_pro' | 'standard';
 

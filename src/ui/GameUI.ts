@@ -1,17 +1,19 @@
 /**
- * ★ Ultra-Sleek, Compact Museum-Lacquer & Gold-Leaf UI Controller — JANKEN · 極 v1.2 ★
+ * ★ Ultra-Sleek, Compact Museum-Lacquer & Gold-Leaf UI Controller — JANKEN · 極 v1.3 ★
  *
  * Strictly ZERO NEON · Compact Ergonomics · Mobile Fullscreen · Built-In PV Cinema Studio:
  *  - Compact Single-Row Mobile Header + Native Fullscreen API & iOS Safari Immersive Fallback
  *  - Much Smaller Sculpted Urushi Hand Cards (94×76 desktop / 72×58 mobile / 64×50 landscape)
  *  - Slim Tactical Strip: Spirit Gauge (気迫) + Overdrive (極一撃 2pt) + Feint (牽制) + Blitz Timer
  *  - Cinema 2.35:1 Letterbox + PV Mode Overlay (Official 26s / Battle 16s / Craft 18s + WebM Export + PNG)
- *  - Left Studio Drawer: Game Modes · PV Studio · Camera Director 2.0 · JSound Engin 1.2 (15-Inst)
- *    · JHand Kinesis 1.1 (18 Poses) · KHDR · Shadow Flame 1.0 · Compact UI Toggle
+ *  - Left Studio Drawer: FINGER S1.0 Hyper-Real Hand Mode · Game Modes · PV Studio
+ *    · Camera Director 2.1 (C² Silky) · JSound Engin 1.3 (384kHz 8×OS · 24-Inst Deck · 230-Ray)
+ *    · JHand Kinesis 1.1 (38-DOF · 36-Pose Showcase Gallery) · KHDR · Shadow Flame 1.0
  *  - Right Drawer: JNV1.0 36-Expert Cognitive Inspector & SHA-256 Pre-Commit Proof
  */
 
 import { AuditionInstrumentId } from '../audio/SoundEngine';
+import { HAND_POSE_CATALOG, HandPoseKey } from '../engine/jhand/types';
 import { runJNV1Benchmark, BenchmarkBotResult } from '../engine/jnv1/benchmark';
 import { JNV_PERSONA_LIST } from '../engine/jnv1/personas';
 import {
@@ -81,6 +83,8 @@ export interface GameUIHandlers {
   onToggleKHDRSplit: (enabled: boolean) => void;
   onChangeKHDRSplitX: (normX: number) => void;
   onChangeShadowFlame: (mode: ShadowFlameMode) => void;
+  onToggleFingerS1: (enabled: boolean) => void;
+  onPreviewPose: (pose: HandPoseKey) => void;
   onChangeStage: (stage: StageId) => void;
   onChangeHandMaterials: (playerMat: HandMaterialPreset, npcMat: HandMaterialPreset) => void;
   onChangeJHandMode: (mode: JHandModeSetting) => void;
@@ -94,23 +98,33 @@ export interface GameUIHandlers {
 
 const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> = [
   { id: 'taiko', label: '大太鼓' },
+  { id: 'otsuzumi', label: '大鼓' },
   { id: 'kotsuzumi', label: '小鼓' },
+  { id: 'kakko', label: '鞨鼓' },
   { id: 'koto', label: '十三絃箏' },
   { id: 'shamisen', label: '三味線' },
   { id: 'biwa', label: '薩摩琵琶' },
+  { id: 'ichigenkin', label: '一絃琴' },
   { id: 'shakuhachi', label: '尺八' },
   { id: 'shinobue', label: '篠笛' },
+  { id: 'ryuteki', label: '龍笛' },
+  { id: 'hichiriki', label: '篳篥' },
   { id: 'sho', label: '雅楽笙' },
+  { id: 'horagai', label: '法螺貝' },
   { id: 'rin_bell', label: 'おりん' },
+  { id: 'bonsho', label: '梵鐘' },
+  { id: 'dora', label: '銅鑼' },
   { id: 'atarigane', label: '祭摺鉦' },
   { id: 'mokugyo', label: '楠木魚' },
   { id: 'hyoshigi', label: '拍子木' },
   { id: 'furin', label: '江戸風鈴' },
   { id: 'sensu', label: '舞扇' },
   { id: 'shishi_odoshi', label: '鹿威し' },
+  { id: 'suikinkutsu', label: '水琴窟' },
 ];
 
-const HAND_MATERIAL_OPTIONS: Array<{ id: HandMaterialPreset; label: string; swatch: string }> = [
+const HAND_MATERIAL_OPTIONS: Array<{ id: HandMaterialPreset; label: string; swatch: string; hero?: boolean }> = [
+  { id: 'living_skin', label: '極写実肌 (FINGER S1.0)', swatch: 'linear-gradient(135deg, #f2ccb0 0%, #c99272 100%)', hero: true },
   { id: 'hinoki_ivory', label: '檜象牙', swatch: 'linear-gradient(135deg, #f5e6ce 0%, #d4b282 100%)' },
   { id: 'karakuri_bronze', label: '真鍮銅', swatch: 'linear-gradient(135deg, #cfa16b 0%, #6d4c2b 100%)' },
   { id: 'bisque_porcelain', label: '京白磁', swatch: 'linear-gradient(135deg, #fcfaf6 0%, #d8d2c7 100%)' },
@@ -371,14 +385,14 @@ export class GameUI {
           <button class="icon-medallion desktop-only" id="btn-camera" data-tip="カメラ切替 (C)" aria-label="カメラ視点切替">
             ${NAV_ICONS.camera}
           </button>
-          <button class="icon-medallion" id="btn-graphics" data-tip="映像・音響1.2・設定 (G)" aria-label="スタジオ設定">
+          <button class="icon-medallion" id="btn-graphics" data-tip="FINGER S1.0・音響1.3・設定 (G)" aria-label="スタジオ設定">
             ${NAV_ICONS.graphics}
           </button>
           <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 解析 (J)" aria-label="JNV1.0解析">
             ${NAV_ICONS.inspector}
             <span class="medallion-seal-dot"></span>
           </button>
-          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.2 ON/OFF" aria-label="音響切替">
+          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.3 ON/OFF" aria-label="音響切替">
             ${NAV_ICONS.soundOn}
           </button>
           <button class="icon-medallion" id="btn-fullscreen" data-tip="全画面表示 (F)" aria-label="全画面切替">
@@ -464,12 +478,12 @@ export class GameUI {
         </div>
       </footer>
 
-      <!-- Left Slide-Out Drawer: Graphics · Camera 2.0 · JHand 1.1 · JSound 1.2 · PV Studio -->
+      <!-- Left Slide-Out Drawer: FINGER S1.0 · Camera 2.1 · JHand 1.1 · JSound 1.3 · PV Studio -->
       <aside class="drawer left" id="drawer-graphics" aria-label="スタジオ設定">
         <div class="drawer-header">
           <div class="drawer-title">
             <h2>映像 · 音響 · 演出</h2>
-            <span class="drawer-badge">v1.2 極</span>
+            <span class="drawer-badge">v1.3 極</span>
           </div>
           <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
@@ -1064,6 +1078,7 @@ export class GameUI {
         <span class="accent">${m.khdrActive ? 'KHDR' : 'SDR'}</span>
         <span class="sep">·</span>
         <span class="accent">${sfShort}</span>
+        ${m.fingerS1Active ? `<span class="sep">·</span><span class="accent">FINGER S1</span>` : ''}
         <span class="sep">·</span>
         <span>${camShort}</span>
       `;
@@ -1096,8 +1111,8 @@ export class GameUI {
       const peakStr = m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`;
       jsoundEl.innerHTML = `
         <div class="metric-box"><div class="k">内部DSP / 立体反射</div><div class="v gold">${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×) · ${m.jsoundEarlyRays}Ray</div></div>
-        <div class="metric-box"><div class="k">残響 RT60 / Peak</div><div class="v">${m.jsoundRt60Sec.toFixed(2)}s · ${peakStr}</div></div>
-        <div class="metric-box"><div class="k">衝突素材ペア</div><div class="v">${m.jsoundMaterialPair}</div></div>
+        <div class="metric-box"><div class="k">RT60 / キャッシュ率</div><div class="v">${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundCacheHitPct}%</div></div>
+        <div class="metric-box"><div class="k">衝突素材 / Peak</div><div class="v">${m.jsoundMaterialPair} · ${peakStr}</div></div>
         <div class="metric-box"><div class="k">直近発音 (${m.jsoundVoices}ch)</div><div class="v">${m.jsoundLastEventJp}</div></div>
       `;
     }
@@ -1153,7 +1168,7 @@ export class GameUI {
   }
 
   // ===========================================================================
-  // LEFT DRAWER: STUDIO (GAMEPLAY · PV · CAMERA 2.0 · JSOUND 1.2 · JHAND · GPU)
+  // LEFT DRAWER: STUDIO (FINGER S1.0 · GAMEPLAY · PV · CAMERA 2.1 · JSOUND 1.3 · JHAND 36-POSE · GPU)
   // ===========================================================================
   private renderGraphicsDrawer(): void {
     const prevScroll = this.graphicsBodyEl.scrollTop;
@@ -1181,6 +1196,26 @@ export class GameUI {
     ];
 
     this.graphicsBodyEl.innerHTML = `
+      <section class="panel-section">
+        <div class="section-head"><span class="section-title">FINGER S1.0 極写実ハンド</span><span class="section-meta">${s.fingerS1Enabled ? 'ON · 彫刻関節+SSS' : 'OFF · 従来造形'}</span></div>
+        <div class="pill-grid cols-2">
+          <button class="pill-btn ${s.fingerS1Enabled ? 'active' : ''}" data-fingers1="on">
+            <span>FINGER S1.0 ON</span>
+            <span class="sub">極写実彫刻+動的皺</span>
+          </button>
+          <button class="pill-btn ${!s.fingerS1Enabled ? 'active' : ''}" data-fingers1="off">
+            <span>標準造形 OFF</span>
+            <span class="sub">クラシック互換</span>
+          </button>
+        </div>
+        <div class="finger-s1-caption">
+          32×24 非対称解剖指節 · 3層動的関節皺 · 二重曲率爪半月 · 指紋/毛穴/静脈PBR · GLSLヘモグロビン皮下散乱SSS（Shadow Flame 1.0 完全対応）
+        </div>
+        <button class="pill-btn full-pill ${s.cameraStyle === 'macro_artisan' ? 'active' : ''}" id="btn-s1-macro">
+          <span>◎ 匠マクロカメラで指先・関節を極近接鑑賞</span>
+        </button>
+      </section>
+
       <section class="panel-section">
         <div class="section-head"><span class="section-title">対局モード</span><span class="section-meta">${GAME_MODE_OPTIONS.find((g) => g.id === this.gameMode)?.label ?? '真剣勝負'}</span></div>
         <div class="pill-grid cols-2">
@@ -1234,7 +1269,7 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">Camera Director 2.0</span><span class="section-meta">${CAMERA_STYLE_SPECS[s.cameraStyle].labelJp}</span></div>
+        <div class="section-head"><span class="section-title">Camera Director 2.1 (C²滑らか追従)</span><span class="section-meta">${CAMERA_STYLE_SPECS[s.cameraStyle].labelJp}</span></div>
         <div class="pill-grid cols-3">
           ${CAMERA_STYLE_LIST.map(
             (c) => `
@@ -1247,19 +1282,19 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">JSound Engin 1.2</span><span class="section-meta">${s.jsoundQuality === 'ultra' ? '192kHz 4×OS · 128Ray' : s.jsoundQuality === 'pro' ? '96kHz 2×OS · 62Ray' : '軽量物理合成'}</span></div>
+        <div class="section-head"><span class="section-title">JSound Engin 1.3</span><span class="section-meta">${s.jsoundQuality === 'ultra' ? '384kHz 8×OS · 230Ray' : s.jsoundQuality === 'pro' ? '192kHz 4×OS · 128Ray' : '96kHz 2×OS · 24Ray'}</span></div>
         <div class="pill-grid cols-3">
           <button class="pill-btn ${s.jsoundQuality === 'ultra' ? 'active' : ''}" data-jsound="ultra">
-            <span>1.2 Ultra</span>
-            <span class="sub">192kHz·128Ray</span>
+            <span>1.3 Ultra</span>
+            <span class="sub">384kHz·230Ray</span>
           </button>
           <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
-            <span>1.2 Pro</span>
-            <span class="sub">96kHz·62Ray</span>
+            <span>1.3 Pro</span>
+            <span class="sub">192kHz·128Ray</span>
           </button>
           <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
-            <span>1.2 Lite</span>
-            <span class="sub">軽量合成</span>
+            <span>1.3 Lite</span>
+            <span class="sub">96kHz·高速</span>
           </button>
         </div>
         <div class="pill-grid cols-3" style="margin-top:5px">
@@ -1275,10 +1310,10 @@ export class GameUI {
             .join('')}
         </div>
         <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
-          <span>${s.jsoundAmbience ? '✓ 空間環境音 ON（11種・鹿威し/三味線/篠笛/風鈴）' : '空間環境音 OFF'}</span>
+          <span>${s.jsoundAmbience ? '✓ 空間環境音 ON（14種・水琴窟/龍笛/銅鑼/鹿威し他）' : '空間環境音 OFF'}</span>
         </button>
-        <div class="swatch-row-label">15和楽器 物理試聴デッキ（現舞台の128本立体残響）</div>
-        <div class="audition-grid cols-3">
+        <div class="swatch-row-label">24和楽器 物理試聴デッキ（384kHz 8×OS · 230本立体残響）</div>
+        <div class="audition-grid cols-4">
           ${AUDITION_INSTRUMENTS.map(
             (inst) => `
             <button class="audition-btn" data-audition="${inst.id}">${inst.label}</button>
@@ -1286,19 +1321,19 @@ export class GameUI {
           ).join('')}
         </div>
         <div class="metric-grid" id="live-jsound-stats">
-          <div class="metric-box"><div class="k">内部DSP / 立体反射</div><div class="v gold">${m ? `${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×) · ${m.jsoundEarlyRays}Ray` : '—'}</div></div>
-          <div class="metric-box"><div class="k">残響 RT60 / Peak</div><div class="v">${m ? `${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
-          <div class="metric-box"><div class="k">衝突素材ペア</div><div class="v">${m ? m.jsoundMaterialPair : '—'}</div></div>
+          <div class="metric-box"><div class="k">内部DSP / 立体反射</div><div class="v gold">${m ? `${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×) · ${m.jsoundEarlyRays}Ray` : '384kHz(8×) · 230Ray'}</div></div>
+          <div class="metric-box"><div class="k">RT60 / キャッシュ率</div><div class="v">${m ? `${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundCacheHitPct}%` : '—'}</div></div>
+          <div class="metric-box"><div class="k">衝突素材 / Peak</div><div class="v">${m ? `${m.jsoundMaterialPair} · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
           <div class="metric-box"><div class="k">直近発音 (${m ? m.jsoundVoices : 0}ch)</div><div class="v">${m ? m.jsoundLastEventJp : '—'}</div></div>
         </div>
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">JHand Kinesis 1.1</span><span class="section-meta">38-DOF · 18掌形</span></div>
+        <div class="section-head"><span class="section-title">JHand Kinesis 1.1</span><span class="section-meta">38-DOF · 36掌形 · C²補間</span></div>
         <div class="pill-grid cols-3">
           <button class="pill-btn ${s.jhandMode === 'biomech_ultra' ? 'active' : ''}" data-jhand="biomech_ultra">
             <span>極 38-DOF</span>
-            <span class="sub">18掌形+ICR</span>
+            <span class="sub">36掌形+6×補間</span>
           </button>
           <button class="pill-btn ${s.jhandMode === 'biomech_pro' ? 'active' : ''}" data-jhand="biomech_pro">
             <span>27-DOF</span>
@@ -1309,8 +1344,16 @@ export class GameUI {
             <span class="sub">標準バネ</span>
           </button>
         </div>
+        <div class="swatch-row-label">36掌形モーション試演デッキ（クリックで即座に実演）</div>
+        <div class="pose-gallery-grid">
+          ${HAND_POSE_CATALOG.map(
+            (pose, idx) => `
+            <button class="pose-chip-btn" data-pose-idx="${idx}" title="${pose.labelJp}">${pose.labelJp}</button>
+          `
+          ).join('')}
+        </div>
         <div class="metric-grid" id="live-jhand-stats">
-          <div class="metric-box"><div class="k">自由度 / 掌形数</div><div class="v gold">${m ? `${m.jhandDof}DOF · ${m.jhandPoseCount}種` : '38DOF · 18種'}</div></div>
+          <div class="metric-box"><div class="k">自由度 / 掌形数</div><div class="v gold">${m ? `${m.jhandDof}DOF · ${m.jhandPoseCount}種` : '38DOF · 36種'}</div></div>
           <div class="metric-box"><div class="k">ICRカム / FDI筋</div><div class="v">${m ? `${m.jhandIcrGlideMm.toFixed(2)}mm · ${m.jhandFdiPct}%` : '—'}</div></div>
           <div class="metric-box"><div class="k">手掌アーチ / ORL</div><div class="v">${m ? `${m.jhandPalmCupDeg.toFixed(1)}° · ${Math.round(m.jhandOrlRatio * 100)}%` : '—'}</div></div>
           <div class="metric-box"><div class="k">協調相</div><div class="v">${m ? m.jhandSynergyJp : '—'}</div></div>
@@ -1379,12 +1422,12 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">手の工芸素材</span></div>
+        <div class="section-head"><span class="section-title">手の造形・工芸素材</span><span class="section-meta">5素材</span></div>
         <div class="swatch-row-label">あなた</div>
         <div class="swatch-grid">
           ${HAND_MATERIAL_OPTIONS.map(
             (opt) => `
-            <button class="swatch-btn ${s.playerHandMaterial === opt.id ? 'active' : ''}" data-pmat="${opt.id}">
+            <button class="swatch-btn ${opt.hero ? 'hero-swatch' : ''} ${s.playerHandMaterial === opt.id ? 'active' : ''}" data-pmat="${opt.id}">
               <span class="swatch-dot" style="background:${opt.swatch}"></span>
               <span>${opt.label}</span>
             </button>
@@ -1395,7 +1438,7 @@ export class GameUI {
         <div class="swatch-grid">
           ${HAND_MATERIAL_OPTIONS.map(
             (opt) => `
-            <button class="swatch-btn ${s.npcHandMaterial === opt.id ? 'active' : ''}" data-nmat="${opt.id}">
+            <button class="swatch-btn ${opt.hero ? 'hero-swatch' : ''} ${s.npcHandMaterial === opt.id ? 'active' : ''}" data-nmat="${opt.id}">
               <span class="swatch-dot" style="background:${opt.swatch}"></span>
               <span>${opt.label}</span>
             </button>
@@ -1427,6 +1470,12 @@ export class GameUI {
     `;
 
     // Bind listeners
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-fingers1]').forEach((b) => {
+      b.addEventListener('click', () => this.handlers.onToggleFingerS1(b.dataset.fingers1 === 'on'));
+    });
+    this.graphicsBodyEl.querySelector('#btn-s1-macro')!.addEventListener('click', () => {
+      this.handlers.onChangeCameraStyle('macro_artisan');
+    });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-gmode]').forEach((b) => {
       b.addEventListener('click', () => {
         this.gameMode = b.dataset.gmode as GameModeId;
@@ -1471,6 +1520,15 @@ export class GameUI {
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-jhand]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeJHandMode(b.dataset.jhand as JHandModeSetting));
+    });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-pose-idx]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const idx = Number(b.dataset.poseIdx);
+        const item = HAND_POSE_CATALOG[idx];
+        if (!item) return;
+        this.pulseEl(b, 'struck');
+        this.handlers.onPreviewPose(item.key);
+      });
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-jsound]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeJSoundQuality(b.dataset.jsound as JSoundModeSetting));

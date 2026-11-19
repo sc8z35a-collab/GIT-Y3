@@ -12,6 +12,7 @@
  */
 
 import * as THREE from 'three';
+import { AnalyticSpring } from '../graphics/FingerS1Engine';
 import { CameraStyleId } from '../graphics/GraphicsConfig';
 
 export type CameraMood =
@@ -62,6 +63,22 @@ export class CameraDirector {
   private currentPos = new THREE.Vector3().copy(this.basePos);
   private currentLook = new THREE.Vector3().copy(this.baseLook);
 
+  // Exact Closed-Form C² AnalyticSpring Steadicam Tracking (zero sudden start/stop snaps!)
+  private readonly posSpringX = new AnalyticSpring(0);
+  private readonly posSpringY = new AnalyticSpring(1.36);
+  private readonly posSpringZ = new AnalyticSpring(2.24);
+  private readonly lookSpringX = new AnalyticSpring(0);
+  private readonly lookSpringY = new AnalyticSpring(0.27);
+  private readonly lookSpringZ = new AnalyticSpring(-0.02);
+  private readonly fovSpring = new AnalyticSpring(38);
+  private readonly rollSpring = new AnalyticSpring(0);
+  private readonly orbitAzSpring = new AnalyticSpring(0);
+  private readonly orbitElSpring = new AnalyticSpring(0);
+  private readonly zoomSpring = new AnalyticSpring(1.0);
+  private readonly recoilSpringX = new AnalyticSpring(0);
+  private readonly recoilSpringY = new AnalyticSpring(0);
+  private readonly recoilSpringZ = new AnalyticSpring(0);
+
   // Camera Style & Mobile Responsive Framing
   private style: CameraStyleId = 'cinematic';
   private aspect = 16 / 9;
@@ -101,10 +118,10 @@ export class CameraDirector {
   private splineShot: ActiveSplineShot | null = null;
   private readonly tmpSplinePos = new THREE.Vector3();
   private readonly tmpSplineLook = new THREE.Vector3();
+  private readonly tmpOffset = new THREE.Vector3();
+  private readonly tmpCamPos = new THREE.Vector3();
 
-  // Spring-damped directional impact impulse
-  private recoilOffset = new THREE.Vector3();
-  private recoilVel = new THREE.Vector3();
+  // Impact micro-shake
   private microShake = 0;
 
   private elapsed = 0;
@@ -224,6 +241,20 @@ export class CameraDirector {
     };
   }
 
+  private syncSpringsToCurrent(): void {
+    this.posSpringX.snap(this.currentPos.x);
+    this.posSpringY.snap(this.currentPos.y);
+    this.posSpringZ.snap(this.currentPos.z);
+    this.lookSpringX.snap(this.currentLook.x);
+    this.lookSpringY.snap(this.currentLook.y);
+    this.lookSpringZ.snap(this.currentLook.z);
+    this.fovSpring.snap(this.currentFov);
+    this.rollSpring.snap(this.currentRoll);
+    this.orbitAzSpring.snap(this.orbitAzimuth);
+    this.orbitElSpring.snap(this.orbitElevation);
+    this.zoomSpring.snap(this.zoomScale);
+  }
+
   /**
    * Architectural crane-in reveal whenever entering a new stage or launching the app!
    */
@@ -233,11 +264,15 @@ export class CameraDirector {
     this.currentLook.set(0.0, 0.42, -0.35);
     this.currentFov = this.baseFov + 6.5;
     this.currentRoll = -0.024;
+    this.orbitAzimuth = 0;
+    this.orbitElevation = 0;
+    this.zoomScale = 1.0;
     this.targetOrbitAzimuth = 0;
     this.targetOrbitElevation = 0;
     this.targetZoomScale = 1.0;
+    this.syncSpringsToCurrent();
     this.setMood('idle');
-    this.dampRate = 3.2;
+    this.dampRate = 3.6;
   }
 
   /**
@@ -437,9 +472,9 @@ export class CameraDirector {
    * Directional spring-damped physical shockwave kick aligned with clash momentum!
    */
   public triggerImpactImpulse(strength = 0.034, dirX = 0, dirY = -0.6): void {
-    this.recoilVel.x += dirX * strength * 16.0;
-    this.recoilVel.y += dirY * strength * 14.0;
-    this.recoilVel.z -= strength * 11.0;
+    this.recoilSpringX.impulse(dirX * strength * 16.0);
+    this.recoilSpringY.impulse(dirY * strength * 14.0);
+    this.recoilSpringZ.impulse(-strength * 11.0);
     this.microShake = Math.max(this.microShake, strength * 0.55);
   }
 
@@ -496,30 +531,47 @@ export class CameraDirector {
       if (rawU >= 1.0) {
         this.targetPos.copy(this.currentPos);
         this.targetLook.copy(this.currentLook);
+        this.syncSpringsToCurrent();
         this.splineShot = null;
       }
       return;
     }
 
-    // 2. Standard / Cinematic Spring-Damped Director Mode
-    this.dampRate = THREE.MathUtils.lerp(this.dampRate, 6.2, 1 - Math.exp(-1.5 * safeDt));
-    const damp = 1 - Math.exp(-this.dampRate * safeDt);
+    // 2. Camera Director 2.1 — Exact Closed-Form C² AnalyticSpring Steadicam Tracking!
+    this.dampRate = THREE.MathUtils.lerp(this.dampRate, 6.2, 1 - Math.exp(-1.8 * safeDt));
+    const omega = Math.max(3.4, this.dampRate * 1.18);
+    const kCam = omega * omega;
+    // Slightly under-critical zeta=0.96 gives buttery Steadicam momentum with zero wobble!
+    const dCam = 2.0 * omega * 0.96;
 
-    this.currentPos.lerp(this.targetPos, damp);
-    this.currentLook.lerp(this.targetLook, damp);
-    this.orbitAzimuth = THREE.MathUtils.lerp(this.orbitAzimuth, this.targetOrbitAzimuth, damp);
-    this.orbitElevation = THREE.MathUtils.lerp(this.orbitElevation, this.targetOrbitElevation, damp);
-    this.zoomScale = THREE.MathUtils.lerp(this.zoomScale, this.targetZoomScale, damp);
+    this.currentPos.set(
+      this.posSpringX.step(this.targetPos.x, kCam, dCam, safeDt),
+      this.posSpringY.step(this.targetPos.y, kCam, dCam, safeDt),
+      this.posSpringZ.step(this.targetPos.z, kCam, dCam, safeDt)
+    );
+    this.currentLook.set(
+      this.lookSpringX.step(this.targetLook.x, kCam * 1.12, dCam * 1.06, safeDt),
+      this.lookSpringY.step(this.targetLook.y, kCam * 1.12, dCam * 1.06, safeDt),
+      this.lookSpringZ.step(this.targetLook.z, kCam * 1.12, dCam * 1.06, safeDt)
+    );
+
+    const kOrb = 58.0;
+    const dOrb = 2.0 * Math.sqrt(kOrb) * 0.98;
+    this.orbitAzimuth = this.orbitAzSpring.step(this.targetOrbitAzimuth, kOrb, dOrb, safeDt);
+    this.orbitElevation = this.orbitElSpring.step(this.targetOrbitElevation, kOrb, dOrb, safeDt);
+    this.zoomScale = this.zoomSpring.step(this.targetZoomScale, kOrb, dOrb, safeDt);
 
     const desiredFov = THREE.MathUtils.clamp(this.baseFov + this.targetFovOffset, 24, 64);
-    if (Math.abs(this.currentFov - desiredFov) > 0.01) {
-      this.currentFov = THREE.MathUtils.lerp(this.currentFov, desiredFov, damp);
+    const nextFov = this.fovSpring.step(desiredFov, kCam * 0.9, dCam * 0.96, safeDt);
+    if (Math.abs(nextFov - this.camera.fov) > 0.005) {
+      this.currentFov = nextFov;
       this.camera.fov = this.currentFov;
       this.camera.updateProjectionMatrix();
     }
 
-    this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, this.targetRoll, damp);
+    this.currentRoll = this.rollSpring.step(this.targetRoll, kCam * 0.85, dCam * 0.95, safeDt);
 
+    const damp = 1 - Math.exp(-this.dampRate * safeDt);
     // Subtle heroic continuous arc on match victory/defeat
     if (this.mood === 'match_victory' || this.mood === 'match_defeat') {
       this.heroSweepAngle += safeDt * 0.26;
@@ -531,29 +583,23 @@ export class CameraDirector {
     if (this.bulletOrbitRemaining > 0) {
       this.bulletOrbitRemaining = Math.max(0, this.bulletOrbitRemaining - safeDt);
       const u = 1 - this.bulletOrbitRemaining / Math.max(0.01, this.bulletOrbitDuration);
-      // Fast dramatic sweep peaking near mid-clash then settling gracefully back
       const arcBell = Math.sin(u * Math.PI);
       this.bulletOrbitAngle = arcBell * this.bulletOrbitSpanRad * this.bulletOrbitDir;
     } else {
       this.bulletOrbitAngle = THREE.MathUtils.lerp(this.bulletOrbitAngle, 0, damp);
     }
 
-    // Step directional impact spring
-    const kR = 240;
-    const dR = 20;
-    const ax = -this.recoilOffset.x * kR - this.recoilVel.x * dR;
-    const ay = -this.recoilOffset.y * kR - this.recoilVel.y * dR;
-    const az = -this.recoilOffset.z * kR - this.recoilVel.z * dR;
-    this.recoilVel.x += ax * safeDt;
-    this.recoilVel.y += ay * safeDt;
-    this.recoilVel.z += az * safeDt;
-    this.recoilOffset.addScaledVector(this.recoilVel, safeDt);
+    // Step directional impact springs (closed-form framerate-invariant!)
+    const recX = this.recoilSpringX.step(0, 240, 22, safeDt);
+    const recY = this.recoilSpringY.step(0, 240, 22, safeDt);
+    const recZ = this.recoilSpringZ.step(0, 240, 22, safeDt);
 
-    // Organic prime-lens breathing + pointer parallax + orbit + bullet-time arc
-    const offset = this.currentPos.clone().sub(this.currentLook);
-    const radius = Math.max(0.85, offset.length() * this.zoomScale);
-    const basePhi = Math.atan2(offset.x, offset.z);
-    const baseTheta = Math.acos(THREE.MathUtils.clamp(offset.y / Math.max(0.01, offset.length()), -0.99, 0.99));
+    // Organic prime-lens breathing + pointer parallax + orbit + bullet-time arc (zero per-frame alloc!)
+    this.tmpOffset.copy(this.currentPos).sub(this.currentLook);
+    const offLen = Math.max(0.01, this.tmpOffset.length());
+    const radius = Math.max(0.85, offLen * this.zoomScale);
+    const basePhi = Math.atan2(this.tmpOffset.x, this.tmpOffset.z);
+    const baseTheta = Math.acos(THREE.MathUtils.clamp(this.tmpOffset.y / offLen, -0.99, 0.99));
 
     const breathX = Math.sin(this.elapsed * 0.68) * 0.014;
     const breathY = Math.cos(this.elapsed * 0.52) * 0.009;
@@ -568,23 +614,21 @@ export class CameraDirector {
       1.38
     );
 
-    const camPos = new THREE.Vector3(
-      this.currentLook.x + radius * Math.sin(finalTheta) * Math.sin(finalPhi),
-      this.currentLook.y + radius * Math.cos(finalTheta),
-      this.currentLook.z + radius * Math.sin(finalTheta) * Math.cos(finalPhi)
+    this.tmpCamPos.set(
+      this.currentLook.x + radius * Math.sin(finalTheta) * Math.sin(finalPhi) + recX,
+      this.currentLook.y + radius * Math.cos(finalTheta) + recY,
+      this.currentLook.z + radius * Math.sin(finalTheta) * Math.cos(finalPhi) + recZ
     );
 
-    camPos.add(this.recoilOffset);
-
     if (this.microShake > 0.0003) {
-      camPos.x += (Math.random() - 0.5) * this.microShake;
-      camPos.y += (Math.random() - 0.5) * this.microShake * 0.85;
+      this.tmpCamPos.x += (Math.random() - 0.5) * this.microShake;
+      this.tmpCamPos.y += (Math.random() - 0.5) * this.microShake * 0.85;
       this.microShake *= Math.exp(-18.0 * safeDt);
     } else {
       this.microShake = 0;
     }
 
-    this.camera.position.copy(camPos);
+    this.camera.position.copy(this.tmpCamPos);
     this.camera.lookAt(this.currentLook);
 
     if (Math.abs(this.currentRoll) > 0.0002) {

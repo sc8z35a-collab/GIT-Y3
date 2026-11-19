@@ -101,22 +101,24 @@ export class GameScene {
   private prePvPlayerMat: HandMaterialPreset = DEFAULT_GRAPHICS_SETTINGS.playerHandMaterial;
   private prePvNpcMat: HandMaterialPreset = DEFAULT_GRAPHICS_SETTINGS.npcHandMaterial;
 
-  // Frame loop, FPS limiter & performance telemetry
+  // Frame loop, FPS limiter & silky EMA delta-time jitter filter
   private rafId = 0;
   private running = false;
   private lastRenderTimestamp = 0;
   private lastLogicTimestamp = 0;
+  private smoothedDt = 1 / 60;
   private elapsedSec = 0;
   private frameTimesMs: number[] = [];
   private lastMetricsEmit = 0;
   private onMetrics?: (m: RenderMetrics) => void;
 
-  // Deterministic Delta-Time Choreography Timeline + Cinema Hit-Stop Time Dilation
+  // Deterministic Delta-Time Choreography Timeline + Smooth Cinema Hit-Stop Time Dilation Ramp
   private timelineCues: TimelineCue[] = [];
   private timelineClock = 0;
   private timelineActive = false;
   private isAnimatingRound = false;
   private hitStopRemaining = 0;
+  private hitStopDuration = 0.14;
   private hitStopScale = 0.14;
   private motionVariantCounter = 0;
   private idleGestureTimer = 5.5;
@@ -209,8 +211,13 @@ export class GameScene {
     this.atmosphere = new AtmosphereEffects();
     this.scene.add(this.atmosphere.group);
 
-    // Dual 38-DOF JHand Kinesis 1.1 Sculpted Hands positioned cleanly over the central brass medallion
-    this.playerHand = new SculptedHandRig(this.textures, this.settings.playerHandMaterial, true);
+    // Dual 38-DOF JHand Kinesis 1.1 × FINGER S1.0 Sculpted Hands positioned cleanly over the central brass medallion
+    this.playerHand = new SculptedHandRig(
+      this.textures,
+      this.settings.playerHandMaterial,
+      true,
+      this.settings.fingerS1Enabled
+    );
     this.playerHand.root.position.set(-0.66, 0.25, 0.22);
     this.playerHand.root.rotation.set(0.08, Math.PI * 0.45, 0.0);
     this.playerHand.onFoley = (ev, wp) => {
@@ -218,7 +225,12 @@ export class GameScene {
     };
     this.scene.add(this.playerHand.root);
 
-    this.npcHand = new SculptedHandRig(this.textures, this.settings.npcHandMaterial, false);
+    this.npcHand = new SculptedHandRig(
+      this.textures,
+      this.settings.npcHandMaterial,
+      false,
+      this.settings.fingerS1Enabled
+    );
     this.npcHand.root.position.set(0.66, 0.25, 0.08);
     this.npcHand.root.rotation.set(0.08, -Math.PI * 0.45, 0.0);
     this.npcHand.onFoley = (ev, wp) => {
@@ -277,7 +289,7 @@ export class GameScene {
       (st) => onPvState?.(st)
     );
 
-    // Apply initial stage, KHDR, Shadow Flame, JHand Kinesis, Camera 2.0, and JSound Engin 1.2 settings!
+    // Apply initial stage, KHDR, Shadow Flame, FINGER S1.0, JHand Kinesis, Camera 2.1, and JSound Engin 1.3 settings!
     this.sound.setHandMaterials(this.settings.playerHandMaterial, this.settings.npcHandMaterial);
     this.sound.setQualityMode(this.settings.jsoundQuality);
     this.sound.setSpatialMode(this.settings.jsoundSpatialMode);
@@ -315,6 +327,39 @@ export class GameScene {
 
   public setCompactUi(compact: boolean): void {
     this.settings.compactUi = compact;
+  }
+
+  public setFingerS1Enabled(enabled: boolean): void {
+    this.settings.fingerS1Enabled = enabled;
+    this.playerHand.setFingerS1Enabled(enabled);
+    this.npcHand.setFingerS1Enabled(enabled);
+    // Subtle appreciative flex so user sees FINGER S1.0 sculpted joints & wrinkles come alive immediately!
+    this.playerHand.addMotionImpulse(0, 0.35, 0, -0.5, 0.7);
+    this.npcHand.addMotionImpulse(0, 0.35, 0, -0.5, -0.7);
+  }
+
+  /** Interactive 36-Pose Showcase Preview (triggered from Studio Drawer Pose Gallery!) */
+  public previewPoseShowcase(poseKey: HandPoseKey): void {
+    if (this.isAnimatingRound || this.pvDirector.isActive()) return;
+    this.idleGestureTimer = 9.0;
+    this.playerHand.setMotionDynamics(185, 21);
+    this.npcHand.setMotionDynamics(175, 21);
+    this.playerHand.setTargetPose(poseKey, false, true);
+    this.npcHand.setTargetPose(poseKey, false, true);
+    this.playerHand.targetOffset.set(0.1, 0.08, 0.04);
+    this.npcHand.targetOffset.set(-0.06, 0.06, 0.0);
+    this.playerHand.targetExtraPitch = -0.06;
+    this.npcHand.targetExtraPitch = -0.04;
+    this.playerHand.targetExtraRoll = -0.1;
+    this.npcHand.targetExtraRoll = 0.08;
+
+    if (poseKey === 'snap_release') this.playerHand.triggerFingerSnap();
+    else if (poseKey === 'wave_flourish') this.playerHand.triggerWaveFlourish();
+    else if (poseKey === 'sword_seal') this.playerHand.triggerSwordSealPulse();
+    else if (poseKey === 'zen_circle' || poseKey === 'lotus_mudra') this.playerHand.triggerZenBreath();
+    else if (poseKey === 'knuckle_crack') this.playerHand.triggerKnuckleFlex();
+    else if (poseKey === SCISSORS) this.playerHand.triggerScissorsSnip();
+    this.sound.playWoodTap(760);
   }
 
   public applyKHDR(enabled: boolean, splitCompare = this.settings.khdrSplitCompare): void {
@@ -393,6 +438,10 @@ export class GameScene {
     this.sunLight.intensity = def.sunIntensity;
     this.sunLight.target.position.set(0, 0.1, 0);
     this.sunWorldDir.copy(this.sunLight.position).normalize();
+
+    // Sync FINGER S1.0 backlit dermal subsurface scattering to the active stage's sun vector!
+    this.playerHand.setSunDirection(this.sunWorldDir);
+    this.npcHand.setSunDirection(this.sunWorldDir);
 
     this.rimLight.color.setHex(def.fillColor);
     this.rimLight.intensity = def.fillIntensity;
@@ -614,7 +663,7 @@ export class GameScene {
     this.timelineClock = 0;
     this.idleGestureTimer = 7.0;
 
-    const variant = this.motionVariantCounter++ % 3;
+    const variant = this.motionVariantCounter++ % 5;
     const isOverdrive = Boolean(options.overdriveActive);
     const streakCount = options.streakCount ?? 0;
     const isDramatic = isOverdrive || isMatchDecidingPoint || streakCount >= 3;
@@ -636,14 +685,14 @@ export class GameScene {
     addCue(0.0, () => {
       if (isDramatic) {
         callbacks.onCinemaBars?.(true);
-        this.cameraDirector.setMood(variant === 1 ? 'ots_npc' : 'ots_player');
+        this.cameraDirector.setMood(variant % 2 === 1 ? 'ots_npc' : 'ots_player');
       } else {
-        this.cameraDirector.setMood(variant === 2 ? 'ots_player' : 'windup');
+        this.cameraDirector.setMood(variant === 2 ? 'ots_player' : variant === 4 ? 'ots_npc' : 'windup');
       }
-      this.playerHand.setMotionDynamics(280, 21);
-      this.npcHand.setMotionDynamics(280, 21);
-      this.playerHand.setTargetPose(isOverdrive ? 'claw_charge' : 'windup', true, true);
-      this.npcHand.setTargetPose('windup', true, true);
+      this.playerHand.setMotionDynamics(280, 22.5);
+      this.npcHand.setMotionDynamics(280, 22.5);
+      this.playerHand.setTargetPose(isOverdrive ? 'claw_charge' : variant === 3 ? 'stealth_curl' : 'windup', true, true);
+      this.npcHand.setTargetPose(variant === 4 ? 'stealth_curl' : 'windup', true, true);
 
       this.playerHand.targetOffset.set(-0.11, 0.24, 0.02);
       this.npcHand.targetOffset.set(0.11, 0.24, -0.02);
@@ -714,9 +763,9 @@ export class GameScene {
     const revealAt = isAikoFollowup ? 0.32 : 0.61;
     const winnerMove = outcome === 'LOSS' ? npcMove : playerMove;
 
-    // === BEAT 3 (PON!!): Explosive Forward Lunge + 38-DOF + Bullet-Time Orbit + JSound 1.2 ===
+    // === BEAT 3 (PON!!): Explosive Forward Lunge + 38-DOF + Bullet-Time Orbit + JSound 1.3 ===
     addCue(revealAt, () => {
-      const clashMood: CameraMood = isDramatic || variant === 1 ? 'low_clash' : 'clash';
+      const clashMood: CameraMood = isDramatic || variant === 1 || variant === 4 ? 'low_clash' : 'clash';
       this.cameraDirector.setMood(clashMood);
       if (isDramatic) {
         this.cameraDirector.triggerBulletTimeOrbit(
@@ -735,8 +784,8 @@ export class GameScene {
 
       this.lightImpactPulse = isOverdrive ? 1.25 : isMatchDecidingPoint ? 1.0 : 0.74;
 
-      this.playerHand.setMotionDynamics(440, 23);
-      this.npcHand.setMotionDynamics(440, 23);
+      this.playerHand.setMotionDynamics(440, 25);
+      this.npcHand.setMotionDynamics(440, 25);
       this.playerHand.setTargetPose(playerMove, true, true);
       this.npcHand.setTargetPose(npcMove, true, true);
 
@@ -751,23 +800,25 @@ export class GameScene {
 
       this.atmosphere.emitClashBurst(outcome, winnerMove, new THREE.Vector3(0, 0.3, 0.08));
 
-      // Trigger Cinema Hit-Stop Time Dilation!
-      this.hitStopRemaining = isOverdrive ? 0.28 : isMatchDecidingPoint ? 0.21 : outcome === 'DRAW' ? 0.08 : 0.12;
-      this.hitStopScale = isOverdrive ? 0.1 : isMatchDecidingPoint ? 0.14 : 0.16;
+      // Trigger Smooth Cinema Hit-Stop Time-Dilation Ramp!
+      const hsDur = isOverdrive ? 0.3 : isMatchDecidingPoint ? 0.22 : outcome === 'DRAW' ? 0.09 : 0.14;
+      this.hitStopDuration = hsDur;
+      this.hitStopRemaining = hsDur;
+      this.hitStopScale = isOverdrive ? 0.11 : isMatchDecidingPoint ? 0.14 : 0.17;
 
       if (outcome === 'WIN') {
         this.applyWinClashPose(this.playerHand, this.npcHand, playerMove, 1, variant);
       } else if (outcome === 'LOSS') {
         this.applyWinClashPose(this.npcHand, this.playerHand, npcMove, -1, variant);
       } else {
-        // DRAW: 3 distinct mirrored standoff variations!
-        const yOff = variant === 1 ? 0.07 : variant === 2 ? -0.02 : 0.02;
+        // DRAW: 5 distinct mirrored standoff variations!
+        const yOff = variant === 1 ? 0.08 : variant === 2 ? -0.02 : variant === 3 ? 0.11 : variant === 4 ? 0.04 : 0.02;
         this.playerHand.targetOffset.set(0.14, yOff, 0.02);
         this.npcHand.targetOffset.set(-0.14, yOff, -0.02);
-        this.playerHand.targetExtraPitch = variant === 1 ? -0.08 : 0.04;
-        this.npcHand.targetExtraPitch = variant === 1 ? -0.08 : 0.04;
-        this.playerHand.targetExtraRoll = variant === 2 ? 0.14 : 0.0;
-        this.npcHand.targetExtraRoll = variant === 2 ? -0.14 : 0.0;
+        this.playerHand.targetExtraPitch = variant === 1 ? -0.09 : variant === 3 ? -0.14 : 0.04;
+        this.npcHand.targetExtraPitch = variant === 1 ? -0.09 : variant === 3 ? -0.14 : 0.04;
+        this.playerHand.targetExtraRoll = variant === 2 ? 0.16 : variant === 4 ? -0.18 : 0.0;
+        this.npcHand.targetExtraRoll = variant === 2 ? -0.16 : variant === 4 ? 0.18 : 0.0;
         this.playerHand.triggerRecoil(0.72, 1);
         this.npcHand.triggerRecoil(0.72, -1);
       }
@@ -785,14 +836,21 @@ export class GameScene {
         this.cameraDirector.setMood('defeat');
         this.applyVictoryFlourish(this.npcHand, this.playerHand, npcMove, -1, variant, isOverdrive);
       } else {
-        // DRAW escalated stance ready for immediate "あいこで…しょ！"
-        this.playerHand.setMotionDynamics(200, 19);
-        this.npcHand.setMotionDynamics(200, 19);
+        // DRAW escalated stance ready for immediate "あいこで…しょ！" (5 variants!)
+        this.playerHand.setMotionDynamics(200, 21);
+        this.npcHand.setMotionDynamics(200, 21);
         if (variant === 1) {
           this.playerHand.setTargetPose('guard', false, true);
           this.npcHand.setTargetPose('guard', false, true);
         } else if (variant === 2) {
-          this.npcHand.setTargetPose('beckon', false, true);
+          this.playerHand.setTargetPose('beckon', false, true);
+          this.npcHand.setTargetPose('stealth_curl', false, true);
+        } else if (variant === 3) {
+          this.playerHand.setTargetPose('counter_parry', false, true);
+          this.npcHand.setTargetPose('counter_parry', false, true);
+        } else if (variant === 4) {
+          this.playerHand.setTargetPose('snap_ready', false, true);
+          this.npcHand.setTargetPose('crane_poise', false, true);
         }
         this.playerHand.targetOffset.set(0.06, 0.06, 0.01);
         this.npcHand.targetOffset.set(-0.06, 0.06, -0.01);
@@ -810,7 +868,7 @@ export class GameScene {
   }
 
   /**
-   * 9 Rotating Move-Specific Instant Collision Postures at exact PON!! moment.
+   * 15 Rotating Move-Specific Instant Collision Postures (5 per Move!) at exact PON!! moment.
    */
   private applyWinClashPose(
     winner: SculptedHandRig,
@@ -832,12 +890,26 @@ export class GameScene {
         winner.targetExtraPitch = -0.26;
         winner.targetExtraRoll = -0.22 * dir;
         winner.addMotionImpulse(2.0 * dir, 1.65, 0.2 * dir, -2.4, -1.9 * dir);
-      } else {
+      } else if (variant === 2) {
         // Variant 2: Horizontal Spinning Haymaker Hook
         winner.targetOffset.set(0.26 * dir, 0.03, 0.05 * dir);
         winner.targetExtraYaw = 0.28 * dir;
         winner.targetExtraRoll = 0.34 * dir;
         winner.addMotionImpulse(2.55 * dir, 0.2, 0.45 * dir, 0.8, 2.5 * dir);
+      } else if (variant === 3) {
+        // Variant 3: Phoenix-Eye Iron-Knuckle Precision Thrust!
+        winner.setTargetPose('iron_knuckle', true, true);
+        winner.targetOffset.set(0.27 * dir, 0.05, 0.02 * dir);
+        winner.targetExtraPitch = 0.04;
+        winner.targetExtraRoll = 0.12 * dir;
+        winner.addMotionImpulse(2.7 * dir, 0.1, 0.15 * dir, 0.5, 1.4 * dir);
+      } else {
+        // Variant 4: Corkscrew Inverted Fist-Pump Impact!
+        winner.setTargetPose('fist_pump', true, true);
+        winner.targetOffset.set(0.24 * dir, 0.13, 0.03 * dir);
+        winner.targetExtraPitch = -0.28;
+        winner.targetExtraRoll = 0.38 * dir;
+        winner.addMotionImpulse(2.2 * dir, 1.4, 0.2 * dir, -2.1, 2.6 * dir);
       }
       loser.targetOffset.set(0.09 * dir, -0.04, -0.05 * dir);
       loser.targetExtraPitch = -0.26;
@@ -856,12 +928,26 @@ export class GameScene {
         winner.targetExtraYaw = -0.22 * dir;
         winner.targetExtraRoll = 0.42 * dir;
         winner.addMotionImpulse(2.45 * dir, 0.15, -0.45 * dir, 0.4, 2.8 * dir);
-      } else {
+      } else if (variant === 2) {
         // Variant 2: Overhead Vertical Scissor-Drop
         winner.targetOffset.set(0.22 * dir, 0.0, 0.03 * dir);
         winner.targetExtraPitch = 0.22;
         winner.targetExtraRoll = 0.06 * dir;
         winner.addMotionImpulse(2.1 * dir, -1.45, 0.15 * dir, 2.1, -1.4 * dir);
+      } else if (variant === 3) {
+        // Variant 3: Kuji-In Twin-Blade Sword Seal Piercing Thrust!
+        winner.setTargetPose('sword_seal', true, true);
+        winner.targetOffset.set(0.28 * dir, 0.07, 0.02 * dir);
+        winner.targetExtraPitch = -0.08;
+        winner.targetExtraRoll = 0.28 * dir;
+        winner.triggerSwordSealPulse();
+      } else {
+        // Variant 4: Rising Supinated Twin-Blade Parry-Slice!
+        winner.setTargetPose('peace_tilt', true, true);
+        winner.targetOffset.set(0.24 * dir, 0.12, 0.03 * dir);
+        winner.targetExtraPitch = -0.18;
+        winner.targetExtraRoll = -0.34 * dir;
+        winner.addMotionImpulse(2.25 * dir, 1.35, 0.18 * dir, -1.7, -2.4 * dir);
       }
       loser.targetOffset.set(0.1 * dir, -0.03, -0.04 * dir);
       loser.targetExtraPitch = -0.22;
@@ -880,12 +966,27 @@ export class GameScene {
         winner.targetExtraPitch = 0.14;
         winner.targetExtraRoll = 0.36 * dir;
         winner.addMotionImpulse(2.3 * dir, -1.1, 0.1 * dir, 1.6, 2.1 * dir);
-      } else {
-        // Variant 2: Grand Palm Thrust Pushback
-        winner.targetOffset.set(0.26 * dir, 0.07, 0.03 * dir);
-        winner.targetExtraPitch = -0.18;
+      } else if (variant === 2) {
+        // Variant 2: Grand Tiger-Palm Shockwave Thrust!
+        winner.setTargetPose('tiger_palm', true, true);
+        winner.targetOffset.set(0.27 * dir, 0.07, 0.03 * dir);
+        winner.targetExtraPitch = -0.22;
         winner.targetExtraRoll = -0.08 * dir;
-        winner.addMotionImpulse(2.4 * dir, 0.45, 0.25 * dir, -1.8, -1.0 * dir);
+        winner.addMotionImpulse(2.55 * dir, 0.45, 0.25 * dir, -1.9, -1.0 * dir);
+      } else if (variant === 3) {
+        // Variant 3: Sweeping Martial Counter-Parry Deflection!
+        winner.setTargetPose('counter_parry', true, true);
+        winner.targetOffset.set(0.24 * dir, 0.09, -0.02 * dir);
+        winner.targetExtraYaw = 0.24 * dir;
+        winner.targetExtraRoll = 0.38 * dir;
+        winner.addMotionImpulse(2.3 * dir, 0.65, -0.3 * dir, -0.8, 2.4 * dir);
+      } else {
+        // Variant 4: Kabuki Sweeping Wave Flourish Palm!
+        winner.setTargetPose('wave_flourish', true, true);
+        winner.targetOffset.set(0.25 * dir, 0.12, 0.03 * dir);
+        winner.targetExtraPitch = -0.16;
+        winner.targetExtraRoll = -0.26 * dir;
+        winner.triggerWaveFlourish();
       }
       loser.targetOffset.set(0.04 * dir, -0.07, -0.03 * dir);
       loser.targetExtraPitch = 0.16;
@@ -894,7 +995,7 @@ export class GameScene {
   }
 
   /**
-   * Expanded 18-Pose Signature Post-Hit-Stop Triumph Flourishes!
+   * Expanded 36-Pose Signature Post-Hit-Stop Triumph Flourishes (5 per Move + Loser Defeat Slump)!
    */
   private applyVictoryFlourish(
     winner: SculptedHandRig,
@@ -904,8 +1005,11 @@ export class GameScene {
     variant: number,
     isOverdrive: boolean
   ): void {
-    winner.setMotionDynamics(185, 19);
-    loser.setMotionDynamics(145, 18);
+    winner.setMotionDynamics(185, 21);
+    loser.setMotionDynamics(145, 20);
+    if (variant >= 3) {
+      loser.setTargetPose('defeat_slump', false, true);
+    }
 
     if (winMove === SCISSORS) {
       if (variant === 1 && !isOverdrive) {
@@ -917,6 +1021,15 @@ export class GameScene {
         winner.setTargetPose('crane_poise', false, true);
         winner.targetOffset.set(0.2 * dir, 0.13, 0.02 * dir);
         winner.targetExtraPitch = -0.1;
+      } else if (variant === 3) {
+        winner.setTargetPose('sword_seal', false, true);
+        winner.targetOffset.set(0.22 * dir, 0.14, 0.02 * dir);
+        winner.targetExtraPitch = -0.12;
+      } else if (variant === 4) {
+        winner.setTargetPose('peace_tilt', false, true);
+        winner.targetOffset.set(0.21 * dir, 0.14, 0.03 * dir);
+        winner.targetExtraPitch = -0.14;
+        winner.triggerVictoryRoll();
       } else {
         winner.targetOffset.set(0.22 * dir, 0.1, 0.02 * dir);
         winner.targetExtraPitch = -0.08;
@@ -929,9 +1042,18 @@ export class GameScene {
         winner.targetOffset.set(0.24 * dir, 0.11, 0.02 * dir);
         winner.targetExtraPitch = -0.06;
       } else if (variant === 2) {
-        winner.setTargetPose('palm_meditate', false, true);
-        winner.targetOffset.set(0.22 * dir, 0.12, 0.02 * dir);
+        winner.setTargetPose('lotus_mudra', false, true);
+        winner.targetOffset.set(0.22 * dir, 0.13, 0.02 * dir);
         winner.targetExtraPitch = -0.08;
+      } else if (variant === 3) {
+        winner.setTargetPose('open_offer', false, true);
+        winner.targetOffset.set(0.23 * dir, 0.12, 0.02 * dir);
+        winner.targetExtraPitch = -0.1;
+      } else if (variant === 4) {
+        winner.setTargetPose('zen_circle', false, true);
+        winner.targetOffset.set(0.21 * dir, 0.14, 0.02 * dir);
+        winner.targetExtraPitch = -0.1;
+        winner.triggerZenBreath();
       } else {
         winner.setTargetPose('envelop', false, true);
         winner.targetOffset.set(0.26 * dir, 0.08, 0.01 * dir);
@@ -939,11 +1061,14 @@ export class GameScene {
       }
       loser.targetOffset.set(0.02 * dir, -0.08, -0.02 * dir);
     } else {
-      winner.setTargetPose(isOverdrive || variant === 0 ? 'victory_fist' : 'knuckle_crack', false, true);
-      winner.targetOffset.set(0.2 * dir, 0.13, 0.02 * dir);
+      const rockFinishes: HandPoseKey[] = ['victory_fist', 'knuckle_crack', 'iron_knuckle', 'fist_pump', 'snap_release'];
+      const chosen = isOverdrive ? 'victory_fist' : rockFinishes[variant % rockFinishes.length];
+      winner.setTargetPose(chosen, false, true);
+      winner.targetOffset.set(0.2 * dir, 0.14, 0.02 * dir);
       winner.targetExtraPitch = -0.16;
       winner.targetExtraRoll = -0.08 * dir;
-      if (isOverdrive) winner.triggerVictoryRoll();
+      if (chosen === 'snap_release') winner.triggerFingerSnap();
+      else if (isOverdrive || variant === 3) winner.triggerVictoryRoll();
     }
   }
 
@@ -993,6 +1118,14 @@ export class GameScene {
       const rawDt = Math.min(0.05, Math.max(0.001, (nowMs - this.lastLogicTimestamp) / 1000));
       this.lastLogicTimestamp = nowMs;
 
+      // ★ Silky Frame-Delta EMA Spike-Smoothing Filter (eliminates micro-stutter on 60/120/Unlimited!) ★
+      if (rawDt > this.smoothedDt * 2.2) {
+        this.smoothedDt = Math.min(0.033, this.smoothedDt * 0.55 + rawDt * 0.45);
+      } else {
+        this.smoothedDt = this.smoothedDt * 0.68 + rawDt * 0.32;
+      }
+      const silkyDt = Math.min(0.045, Math.max(0.001, this.smoothedDt));
+
       // Advance Built-In PV Cinema Director timeline if active
       this.pvDirector.update(rawDt);
 
@@ -1006,41 +1139,81 @@ export class GameScene {
           }
         }
       } else if (!this.isAnimatingRound && !this.pvDirector.isActive() && !this.overdriveArmed) {
-        // Subtle lifelike idle personality micro-gestures every ~7-9 seconds!
+        // 10 Lifelike Idle Personality Micro-Gestures across our 36-Pose library!
         this.idleGestureTimer -= rawDt;
         if (this.idleGestureTimer <= 0) {
-          this.idleGestureTimer = 7.5 + Math.random() * 4.0;
-          const pick = Math.floor(Math.random() * 3);
+          this.idleGestureTimer = 7.2 + Math.random() * 4.2;
+          const pick = Math.floor(Math.random() * 10);
+          const restoreLater = (hand: SculptedHandRig, delayMs = 1150) => {
+            window.setTimeout(() => {
+              if (!this.isAnimatingRound && !this.pvDirector.isActive() && !this.overdriveArmed) {
+                hand.setTargetPose('ready', false, true);
+              }
+            }, delayMs);
+          };
           if (pick === 0) {
             this.npcHand.triggerKnuckleFlex();
           } else if (pick === 1) {
             this.npcHand.setTargetPose('beckon', false, true);
-            window.setTimeout(() => {
-              if (!this.isAnimatingRound && !this.pvDirector.isActive()) {
-                this.npcHand.setTargetPose('ready', false, true);
-              }
-            }, 950);
-          } else {
+            restoreLater(this.npcHand, 1050);
+          } else if (pick === 2) {
             this.playerHand.triggerKnuckleFlex();
+          } else if (pick === 3) {
+            this.playerHand.setTargetPose('lotus_mudra', false, true);
+            restoreLater(this.playerHand, 1300);
+          } else if (pick === 4) {
+            this.npcHand.setTargetPose('koto_pluck', false, true);
+            restoreLater(this.npcHand, 1200);
+          } else if (pick === 5) {
+            this.playerHand.setTargetPose('zen_circle', false, true);
+            restoreLater(this.playerHand, 1250);
+          } else if (pick === 6) {
+            this.npcHand.setTargetPose('fan_hold', false, true);
+            restoreLater(this.npcHand, 1200);
+          } else if (pick === 7) {
+            this.playerHand.setTargetPose('tea_whisk', false, true);
+            restoreLater(this.playerHand, 1150);
+          } else if (pick === 8) {
+            this.npcHand.setTargetPose('brush_grip', false, true);
+            restoreLater(this.npcHand, 1200);
+          } else {
+            this.playerHand.triggerWaveFlourish();
+            restoreLater(this.playerHand, 1100);
           }
         }
       }
 
-      // Compute cinema Hit-Stop time scale for 3D motion & particles!
-      let simDt = rawDt;
+      // ★ Smooth Cinema Hit-Stop Time-Dilation Ramp (silky decel in + easeOutExpo glide back to 1.0×!) ★
+      let simDt = silkyDt;
       if (this.hitStopRemaining > 0) {
         this.hitStopRemaining = Math.max(0, this.hitStopRemaining - rawDt);
-        simDt = rawDt * this.hitStopScale;
+        const progress = 1.0 - this.hitStopRemaining / Math.max(0.01, this.hitStopDuration);
+        let timeScale: number;
+        if (progress < 0.14) {
+          // Smooth 14% ramp down into bullet-time slow-mo
+          const u = progress / 0.14;
+          const s = u * u * (3 - 2 * u);
+          timeScale = THREE.MathUtils.lerp(1.0, this.hitStopScale, s);
+        } else if (progress < 0.58) {
+          // Suspended high-drama cinema peak
+          timeScale = this.hitStopScale;
+        } else {
+          // Silky easeOutExpo ramp smoothly back to 1.0× speed!
+          const u = (progress - 0.58) / 0.42;
+          const easeOut = 1.0 - Math.pow(2, -7.5 * u);
+          timeScale = THREE.MathUtils.lerp(this.hitStopScale, 1.0, easeOut);
+        }
+        simDt = silkyDt * timeScale;
       }
 
       this.elapsedSec += simDt;
 
       // Smooth warm-sunlight impact glint & Overdrive buildup (strictly zero neon!)
       const targetOdBoost = this.overdriveArmed ? 0.38 : 0;
-      this.overdriveSunBoost = THREE.MathUtils.lerp(this.overdriveSunBoost, targetOdBoost, 1 - Math.exp(-4.5 * rawDt));
+      this.overdriveSunBoost = THREE.MathUtils.lerp(this.overdriveSunBoost, targetOdBoost, 1 - Math.exp(-4.5 * silkyDt));
 
       if (this.lightImpactPulse > 0.001 || this.overdriveSunBoost > 0.002) {
-        this.lightImpactPulse *= Math.exp(-5.5 * rawDt);
+        this.lightImpactPulse *= Math.exp(-5.5 * silkyDt);
         this.sunLight.intensity =
           this.baseSunIntensity + this.lightImpactPulse * 0.65 + this.overdriveSunBoost;
         this.khdr.exposure =
@@ -1050,7 +1223,7 @@ export class GameScene {
         this.khdr.exposure = this.baseExposure;
       }
 
-      // Update 3D spring rigs, tabletop props, physical VFX, and cinema camera
+      // Update 3D spring rigs, tabletop props, physical VFX, and C² Steadicam cinema camera
       this.playerHand.update(simDt);
       this.npcHand.update(simDt);
       this.playerHand.getPalmWorldPosition(this.tmpLeftPalm);
@@ -1058,9 +1231,9 @@ export class GameScene {
 
       this.stageBuilder.update(simDt, this.tmpLeftPalm, this.tmpRightPalm, this.settings.shadowFlame);
       this.atmosphere.update(simDt, this.settings.stage);
-      this.cameraDirector.update(rawDt);
+      this.cameraDirector.update(silkyDt);
 
-      // Sync 3D HRTF AudioListener pose in JSound Engin 1.2 with live Cinema Camera!
+      // Sync 3D HRTF AudioListener pose in JSound Engin 1.3 with live Cinema Camera!
       this.cameraDirector.camera.getWorldDirection(this.tmpCamForward);
       const camPos = this.cameraDirector.camera.position;
       this.sound.setListenerPose(
@@ -1100,6 +1273,7 @@ export class GameScene {
           shadowMapSize: this.currentShadowMapSize,
           khdrActive: this.settings.khdrEnabled,
           shadowFlameMode: this.settings.shadowFlame,
+          fingerS1Active: this.settings.fingerS1Enabled,
           cameraStyle: this.settings.cameraStyle,
           jhandDof: jhandT.activeDof,
           jhandPoseCount: this.playerHand.kinesis.getPoseCount(),
@@ -1112,6 +1286,7 @@ export class GameScene {
           jsoundEarlyRays: jsoundT.earlyRayCount,
           jsoundOversampling: jsoundT.oversamplingFactor,
           jsoundDspRateKhz: Math.round(jsoundT.internalDspRateHz / 1000),
+          jsoundCacheHitPct: jsoundT.cacheHitRatePct,
           jsoundSpatialMode: jsoundT.spatialMode,
           jsoundVoices: jsoundT.activeVoices,
           jsoundPeakDb: jsoundT.peakDb,

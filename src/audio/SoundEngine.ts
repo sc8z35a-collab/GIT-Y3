@@ -1,6 +1,6 @@
 /**
- * ★ JSound Engin 1.2 — Public Audio Facade ★
- * Re-exports the proprietary 192kHz 4×OS 18-instrument, 32-material, 128-ray 3D Binaural acoustic engine.
+ * ★ JSound Engin 1.3 — Public Audio Facade ★
+ * Re-exports the proprietary 384kHz 8×OS, 26-instrument, 43-material, 230-ray 3D Spatial & LRU-Cached engine.
  */
 export { JSoundEngine, JSoundEngine as SoundEngine } from '../engine/jsound/JSoundEngine';
 export type {

@@ -13,7 +13,12 @@ export type ResolutionPresetId = 'hd' | 'fhd' | '1.5k' | '2k';
 export type FpsLimitMode = 60 | 120 | 0; // 0 = Unlimited (無制限)
 export type ShadowFlameMode = 'standard' | 'flash' | 'pro';
 export type StageId = 'zashiki' | 'salon' | 'shrine' | 'onsen' | 'atelier';
-export type HandMaterialPreset = 'hinoki_ivory' | 'bisque_porcelain' | 'obsidian_gold' | 'karakuri_bronze';
+export type HandMaterialPreset =
+  | 'living_skin'
+  | 'hinoki_ivory'
+  | 'bisque_porcelain'
+  | 'obsidian_gold'
+  | 'karakuri_bronze';
 export type CameraStyleId = 'cinematic' | 'duel_rail' | 'macro_artisan' | 'broadcast' | 'free_orbit';
 export type GameModeId = 'classic' | 'survival' | 'blitz' | 'endless';
 export type PVModeId = 'grand_trailer' | 'battle_reel' | 'craft_showcase';
@@ -165,6 +170,7 @@ export interface GraphicsSettings {
   khdrSplitCompare: boolean;
   shadowFlame: ShadowFlameMode;
   stage: StageId;
+  fingerS1Enabled: boolean;
   playerHandMaterial: HandMaterialPreset;
   npcHandMaterial: HandMaterialPreset;
   jhandMode: JHandModeSetting;
@@ -182,7 +188,8 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   khdrSplitCompare: false,
   shadowFlame: 'pro',
   stage: 'zashiki',
-  playerHandMaterial: 'hinoki_ivory',
+  fingerS1Enabled: true,
+  playerHandMaterial: 'living_skin',
   npcHandMaterial: 'karakuri_bronze',
   jhandMode: 'biomech_ultra',
   jsoundQuality: 'ultra',
@@ -203,6 +210,7 @@ export interface RenderMetrics {
   shadowMapSize: number;
   khdrActive: boolean;
   shadowFlameMode: ShadowFlameMode;
+  fingerS1Active: boolean;
   cameraStyle: CameraStyleId;
   jhandDof: number;
   jhandPoseCount: number;
@@ -216,6 +224,7 @@ export interface RenderMetrics {
   jsoundOversampling: number;
   jsoundDspRateKhz: number;
   jsoundSpatialMode: JSoundSpatialMode;
+  jsoundCacheHitPct: number;
   jsoundVoices: number;
   jsoundPeakDb: number;
   jsoundMaterialPair: string;

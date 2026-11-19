@@ -488,7 +488,306 @@ const ANATOMICAL_POSES: Record<HandPoseKey, FullAnatomicalTarget> = {
     palmCupBias: 1.0,
     effort: 1.0,
   },
+  // ★ 18 NEW 38-DOF ANATOMICAL POSES (Total 36 Poses!) ★
+  lotus_mudra: {
+    // 蓮華印: Sacred curved lotus mudra — thumb meets middle pad delicately, index & pinky bloom!
+    thumb: { cmcFlex: 0.62, cmcAbd: -0.62, cmcPronation: 0.74, mcpFlex: 0.34, mcpAbd: 0.04, ipFlex: 0.16 },
+    fingers: {
+      index: { mcpFlex: 0.08, mcpAbd: 0.24, pipFlex: 0.22, dipFlex: 0.14 },
+      middle: { mcpFlex: 0.96, mcpAbd: 0.02, pipFlex: 0.88, dipFlex: 0.56 },
+      ring: { mcpFlex: 0.84, mcpAbd: -0.06, pipFlex: 0.78, dipFlex: 0.48 },
+      pinky: { mcpFlex: -0.04, mcpAbd: -0.28, pipFlex: 0.18, dipFlex: 0.12 },
+    },
+    wristPitch: -0.14,
+    wristYaw: 0.04,
+    wristRoll: -0.32,
+    forearmPronation: -0.58,
+    palmCupBias: 0.48,
+    effort: 0.32,
+  },
+  sword_seal: {
+    // 剣印 (Kuji-in Sword Seal): Index & middle welded razor-straight together, thumb locks ring & pinky!
+    thumb: { cmcFlex: 0.86, cmcAbd: -0.94, cmcPronation: 0.76, mcpFlex: 0.74, mcpAbd: 0.1, ipFlex: 0.66 },
+    fingers: {
+      index: { mcpFlex: -0.14, mcpAbd: -0.02, pipFlex: 0.01, dipFlex: 0.0 },
+      middle: { mcpFlex: -0.13, mcpAbd: 0.01, pipFlex: 0.01, dipFlex: 0.0 },
+      ring: { mcpFlex: 1.56, mcpAbd: -0.04, pipFlex: 1.72, dipFlex: 1.12 },
+      pinky: { mcpFlex: 1.6, mcpAbd: -0.08, pipFlex: 1.72, dipFlex: 1.1 },
+    },
+    wristPitch: -0.08,
+    wristYaw: 0.16,
+    wristRoll: 0.34,
+    forearmPronation: 0.62,
+    palmCupBias: 0.66,
+    effort: 0.92,
+  },
+  tiger_palm: {
+    // 虎掌打: Martial pushing palm — dramatic dorsal wrist hyperextension, fingers taut & arched!
+    thumb: { cmcFlex: 0.12, cmcAbd: 0.28, cmcPronation: -0.22, mcpFlex: 0.14, mcpAbd: -0.06, ipFlex: 0.26 },
+    fingers: {
+      index: { mcpFlex: -0.26, mcpAbd: 0.26, pipFlex: 0.54, dipFlex: 0.36 },
+      middle: { mcpFlex: -0.28, mcpAbd: 0.04, pipFlex: 0.58, dipFlex: 0.4 },
+      ring: { mcpFlex: -0.24, mcpAbd: -0.14, pipFlex: 0.56, dipFlex: 0.38 },
+      pinky: { mcpFlex: -0.18, mcpAbd: -0.28, pipFlex: 0.5, dipFlex: 0.34 },
+    },
+    wristPitch: -0.48,
+    wristYaw: 0.02,
+    wristRoll: 0.04,
+    forearmPronation: 0.08,
+    palmCupBias: 0.18,
+    effort: 0.94,
+  },
+  iron_knuckle: {
+    // 鳳眼拳 (Phoenix-Eye Martial Fist): Index PIP protruding sharply braced by thumb!
+    thumb: { cmcFlex: 0.72, cmcAbd: -0.78, cmcPronation: 0.7, mcpFlex: 0.52, mcpAbd: 0.12, ipFlex: 0.34 },
+    fingers: {
+      index: { mcpFlex: 0.88, mcpAbd: 0.04, pipFlex: 1.74, dipFlex: 1.18 },
+      middle: { mcpFlex: 1.56, mcpAbd: 0.0, pipFlex: 1.72, dipFlex: 1.14 },
+      ring: { mcpFlex: 1.6, mcpAbd: -0.03, pipFlex: 1.74, dipFlex: 1.14 },
+      pinky: { mcpFlex: 1.64, mcpAbd: -0.05, pipFlex: 1.72, dipFlex: 1.12 },
+    },
+    wristPitch: 0.06,
+    wristYaw: -0.06,
+    wristRoll: 0.2,
+    forearmPronation: 0.42,
+    palmCupBias: 0.92,
+    effort: 0.96,
+  },
+  tea_whisk: {
+    // 茶筅構え: Refined chado tea-ceremony tripod hold with graceful ulnar taper!
+    thumb: { cmcFlex: 0.54, cmcAbd: -0.44, cmcPronation: 0.62, mcpFlex: 0.26, mcpAbd: 0.02, ipFlex: 0.18 },
+    fingers: {
+      index: { mcpFlex: 0.62, mcpAbd: 0.06, pipFlex: 0.76, dipFlex: 0.48 },
+      middle: { mcpFlex: 0.74, mcpAbd: 0.0, pipFlex: 0.84, dipFlex: 0.52 },
+      ring: { mcpFlex: 0.52, mcpAbd: -0.08, pipFlex: 0.62, dipFlex: 0.38 },
+      pinky: { mcpFlex: 0.24, mcpAbd: -0.2, pipFlex: 0.34, dipFlex: 0.22 },
+    },
+    wristPitch: 0.16,
+    wristYaw: 0.12,
+    wristRoll: -0.18,
+    forearmPronation: -0.24,
+    palmCupBias: 0.44,
+    effort: 0.28,
+  },
+  fan_hold: {
+    // 舞扇持ち: Ceremonial folding-fan grasp — thumb/index/middle cradle pivot, ring/pinky poised!
+    thumb: { cmcFlex: 0.46, cmcAbd: -0.32, cmcPronation: 0.48, mcpFlex: 0.22, mcpAbd: 0.04, ipFlex: 0.1 },
+    fingers: {
+      index: { mcpFlex: 0.34, mcpAbd: 0.14, pipFlex: 0.44, dipFlex: 0.28 },
+      middle: { mcpFlex: 0.82, mcpAbd: 0.02, pipFlex: 0.92, dipFlex: 0.58 },
+      ring: { mcpFlex: 0.96, mcpAbd: -0.04, pipFlex: 1.04, dipFlex: 0.66 },
+      pinky: { mcpFlex: 0.18, mcpAbd: -0.24, pipFlex: 0.28, dipFlex: 0.18 },
+    },
+    wristPitch: -0.14,
+    wristYaw: 0.18,
+    wristRoll: -0.28,
+    forearmPronation: -0.38,
+    palmCupBias: 0.4,
+    effort: 0.38,
+  },
+  brush_grip: {
+    // 筆執り: Master calligraphy brush tripod pinch with supple carpal arch!
+    thumb: { cmcFlex: 0.58, cmcAbd: -0.5, cmcPronation: 0.68, mcpFlex: 0.3, mcpAbd: 0.04, ipFlex: 0.12 },
+    fingers: {
+      index: { mcpFlex: 0.72, mcpAbd: 0.04, pipFlex: 0.78, dipFlex: 0.46 },
+      middle: { mcpFlex: 0.84, mcpAbd: -0.02, pipFlex: 0.88, dipFlex: 0.52 },
+      ring: { mcpFlex: 1.08, mcpAbd: -0.06, pipFlex: 1.14, dipFlex: 0.7 },
+      pinky: { mcpFlex: 1.18, mcpAbd: -0.1, pipFlex: 1.22, dipFlex: 0.74 },
+    },
+    wristPitch: 0.24,
+    wristYaw: -0.08,
+    wristRoll: 0.26,
+    forearmPronation: 0.48,
+    palmCupBias: 0.58,
+    effort: 0.42,
+  },
+  koto_pluck: {
+    // 箏爪弾き: 13-string Koto ivory-pick posture — thumb & index/middle arched over strings!
+    thumb: { cmcFlex: 0.42, cmcAbd: -0.24, cmcPronation: 0.52, mcpFlex: 0.16, mcpAbd: -0.02, ipFlex: 0.08 },
+    fingers: {
+      index: { mcpFlex: 0.48, mcpAbd: 0.14, pipFlex: 0.68, dipFlex: 0.44 },
+      middle: { mcpFlex: 0.58, mcpAbd: 0.02, pipFlex: 0.78, dipFlex: 0.5 },
+      ring: { mcpFlex: 0.38, mcpAbd: -0.1, pipFlex: 0.52, dipFlex: 0.32 },
+      pinky: { mcpFlex: 0.16, mcpAbd: -0.22, pipFlex: 0.26, dipFlex: 0.16 },
+    },
+    wristPitch: 0.22,
+    wristYaw: -0.12,
+    wristRoll: 0.16,
+    forearmPronation: 0.34,
+    palmCupBias: 0.42,
+    effort: 0.46,
+  },
+  snap_ready: {
+    // 指パッチン溜: Preloaded finger-snap — middle finger pressed firmly into thumb pad!
+    thumb: { cmcFlex: 0.66, cmcAbd: -0.58, cmcPronation: 0.78, mcpFlex: 0.32, mcpAbd: 0.06, ipFlex: -0.08 },
+    fingers: {
+      index: { mcpFlex: 0.24, mcpAbd: 0.18, pipFlex: 0.34, dipFlex: 0.22 },
+      middle: { mcpFlex: 0.92, mcpAbd: 0.04, pipFlex: 0.72, dipFlex: 0.34 },
+      ring: { mcpFlex: 1.46, mcpAbd: -0.06, pipFlex: 1.62, dipFlex: 1.04 },
+      pinky: { mcpFlex: 1.54, mcpAbd: -0.1, pipFlex: 1.66, dipFlex: 1.06 },
+    },
+    wristPitch: -0.12,
+    wristYaw: 0.1,
+    wristRoll: -0.24,
+    forearmPronation: -0.46,
+    palmCupBias: 0.62,
+    effort: 0.86,
+  },
+  snap_release: {
+    // 指弾き開放: Explosive snap follow-through — middle slapped onto thenar, thumb & index flared!
+    thumb: { cmcFlex: 0.12, cmcAbd: 0.24, cmcPronation: -0.14, mcpFlex: 0.08, mcpAbd: -0.06, ipFlex: -0.14 },
+    fingers: {
+      index: { mcpFlex: -0.14, mcpAbd: 0.22, pipFlex: 0.06, dipFlex: 0.04 },
+      middle: { mcpFlex: 1.54, mcpAbd: 0.02, pipFlex: 1.72, dipFlex: 1.12 },
+      ring: { mcpFlex: 1.48, mcpAbd: -0.05, pipFlex: 1.64, dipFlex: 1.06 },
+      pinky: { mcpFlex: 1.42, mcpAbd: -0.1, pipFlex: 1.58, dipFlex: 1.0 },
+    },
+    wristPitch: -0.22,
+    wristYaw: 0.18,
+    wristRoll: -0.34,
+    forearmPronation: -0.64,
+    palmCupBias: 0.54,
+    effort: 0.78,
+  },
+  peace_tilt: {
+    // 斜め双刃: Confident relaxed supinated victory V-sign with jaunty radial tilt!
+    thumb: { cmcFlex: 0.82, cmcAbd: -0.92, cmcPronation: 0.74, mcpFlex: 0.7, mcpAbd: 0.08, ipFlex: 0.62 },
+    fingers: {
+      index: { mcpFlex: -0.12, mcpAbd: 0.34, pipFlex: 0.03, dipFlex: 0.02 },
+      middle: { mcpFlex: -0.08, mcpAbd: -0.26, pipFlex: 0.04, dipFlex: 0.02 },
+      ring: { mcpFlex: 1.54, mcpAbd: -0.04, pipFlex: 1.7, dipFlex: 1.1 },
+      pinky: { mcpFlex: 1.58, mcpAbd: -0.08, pipFlex: 1.7, dipFlex: 1.08 },
+    },
+    wristPitch: -0.18,
+    wristYaw: 0.2,
+    wristRoll: -0.36,
+    forearmPronation: -0.58,
+    palmCupBias: 0.62,
+    effort: 0.62,
+  },
+  open_offer: {
+    // 献上掌: Supinated gracious offering hand — welcoming soft upward cup!
+    thumb: { cmcFlex: 0.18, cmcAbd: 0.14, cmcPronation: -0.1, mcpFlex: 0.12, mcpAbd: -0.02, ipFlex: 0.04 },
+    fingers: {
+      index: { mcpFlex: 0.18, mcpAbd: 0.14, pipFlex: 0.24, dipFlex: 0.16 },
+      middle: { mcpFlex: 0.22, mcpAbd: 0.02, pipFlex: 0.28, dipFlex: 0.18 },
+      ring: { mcpFlex: 0.28, mcpAbd: -0.08, pipFlex: 0.34, dipFlex: 0.22 },
+      pinky: { mcpFlex: 0.34, mcpAbd: -0.18, pipFlex: 0.38, dipFlex: 0.24 },
+    },
+    wristPitch: -0.16,
+    wristYaw: 0.06,
+    wristRoll: -0.52,
+    forearmPronation: -0.84,
+    palmCupBias: 0.38,
+    effort: 0.2,
+  },
+  fist_pump: {
+    // 凱旋握拳: Surging angled triumph fist with strong forearm twist!
+    thumb: { cmcFlex: 0.84, cmcAbd: -0.9, cmcPronation: 0.8, mcpFlex: 0.74, mcpAbd: 0.14, ipFlex: 0.68 },
+    fingers: {
+      index: { mcpFlex: 1.58, mcpAbd: 0.02, pipFlex: 1.74, dipFlex: 1.14 },
+      middle: { mcpFlex: 1.62, mcpAbd: 0.0, pipFlex: 1.76, dipFlex: 1.16 },
+      ring: { mcpFlex: 1.64, mcpAbd: -0.02, pipFlex: 1.76, dipFlex: 1.14 },
+      pinky: { mcpFlex: 1.66, mcpAbd: -0.04, pipFlex: 1.74, dipFlex: 1.12 },
+    },
+    wristPitch: -0.3,
+    wristYaw: -0.12,
+    wristRoll: 0.32,
+    forearmPronation: 0.64,
+    palmCupBias: 1.0,
+    effort: 0.98,
+  },
+  defeat_slump: {
+    // 脱力垂手: Heavy gravity-relaxed defeated hand — zero tension, limp natural cascade!
+    thumb: { cmcFlex: 0.32, cmcAbd: -0.26, cmcPronation: 0.22, mcpFlex: 0.26, mcpAbd: 0.0, ipFlex: 0.24 },
+    fingers: {
+      index: { mcpFlex: 0.56, mcpAbd: 0.04, pipFlex: 0.68, dipFlex: 0.44 },
+      middle: { mcpFlex: 0.64, mcpAbd: 0.0, pipFlex: 0.76, dipFlex: 0.5 },
+      ring: { mcpFlex: 0.74, mcpAbd: -0.04, pipFlex: 0.84, dipFlex: 0.54 },
+      pinky: { mcpFlex: 0.84, mcpAbd: -0.08, pipFlex: 0.9, dipFlex: 0.58 },
+    },
+    wristPitch: 0.52,
+    wristYaw: -0.14,
+    wristRoll: 0.16,
+    forearmPronation: 0.36,
+    palmCupBias: 0.28,
+    effort: 0.05,
+  },
+  stealth_curl: {
+    // 忍び構え: Low-profile covert coiled fingers ready to strike in any direction!
+    thumb: { cmcFlex: 0.52, cmcAbd: -0.42, cmcPronation: 0.44, mcpFlex: 0.46, mcpAbd: 0.04, ipFlex: 0.48 },
+    fingers: {
+      index: { mcpFlex: 0.66, mcpAbd: 0.16, pipFlex: 1.18, dipFlex: 0.78 },
+      middle: { mcpFlex: 0.74, mcpAbd: 0.02, pipFlex: 1.24, dipFlex: 0.82 },
+      ring: { mcpFlex: 0.84, mcpAbd: -0.08, pipFlex: 1.28, dipFlex: 0.84 },
+      pinky: { mcpFlex: 0.94, mcpAbd: -0.18, pipFlex: 1.32, dipFlex: 0.86 },
+    },
+    wristPitch: 0.12,
+    wristYaw: -0.08,
+    wristRoll: 0.22,
+    forearmPronation: 0.46,
+    palmCupBias: 0.64,
+    effort: 0.72,
+  },
+  wave_flourish: {
+    // 歌舞伎波動: Sweeping theatrical kabuki radial-to-ulnar finger fan cascade!
+    thumb: { cmcFlex: 0.08, cmcAbd: 0.26, cmcPronation: -0.2, mcpFlex: 0.04, mcpAbd: -0.06, ipFlex: -0.14 },
+    fingers: {
+      index: { mcpFlex: -0.2, mcpAbd: 0.3, pipFlex: 0.06, dipFlex: 0.02 },
+      middle: { mcpFlex: 0.06, mcpAbd: 0.08, pipFlex: 0.26, dipFlex: 0.16 },
+      ring: { mcpFlex: 0.42, mcpAbd: -0.12, pipFlex: 0.58, dipFlex: 0.36 },
+      pinky: { mcpFlex: 0.82, mcpAbd: -0.28, pipFlex: 0.96, dipFlex: 0.62 },
+    },
+    wristPitch: -0.24,
+    wristYaw: 0.22,
+    wristRoll: -0.26,
+    forearmPronation: -0.34,
+    palmCupBias: 0.24,
+    effort: 0.68,
+  },
+  counter_parry: {
+    // 受け流し: Sweeping ulnar-deviated martial deflection palm with tightly tucked thumb!
+    thumb: { cmcFlex: 0.64, cmcAbd: -0.58, cmcPronation: 0.54, mcpFlex: 0.52, mcpAbd: 0.08, ipFlex: 0.4 },
+    fingers: {
+      index: { mcpFlex: -0.08, mcpAbd: -0.04, pipFlex: 0.08, dipFlex: 0.05 },
+      middle: { mcpFlex: -0.06, mcpAbd: -0.01, pipFlex: 0.1, dipFlex: 0.06 },
+      ring: { mcpFlex: -0.02, mcpAbd: 0.02, pipFlex: 0.14, dipFlex: 0.08 },
+      pinky: { mcpFlex: 0.04, mcpAbd: 0.05, pipFlex: 0.18, dipFlex: 0.1 },
+    },
+    wristPitch: -0.18,
+    wristYaw: -0.26,
+    wristRoll: 0.42,
+    forearmPronation: 0.74,
+    palmCupBias: 0.26,
+    effort: 0.84,
+  },
+  zen_circle: {
+    // 禅円相 (Chin-Mudra / Perfection Ring): Thumb & index form an unbroken golden circle, 3 fingers gracefully tiered!
+    thumb: { cmcFlex: 0.66, cmcAbd: -0.62, cmcPronation: 0.84, mcpFlex: 0.34, mcpAbd: 0.04, ipFlex: 0.42 },
+    fingers: {
+      index: { mcpFlex: 0.86, mcpAbd: 0.06, pipFlex: 0.98, dipFlex: 0.64 },
+      middle: { mcpFlex: -0.12, mcpAbd: 0.12, pipFlex: 0.08, dipFlex: 0.04 },
+      ring: { mcpFlex: -0.06, mcpAbd: -0.08, pipFlex: 0.14, dipFlex: 0.08 },
+      pinky: { mcpFlex: 0.02, mcpAbd: -0.24, pipFlex: 0.2, dipFlex: 0.12 },
+    },
+    wristPitch: -0.12,
+    wristYaw: 0.08,
+    wristRoll: -0.24,
+    forearmPronation: -0.44,
+    palmCupBias: 0.36,
+    effort: 0.36,
+  },
 };
+
+/** C² Quintic Hermite Smoothstep (zero velocity & acceleration discontinuity -> ultra-silky!) */
+function quinticSmooth(u: number): number {
+  const c = u <= 0 ? 0 : u >= 1 ? 1 : u;
+  return c * c * c * (c * (c * 6 - 15) + 10);
+}
+
+function lerpScalar(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
 
 /** Irrational-frequency 1/f pink quasi-stochastic drift generator (zero cyclic repetition!) */
 function pinkBioDrift(t: number, phase: number): number {
@@ -506,6 +805,8 @@ export class JHandKinesisEngine {
   private prevPoseKey: HandPoseKey = 'ready';
   private activeSynergy: TransitionSynergy = 'neutral';
   private target: FullAnatomicalTarget = structuredClone(ANATOMICAL_POSES.ready);
+  private prevTarget: FullAnatomicalTarget = structuredClone(ANATOMICAL_POSES.ready);
+  private blendDuration = 0.09;
 
   // 38-DOF Biomechanical Joint Bank (anatomically scaled moments of inertia!)
   private readonly fingers: Record<FingerName, FingerJointBank>;
@@ -622,6 +923,39 @@ export class JHandKinesisEngine {
     return this.currentPoseKey;
   }
 
+  /** Capture current C² blended target state so rapid pose interrupts remain 100% butter-smooth! */
+  private snapshotBlendedTarget(): FullAnatomicalTarget {
+    const b = quinticSmooth(this.poseElapsed / Math.max(0.001, this.blendDuration));
+    const lerpFinger = (a: FingerTarget, c: FingerTarget): FingerTarget => ({
+      mcpFlex: lerpScalar(a.mcpFlex, c.mcpFlex, b),
+      mcpAbd: lerpScalar(a.mcpAbd, c.mcpAbd, b),
+      pipFlex: lerpScalar(a.pipFlex, c.pipFlex, b),
+      dipFlex: lerpScalar(a.dipFlex, c.dipFlex, b),
+    });
+    return {
+      thumb: {
+        cmcFlex: lerpScalar(this.prevTarget.thumb.cmcFlex, this.target.thumb.cmcFlex, b),
+        cmcAbd: lerpScalar(this.prevTarget.thumb.cmcAbd, this.target.thumb.cmcAbd, b),
+        cmcPronation: lerpScalar(this.prevTarget.thumb.cmcPronation, this.target.thumb.cmcPronation, b),
+        mcpFlex: lerpScalar(this.prevTarget.thumb.mcpFlex, this.target.thumb.mcpFlex, b),
+        mcpAbd: lerpScalar(this.prevTarget.thumb.mcpAbd, this.target.thumb.mcpAbd, b),
+        ipFlex: lerpScalar(this.prevTarget.thumb.ipFlex, this.target.thumb.ipFlex, b),
+      },
+      fingers: {
+        index: lerpFinger(this.prevTarget.fingers.index, this.target.fingers.index),
+        middle: lerpFinger(this.prevTarget.fingers.middle, this.target.fingers.middle),
+        ring: lerpFinger(this.prevTarget.fingers.ring, this.target.fingers.ring),
+        pinky: lerpFinger(this.prevTarget.fingers.pinky, this.target.fingers.pinky),
+      },
+      wristPitch: lerpScalar(this.prevTarget.wristPitch, this.target.wristPitch, b),
+      wristYaw: lerpScalar(this.prevTarget.wristYaw, this.target.wristYaw, b),
+      wristRoll: lerpScalar(this.prevTarget.wristRoll, this.target.wristRoll, b),
+      forearmPronation: lerpScalar(this.prevTarget.forearmPronation, this.target.forearmPronation, b),
+      palmCupBias: lerpScalar(this.prevTarget.palmCupBias, this.target.palmCupBias, b),
+      effort: lerpScalar(this.prevTarget.effort, this.target.effort, b),
+    };
+  }
+
   /**
    * Layer 1: Command target pose & classify real human Two-Stage Neuromotor Synergy!
    */
@@ -631,17 +965,22 @@ export class JHandKinesisEngine {
     cascadeWave = true,
     hoverMode = false
   ): void {
+    this.prevTarget = this.snapshotBlendedTarget();
     this.prevPoseKey = this.currentPoseKey;
     this.currentPoseKey = poseKey;
     this.target = structuredClone(ANATOMICAL_POSES[poseKey]);
     this.idleDrumWeight = poseKey === 'ready' && !hoverMode ? 1.0 : 0.0;
+    // Silky C² quintic target transition window (crisp on combat reveal, liquid-smooth on poses!)
+    this.blendDuration = snappy ? 0.032 : hoverMode ? 0.095 : 0.145;
 
     // Classify authentic human 2-stage grasp/release neuromotor synergy!
     if (
       poseKey === ROCK ||
       poseKey === 'windup' ||
       poseKey === 'victory_fist' ||
-      poseKey === 'knuckle_crack'
+      poseKey === 'knuckle_crack' ||
+      poseKey === 'iron_knuckle' ||
+      poseKey === 'fist_pump'
     ) {
       this.activeSynergy = 'hook_roll_clamp';
     } else if (
@@ -649,28 +988,38 @@ export class JHandKinesisEngine {
       poseKey === 'salute' ||
       poseKey === 'blade_edge' ||
       poseKey === 'palm_meditate' ||
-      poseKey === 'guard'
+      poseKey === 'guard' ||
+      poseKey === 'tiger_palm' ||
+      poseKey === 'open_offer' ||
+      poseKey === 'counter_parry' ||
+      poseKey === 'wave_flourish'
     ) {
       this.activeSynergy = 'unlatch_bloom_fan';
-    } else if (poseKey === SCISSORS || poseKey === 'feint_flick' || poseKey === 'finger_gun') {
+    } else if (
+      poseKey === SCISSORS ||
+      poseKey === 'feint_flick' ||
+      poseKey === 'finger_gun' ||
+      poseKey === 'sword_seal' ||
+      poseKey === 'peace_tilt'
+    ) {
       this.activeSynergy = 'clamp_fire_shear';
     } else {
       this.activeSynergy = 'neutral';
     }
 
     if (snappy) {
-      this.baseStiffness = 550;
-      this.baseDamping = 24.8;
+      this.baseStiffness = 565;
+      this.baseDamping = 25.4;
     } else if (hoverMode) {
-      this.baseStiffness = 275;
-      this.baseDamping = 24.0;
+      this.baseStiffness = 285;
+      this.baseDamping = 24.5;
     } else {
-      this.baseStiffness = 210;
-      this.baseDamping = 21.2;
+      this.baseStiffness = 225;
+      this.baseDamping = 22.4;
     }
 
     // Reset Hill activation subtly on explosive transitions for realistic torque recruitment curve
-    const resetAct = snappy ? 0.4 : 0.68;
+    const resetAct = snappy ? 0.44 : 0.72;
     for (const f of FINGER_NAMES) {
       this.fingers[f].mcpFlex.activation = Math.min(this.fingers[f].mcpFlex.activation, resetAct);
       this.fingers[f].pipFlex.activation = Math.min(this.fingers[f].pipFlex.activation, resetAct);
@@ -685,15 +1034,15 @@ export class JHandKinesisEngine {
     if (cascadeWave) {
       if (this.activeSynergy === 'unlatch_bloom_fan') {
         // Real human Rock -> Paper: Thumb releases FIRST (0ms), then radial-to-ulnar bloom!
-        this.cascadeDelays = { thumb: 0.0, index: 0.018, middle: 0.036, ring: 0.056, pinky: 0.076 };
+        this.cascadeDelays = { thumb: 0.0, index: 0.016, middle: 0.032, ring: 0.05, pinky: 0.068 };
       } else if (this.activeSynergy === 'hook_roll_clamp') {
         // Real human Paper -> Rock: Ulnar grip (pinky->ring->middle->index) hooks first, thumb clamps last!
-        this.cascadeDelays = { pinky: 0.0, ring: 0.011, middle: 0.022, index: 0.033, thumb: 0.076 };
+        this.cascadeDelays = { pinky: 0.0, ring: 0.01, middle: 0.02, index: 0.03, thumb: 0.072 };
       } else if (this.activeSynergy === 'clamp_fire_shear') {
         // Ring/Pinky lock immediate; Thumb secures Ring; Index/Middle fire out cleanly into V-blades!
-        this.cascadeDelays = { ring: 0.0, pinky: 0.0, thumb: 0.014, index: 0.016, middle: 0.029 };
+        this.cascadeDelays = { ring: 0.0, pinky: 0.0, thumb: 0.013, index: 0.015, middle: 0.027 };
       } else {
-        this.cascadeDelays = { thumb: 0, index: 0.014, middle: 0.028, ring: 0.042, pinky: 0.056 };
+        this.cascadeDelays = { thumb: 0, index: 0.012, middle: 0.024, ring: 0.036, pinky: 0.048 };
       }
     } else {
       this.cascadeDelays = { thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0 };
@@ -750,6 +1099,43 @@ export class JHandKinesisEngine {
     this.thumb.cmcAbd.addTorqueImpulse(1.5);
   }
 
+  /** Crisp explosive middle-finger snap into palm + thumb radial kick! */
+  public triggerFingerSnap(): void {
+    this.setTargetPose('snap_release', true, false);
+    this.fingers.middle.mcpFlex.addTorqueImpulse(5.4);
+    this.fingers.middle.pipFlex.addTorqueImpulse(6.2);
+    this.thumb.cmcAbd.addTorqueImpulse(3.2);
+    this.wristYaw.addTorqueImpulse(1.8);
+    this.forearmPron.addTorqueImpulse(-2.4);
+  }
+
+  /** Theatrical kabuki-style radial-to-ulnar flowing finger wave! */
+  public triggerWaveFlourish(): void {
+    this.setTargetPose('wave_flourish', false, true);
+    this.forearmPron.addTorqueImpulse(-1.8);
+    this.mcPitch.addTorqueImpulse(-1.6);
+    this.fingers.index.mcpFlex.addTorqueImpulse(-2.6);
+    this.fingers.middle.pipFlex.addTorqueImpulse(-1.6);
+    this.fingers.ring.pipFlex.addTorqueImpulse(1.4);
+    this.fingers.pinky.pipFlex.addTorqueImpulse(2.2);
+  }
+
+  /** Crisp Kuji-in Sword Seal energy lock pulse! */
+  public triggerSwordSealPulse(): void {
+    this.setTargetPose('sword_seal', true, true);
+    this.forearmPron.addTorqueImpulse(2.4);
+    this.wristYaw.addTorqueImpulse(1.6);
+    this.fingers.index.mcpFlex.addTorqueImpulse(-2.2);
+    this.fingers.middle.mcpFlex.addTorqueImpulse(-2.2);
+  }
+
+  /** Serene Zen Mudra harmonic breath ripple */
+  public triggerZenBreath(): void {
+    this.setTargetPose('zen_circle', false, true);
+    this.mcPitch.addTorqueImpulse(-0.85);
+    this.forearmPron.addTorqueImpulse(-0.9);
+  }
+
   /** Subtle non-cheating NPC neuromuscular micro-tell triggered on player Feint */
   public triggerNpcTell(stanceCue: 'tight' | 'poised' | 'open'): void {
     this.thoughtPulse = 0.85;
@@ -788,6 +1174,7 @@ export class JHandKinesisEngine {
 
   /**
    * Step the 8-Layer 38-DOF Biomechanical Articulation Engine forward by `dt` seconds.
+   * Uses 6× sub-stepping in Ultra mode + C² Quintic target blending for ultra-silky ("ぬるぬる") fluidity!
    */
   public step(
     dt: number,
@@ -807,8 +1194,11 @@ export class JHandKinesisEngine {
 
     const ultra = this.mode === 'biomech_ultra';
     const pro = this.mode === 'biomech_ultra' || this.mode === 'biomech_pro';
-    const subSteps = ultra ? 4 : 3;
+    const subSteps = ultra ? 6 : 4;
     const foleyEvents: HandFoleyEvent[] = [];
+
+    // C² Quintic target blend factor for silky zero-jerk transitions!
+    const qBlend = quinticSmooth(this.poseElapsed / Math.max(0.001, this.blendDuration));
 
     // -------------------------------------------------------------------------
     // Compute wrist linear & angular acceleration for Layer 5 Inertial Whip-Lag
@@ -831,8 +1221,13 @@ export class JHandKinesisEngine {
     // -------------------------------------------------------------------------
     const kW = this.baseStiffness * 0.86;
     const dW = this.baseDamping * 0.94;
+    const tgtForearmPron = lerpScalar(this.prevTarget.forearmPronation, this.target.forearmPronation, qBlend);
+    const tgtWristYaw = lerpScalar(this.prevTarget.wristYaw, this.target.wristYaw, qBlend);
+    const tgtWristRoll = lerpScalar(this.prevTarget.wristRoll, this.target.wristRoll, qBlend);
+    const tgtWristPitch = lerpScalar(this.prevTarget.wristPitch, this.target.wristPitch, qBlend);
+
     this.forearmPron.step(
-      this.target.forearmPronation + extraWristRoll * 0.54,
+      tgtForearmPron + extraWristRoll * 0.54,
       kW,
       dW,
       0,
@@ -840,12 +1235,12 @@ export class JHandKinesisEngine {
       46,
       subSteps
     );
-    this.wristYaw.step(this.target.wristYaw, kW, dW, 0, safeDt, 46, subSteps);
-    this.wristRoll.step(this.target.wristRoll, kW * 1.05, dW, 0, safeDt, 46, subSteps);
+    this.wristYaw.step(tgtWristYaw, kW, dW, 0, safeDt, 46, subSteps);
+    this.wristRoll.step(tgtWristRoll, kW * 1.05, dW, 0, safeDt, 46, subSteps);
 
     // Dart-Thrower's Motion (DTM) oblique plane coupling: radial deviation biases subtle extension!
     const dtmBias = ultra ? -this.wristYaw.pos * 0.14 : 0;
-    const targetTotalPitch = this.target.wristPitch + dtmBias;
+    const targetTotalPitch = tgtWristPitch + dtmBias;
 
     // Anatomical carpal row partition:
     // Dorsal extension (<0): ~42% Radiocarpal + ~58% Midcarpal
@@ -961,7 +1356,8 @@ export class JHandKinesisEngine {
     // -------------------------------------------------------------------------
     // Layer 7: Stochastic 1/f Pink Micro-Life + 1.15 Hz Arterial Pulse + 8.5–12.5 Hz Tremor
     // -------------------------------------------------------------------------
-    this.effortSmooth += (this.target.effort - this.effortSmooth) * Math.min(1, safeDt * 8.5);
+    const tgtEffort = lerpScalar(this.prevTarget.effort, this.target.effort, qBlend);
+    this.effortSmooth += (tgtEffort - this.effortSmooth) * Math.min(1, safeDt * 8.5);
     const breath = Math.sin(this.simClock * 1.82) + Math.sin(this.simClock * 0.73) * 0.22;
     // Authentic 69 BPM (1.15 Hz) resting arterial pulse systolic peak!
     const pulsePhase = (this.simClock * 1.15) % 1.0;
@@ -984,14 +1380,22 @@ export class JHandKinesisEngine {
     const dJ = this.baseDamping;
 
     // -------------------------------------------------------------------------
-    // Step All 4 Fingers through Layers 1–6
+    // Step All 4 Fingers through Layers 1–6 (with per-digit C² Quintic target blending!)
     // -------------------------------------------------------------------------
     for (let idx = 0; idx < FINGER_NAMES.length; idx++) {
       const name = FINGER_NAMES[idx];
       const bank = this.fingers[name];
-      const tgt = this.target.fingers[name];
+      const delay = this.cascadeDelays[name];
 
-      if (this.poseElapsed >= this.cascadeDelays[name]) {
+      if (this.poseElapsed >= delay) {
+        const fBlend = quinticSmooth((this.poseElapsed - delay) / Math.max(0.001, this.blendDuration));
+        const prevT = this.prevTarget.fingers[name];
+        const nextT = this.target.fingers[name];
+        const tgtMcpFlex = lerpScalar(prevT.mcpFlex, nextT.mcpFlex, fBlend);
+        const tgtMcpAbd = lerpScalar(prevT.mcpAbd, nextT.mcpAbd, fBlend);
+        const tgtPipFlex = lerpScalar(prevT.pipFlex, nextT.pipFlex, fBlend);
+        const tgtDipFlex = lerpScalar(prevT.dipFlex, nextT.dipFlex, fBlend);
+
         // Layer 3B: Juncturae Tendinum sympathetic tendon coupling
         let juncturaeOffset = 0;
         if (pro) {
@@ -1023,14 +1427,14 @@ export class JHandKinesisEngine {
         // Layer 4A: Collateral-Ligament Abduction–Flexion Convergence
         const flexFactor = Math.max(0, bank.mcpFlex.pos) / 1.65;
         const ligamentAbdGain = pro ? Math.pow(Math.max(0.07, 1.0 - flexFactor * 0.9), 1.38) : 1.0;
-        const effectiveAbdTarget = (tgt.mcpAbd + extraSpread) * ligamentAbdGain;
+        const effectiveAbdTarget = (tgtMcpAbd + extraSpread) * ligamentAbdGain;
 
         // Layer 1B Two-Stage Synergy offset applied to MCP vs PIP
         const isBlade = this.currentPoseKey === SCISSORS && (name === 'index' || name === 'middle');
         const mcpSynergy = isBlade ? 0 : hookMcpHoldback;
         const pipSynergy = isBlade ? 0 : hookPipBoost + bloomPipLag;
 
-        const mcpTarget = tgt.mcpFlex + tenodesisFlex + juncturaeOffset + bioOverlay + extraCurl + mcpSynergy;
+        const mcpTarget = tgtMcpFlex + tenodesisFlex + juncturaeOffset + bioOverlay + extraCurl + mcpSynergy;
         bank.mcpFlex.step(mcpTarget, kJ, dJ, rawWhipTorque * 0.42, safeDt, 48, subSteps);
         bank.mcpAbd.step(effectiveAbdTarget, kJ * 0.9, dJ * 0.92, 0, safeDt, 50, subSteps);
 
@@ -1042,13 +1446,13 @@ export class JHandKinesisEngine {
         bank.mcpAxialTwist.step(twistTarget, kJ * 0.8, dJ * 0.96, 0, safeDt, 42, subSteps);
 
         // PIP integration with stronger mid-chain inertial whip
-        const pipTarget = tgt.pipFlex + tenodesisFlex * 0.9 + bioOverlay * 0.85 + pipSynergy;
+        const pipTarget = tgtPipFlex + tenodesisFlex * 0.9 + bioOverlay * 0.85 + pipSynergy;
         bank.pipFlex.step(pipTarget, kJ * 1.08, dJ * 0.94, rawWhipTorque * 0.84, safeDt, 52, subSteps);
 
         // Layer 3C: Oblique Retinacular Ligament (ORL) + Central Slip DIP–PIP Biomechanical Coupling!
         const orlDipTarget = pro
-          ? 0.67 * bank.pipFlex.pos + 0.33 * (tgt.dipFlex + bioOverlay * 0.48 + pipSynergy * 0.45)
-          : tgt.dipFlex + bioOverlay * 0.55;
+          ? 0.67 * bank.pipFlex.pos + 0.33 * (tgtDipFlex + bioOverlay * 0.48 + pipSynergy * 0.45)
+          : tgtDipFlex + bioOverlay * 0.55;
         bank.dipFlex.step(orlDipTarget, kJ * 1.18, dJ * 0.91, rawWhipTorque * 1.16, safeDt, 54, subSteps);
 
         // Layer 6A: Analytical Fingertip-to-Palm-Bed Elastic Contact & Pulp Pad Compression!
@@ -1063,7 +1467,7 @@ export class JHandKinesisEngine {
           bank.dipFlex.vel *= Math.max(0.52, 1.0 - contact * 0.38);
         }
 
-        // Layer 8: Emit Rich Articulated Micro-Foley Events to JSound Engin 1.1!
+        // Layer 8: Emit Rich Articulated Micro-Foley Events to JSound Engin 1.3!
         if (
           contact > 0.45 &&
           bank.prevPalmContact <= 0.45 &&
@@ -1132,7 +1536,9 @@ export class JHandKinesisEngine {
     // -------------------------------------------------------------------------
     // Step 6-DOF True Saddle-Joint Thumb with Clearance Arc + IP Hyperextension Clamp!
     // -------------------------------------------------------------------------
-    if (this.poseElapsed >= this.cascadeDelays.thumb) {
+    const thumbDelay = this.cascadeDelays.thumb;
+    if (this.poseElapsed >= thumbDelay) {
+      const tBlend = quinticSmooth((this.poseElapsed - thumbDelay) / Math.max(0.001, this.blendDuration));
       const indexClosure = Math.max(0, Math.min(1, this.fingers.index.mcpFlex.pos / 1.45));
       const ringClosure = Math.max(0, Math.min(1, this.fingers.ring.mcpFlex.pos / 1.45));
 
@@ -1145,7 +1551,15 @@ export class JHandKinesisEngine {
         thumbClearanceLift = sweepWindow * 0.25;
       }
 
-      const tTgt = this.target.thumb;
+      const prevTh = this.prevTarget.thumb;
+      const nextTh = this.target.thumb;
+      const thCmcFlex = lerpScalar(prevTh.cmcFlex, nextTh.cmcFlex, tBlend);
+      const thCmcAbd = lerpScalar(prevTh.cmcAbd, nextTh.cmcAbd, tBlend);
+      const thCmcPron = lerpScalar(prevTh.cmcPronation, nextTh.cmcPronation, tBlend);
+      const thMcpFlex = lerpScalar(prevTh.mcpFlex, nextTh.mcpFlex, tBlend);
+      const thMcpAbd = lerpScalar(prevTh.mcpAbd, nextTh.mcpAbd, tBlend);
+      const thIpFlex = lerpScalar(prevTh.ipFlex, nextTh.ipFlex, tBlend);
+
       const thumbDrift = ultra ? pinkBioDrift(this.simClock, 9.31) * (0.006 + this.idleDrumWeight * 0.01) : 0;
       const thumbTremor = pro
         ? Math.sin(this.simClock * Math.PI * 2 * 9.35) * (0.002 + this.effortSmooth * 0.0044)
@@ -1156,7 +1570,7 @@ export class JHandKinesisEngine {
         ultra && this.currentPoseKey === ROCK && indexClosure > 0.86 ? -0.09 : 0;
 
       this.thumb.cmcFlex.step(
-        tTgt.cmcFlex - thumbClearanceLift * 0.55 + thumbDrift + thumbTremor,
+        thCmcFlex - thumbClearanceLift * 0.55 + thumbDrift + thumbTremor,
         kJ,
         dJ,
         0,
@@ -1164,10 +1578,10 @@ export class JHandKinesisEngine {
         48,
         subSteps
       );
-      this.thumb.cmcAbd.step(tTgt.cmcAbd + thumbClearanceLift * 0.75, kJ, dJ, 0, safeDt, 48, subSteps);
-      this.thumb.cmcPronation.step(tTgt.cmcPronation, kJ * 0.96, dJ * 0.95, 0, safeDt, 46, subSteps);
+      this.thumb.cmcAbd.step(thCmcAbd + thumbClearanceLift * 0.75, kJ, dJ, 0, safeDt, 48, subSteps);
+      this.thumb.cmcPronation.step(thCmcPron, kJ * 0.96, dJ * 0.95, 0, safeDt, 46, subSteps);
       this.thumb.mcpFlex.step(
-        tTgt.mcpFlex - thumbClearanceLift * 0.34,
+        thMcpFlex - thumbClearanceLift * 0.34,
         kJ * 1.05,
         dJ,
         rawWhipTorque * 0.28,
@@ -1175,9 +1589,9 @@ export class JHandKinesisEngine {
         50,
         subSteps
       );
-      this.thumb.mcpAbd.step(ultra ? tTgt.mcpAbd : 0, kJ * 0.9, dJ * 0.96, 0, safeDt, 46, subSteps);
+      this.thumb.mcpAbd.step(ultra ? thMcpAbd : 0, kJ * 0.9, dJ * 0.96, 0, safeDt, 46, subSteps);
       this.thumb.ipFlex.step(
-        tTgt.ipFlex + firmPressHyperExt,
+        thIpFlex + firmPressHyperExt,
         kJ * 1.15,
         dJ * 0.92,
         rawWhipTorque * 0.48,
@@ -1218,14 +1632,15 @@ export class JHandKinesisEngine {
     const midFlexNorm = Math.max(0, Math.min(1, this.fingers.middle.mcpFlex.pos / 1.6));
     const ringFlexNorm = Math.max(0, Math.min(1, this.fingers.ring.mcpFlex.pos / 1.6));
     const pinkyFlexNorm = Math.max(0, Math.min(1, this.fingers.pinky.mcpFlex.pos / 1.6));
+    const tgtPalmCup = lerpScalar(this.prevTarget.palmCupBias, this.target.palmCupBias, qBlend);
 
-    this.cmc2.step(ultra ? idxFlexNorm * 0.042 + this.target.palmCupBias * 0.014 : 0, kW, dW, 0, safeDt, 44, subSteps);
-    this.cmc3.step(ultra ? midFlexNorm * 0.026 + this.target.palmCupBias * 0.008 : 0, kW, dW, 0, safeDt, 44, subSteps);
-    this.cmc4.step(pro ? ringFlexNorm * 0.165 + this.target.palmCupBias * 0.058 : 0, kW * 1.1, dW, 0, safeDt, 46, subSteps);
-    this.cmc5.step(pro ? pinkyFlexNorm * 0.265 + this.target.palmCupBias * 0.095 : 0, kW * 1.1, dW, 0, safeDt, 46, subSteps);
+    this.cmc2.step(ultra ? idxFlexNorm * 0.042 + tgtPalmCup * 0.014 : 0, kW, dW, 0, safeDt, 44, subSteps);
+    this.cmc3.step(ultra ? midFlexNorm * 0.026 + tgtPalmCup * 0.008 : 0, kW, dW, 0, safeDt, 44, subSteps);
+    this.cmc4.step(pro ? ringFlexNorm * 0.165 + tgtPalmCup * 0.058 : 0, kW * 1.1, dW, 0, safeDt, 46, subSteps);
+    this.cmc5.step(pro ? pinkyFlexNorm * 0.265 + tgtPalmCup * 0.095 : 0, kW * 1.1, dW, 0, safeDt, 46, subSteps);
     // 5th metacarpal axial opposition supination rotates pinky heel toward thumb during Rock/Envelop!
     this.cmc5Sup.step(
-      ultra ? pinkyFlexNorm * 0.22 + this.target.palmCupBias * 0.095 : 0,
+      ultra ? pinkyFlexNorm * 0.22 + tgtPalmCup * 0.095 : 0,
       kW * 1.05,
       dW,
       0,

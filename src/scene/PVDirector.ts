@@ -200,12 +200,12 @@ export class PVDirector {
     this.totalDuration = 26.0;
     const totalActs = 6;
 
-    // ACT 1 (0.0s): Sacred Opening — Zashiki Zen Crane Glide
+    // ACT 1 (0.0s): Sacred Opening — Zashiki Zen Crane Glide (FINGER S1.0 Living Skin vs Bronze!)
     this.addCue(0.0, () => {
       this.bridge.setStageQuiet('zashiki');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'karakuri_bronze');
-      this.bridge.poseHands('palm_meditate', 'palm_meditate', {
-        pOffset: [-0.04, 0.04, 0.0],
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
+      this.bridge.poseHands('lotus_mudra', 'palm_meditate', {
+        pOffset: [-0.04, 0.05, 0.0],
         nOffset: [0.04, 0.04, 0.0],
         pPitch: -0.04,
         nPitch: -0.04,
@@ -228,13 +228,13 @@ export class PVDirector {
         rollEnd: 0.008,
       });
       this.bridge.playPvAudioCue(0, 'zashiki');
-      this.setCard('JANKEN · KIWAMI 3D', '一手に、魂を宿す。', '高精細3D工芸 × 独自演算エンジン', 1, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '一手に、魂を宿す。', 'FINGER S1.0 × 38自由度生体造形 × 384kHz物理音響', 1, totalActs, true);
     });
 
-    // ACT 2 (4.4s): JHand Kinesis 1.1 — 38-DOF Macro Craft Showcase
+    // ACT 2 (4.4s): FINGER S1.0 × JHand Kinesis 1.1 — Hyper-Real Macro Anatomy Showcase
     this.addCue(4.4, () => {
-      this.bridge.setMaterialsQuiet('bisque_porcelain', 'obsidian_gold');
-      this.bridge.poseHands('crane_poise', 'guard', {
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
+      this.bridge.poseHands('zen_circle', 'sword_seal', {
         pOffset: [0.08, 0.08, 0.04],
         nOffset: [-0.02, 0.02, 0],
         pRoll: -0.14,
@@ -242,9 +242,9 @@ export class PVDirector {
       });
       this.bridge.playSpline({
         positions: [
-          new THREE.Vector3(-0.88, 0.72, 1.32),
-          new THREE.Vector3(-0.24, 0.66, 1.14),
-          new THREE.Vector3(0.42, 0.74, 1.24),
+          new THREE.Vector3(-0.84, 0.68, 1.24),
+          new THREE.Vector3(-0.22, 0.62, 1.08),
+          new THREE.Vector3(0.42, 0.72, 1.2),
         ],
         lookTargets: [
           new THREE.Vector3(-0.42, 0.31, 0.14),
@@ -252,17 +252,17 @@ export class PVDirector {
           new THREE.Vector3(0.28, 0.3, 0.08),
         ],
         durationSec: 4.3,
-        fovStart: 32,
-        fovEnd: 29,
+        fovStart: 31,
+        fovEnd: 28,
         rollStart: -0.018,
         rollEnd: 0.018,
       });
       this.bridge.playPvAudioCue(1, 'zashiki');
-      this.setCard('JHAND KINESIS 1.1', '38自由度・生体関節工学', '18種の掌形と腱・皮膚の極致描写', 2, totalActs);
+      this.setCard('FINGER S1.0 × JHAND 1.1', '指紋・関節皺・皮下散乱の極致', '36種の掌形 × 38自由度C²滑らか関節演算', 2, totalActs);
     });
 
     this.addCue(6.4, () => {
-      this.bridge.poseHands('blade_edge', 'knuckle_crack', {
+      this.bridge.poseHands('wave_flourish', 'iron_knuckle', {
         pOffset: [0.1, 0.07, 0.03],
         nOffset: [-0.06, 0.05, -0.02],
         snappy: true,
@@ -273,8 +273,8 @@ export class PVDirector {
     // ACT 3 (8.8s): KHDR + Shadow Flame 1.0 Pro Live A/B Sweep on Twilight Shrine
     this.addCue(8.8, () => {
       this.bridge.setStageQuiet('shrine');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'karakuri_bronze');
-      this.bridge.poseHands('guard', 'beckon', {
+      this.bridge.setMaterialsQuiet('living_skin', 'obsidian_gold');
+      this.bridge.poseHands('tiger_palm', 'beckon', {
         pOffset: [0.02, 0.06, 0.02],
         nOffset: [-0.04, 0.08, -0.02],
       });
@@ -303,12 +303,12 @@ export class PVDirector {
       this.setCard('KHDR × SHADOW FLAME 1.0 PRO', '陰翳と光彩、物理の再定義。', '16-bit浮動小数HDR × PCSS可変半影', 3, totalActs);
     });
 
-    // ACT 4 (13.2s): JSound Engin 1.2 192kHz 4×OS Spatial Acoustics in Grand Salon
+    // ACT 4 (13.2s): JSound Engin 1.3 384kHz 8×OS Spatial Acoustics in Grand Salon
     this.addCue(13.2, () => {
       this.khdrSweepActive = false;
       this.bridge.setKhdrSplitCompare(false, 0.5);
       this.bridge.setStageQuiet('salon');
-      this.bridge.poseHands('claw_charge', 'claw_charge', {
+      this.bridge.poseHands('claw_charge', 'stealth_curl', {
         pOffset: [-0.08, 0.08, 0.02],
         nOffset: [0.08, 0.08, -0.02],
         pPitch: -0.14,
@@ -333,14 +333,14 @@ export class PVDirector {
         rollEnd: 0.024,
       });
       this.bridge.playPvAudioCue(3, 'salon');
-      this.setCard('JSOUND ENGIN 1.2', '192kHz・18和楽器・128本立体反射', '全音源リアルタイム物理モデリング生成', 4, totalActs);
+      this.setCard('JSOUND ENGIN 1.3', '384kHz 8×OS・26和楽器・230音線立体音響', '23-Tap Kaiser FIR × 43物理素材リアルタイム合成', 4, totalActs);
     });
 
     // ACT 5 (17.2s): Golden Atelier Overdrive Bullet-Time Duel Climax!!
     this.addCue(17.2, () => {
       this.bridge.stopSpline();
       this.bridge.setStageQuiet('atelier');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'obsidian_gold');
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
       this.bridge.playPvAudioCue(4, 'atelier');
       this.setCard('JNV1.0 × 極一撃 OVERDRIVE', '先読みを断つ、極致の一閃。', 'SHA-256完全公正コミットメント対戦', 5, totalActs);
     });
@@ -351,7 +351,7 @@ export class PVDirector {
 
     // ACT 6 (21.6s): Grand Ceremonial Hanko Finale
     this.addCue(21.6, () => {
-      this.bridge.poseHands('victory_fist', 'bow', {
+      this.bridge.poseHands('fist_pump', 'defeat_slump', {
         pOffset: [0.2, 0.2, 0.04],
         nOffset: [0.14, -0.09, -0.04],
         pPitch: -0.18,
@@ -377,7 +377,7 @@ export class PVDirector {
         rollEnd: 0,
       });
       this.bridge.playPvAudioCue(5, 'atelier');
-      this.setCard('JANKEN · KIWAMI 3D', '極 — KIWAMI', 'JNV1.0 · JHand 1.1 · JSound 1.2 · KHDR · Shadow Flame', 6, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '極 — KIWAMI', 'FINGER S1.0 · JSound 1.3 · JHand 1.1 · KHDR · Shadow Flame', 6, totalActs, true);
     });
 
     // End cleanly
@@ -395,9 +395,9 @@ export class PVDirector {
 
     this.addCue(0.0, () => {
       this.bridge.setStageQuiet('zashiki');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'karakuri_bronze');
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
       this.bridge.playPvAudioCue(3, 'zashiki');
-      this.setCard('BATTLE REEL · 第一合', '剛拳粉砕 — ROCK CRUSH', '大太鼓衝撃 × 38自由度剛拳', 1, totalActs);
+      this.setCard('BATTLE REEL · 第一合', '剛拳粉砕 — ROCK CRUSH', '大太鼓×青銅銅鑼 × FINGER S1.0生体剛拳', 1, totalActs);
       this.bridge.triggerClash(ROCK, SCISSORS, 'WIN', false);
     });
 
@@ -410,20 +410,20 @@ export class PVDirector {
 
     this.addCue(8.4, () => {
       this.bridge.setStageQuiet('onsen');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'karakuri_bronze');
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
       this.setCard('BATTLE REEL · 第三合', '包摂掌打 — PAPER ENVELOP', 'バレットタイム180°旋回 × 極一撃', 3, totalActs);
       this.bridge.triggerClash(PAPER, ROCK, 'WIN', true);
     });
 
     this.addCue(12.6, () => {
       this.bridge.triggerVictoryShower();
-      this.bridge.poseHands('finger_gun', 'bow', {
+      this.bridge.poseHands('peace_tilt', 'bow', {
         pOffset: [0.2, 0.16, 0.04],
         nOffset: [0.12, -0.08, -0.04],
         routine: 'victory',
       });
       this.bridge.playPvAudioCue(5, 'onsen');
-      this.setCard('JANKEN · KIWAMI 3D', '極 — 決着', 'JNV1.0 · JSound Engin 1.2', 4, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '極 — 決着', 'FINGER S1.0 · JNV1.0 · JSound Engin 1.3', 4, totalActs, true);
     });
 
     this.addCue(15.9, () => {
@@ -432,7 +432,7 @@ export class PVDirector {
   }
 
   // ===========================================================================
-  // PV 3: ARTISAN CRAFT & ACOUSTICS SHOWCASE (18s · Museum Macro Tour)
+  // PV 3: FINGER S1.0 ANATOMY, CRAFT & ACOUSTICS SHOWCASE (18s · Museum Macro Tour)
   // ===========================================================================
   private buildCraftShowcase(): void {
     this.totalDuration = 18.0;
@@ -440,31 +440,31 @@ export class PVDirector {
 
     this.addCue(0.0, () => {
       this.bridge.setStageQuiet('zashiki');
-      this.bridge.setMaterialsQuiet('hinoki_ivory', 'karakuri_bronze');
-      this.bridge.poseHands('crane_poise', 'palm_meditate', { pOffset: [0.06, 0.08, 0.03] });
+      this.bridge.setMaterialsQuiet('living_skin', 'karakuri_bronze');
+      this.bridge.poseHands('lotus_mudra', 'koto_pluck', { pOffset: [0.06, 0.08, 0.03] });
       this.bridge.playSpline({
         positions: [
-          new THREE.Vector3(-0.95, 0.72, 1.35),
-          new THREE.Vector3(-0.1, 0.65, 1.18),
-          new THREE.Vector3(0.85, 0.78, 1.38),
+          new THREE.Vector3(-0.9, 0.68, 1.26),
+          new THREE.Vector3(-0.1, 0.62, 1.12),
+          new THREE.Vector3(0.82, 0.74, 1.32),
         ],
         lookTargets: [
-          new THREE.Vector3(-0.32, 0.3, 0.14),
+          new THREE.Vector3(-0.34, 0.3, 0.14),
           new THREE.Vector3(0, 0.29, 0.1),
           new THREE.Vector3(0.32, 0.3, 0.08),
         ],
         durationSec: 4.4,
-        fovStart: 31,
-        fovEnd: 30,
+        fovStart: 30,
+        fovEnd: 29,
       });
       this.bridge.playPvAudioCue(0, 'zashiki');
-      this.setCard('CRAFT · 檜木彫 × 絡繰銅', '伝統工芸と物理光学の融合', '木目異方性クリアコート × 鍛金青銅', 1, totalActs);
+      this.setCard('FINGER S1.0 · 極写実生体肌 × 絡繰銅', '指紋・爪半月・動的関節皺の極致', '皮下散乱SSS × リアルタイム関節白化シェーダー', 1, totalActs);
     });
 
     this.addCue(4.6, () => {
       this.bridge.setStageQuiet('onsen');
       this.bridge.setMaterialsQuiet('bisque_porcelain', 'obsidian_gold');
-      this.bridge.poseHands('blade_edge', 'crane_poise', { pOffset: [0.08, 0.07, 0.03] });
+      this.bridge.poseHands('sword_seal', 'fan_hold', { pOffset: [0.08, 0.07, 0.03] });
       this.bridge.playSpline({
         positions: [
           new THREE.Vector3(0.92, 0.84, 1.44),
@@ -486,7 +486,8 @@ export class PVDirector {
 
     this.addCue(9.2, () => {
       this.bridge.setStageQuiet('atelier');
-      this.bridge.poseHands('claw_charge', 'salute', { pOffset: [0.02, 0.1, 0.02], nOffset: [-0.02, 0.12, -0.02] });
+      this.bridge.setMaterialsQuiet('living_skin', 'hinoki_ivory');
+      this.bridge.poseHands('zen_circle', 'tea_whisk', { pOffset: [0.02, 0.1, 0.02], nOffset: [-0.02, 0.12, -0.02] });
       this.bridge.playSpline({
         positions: [
           new THREE.Vector3(-0.7, 1.15, 1.95),
@@ -503,11 +504,11 @@ export class PVDirector {
         fovEnd: 31,
       });
       this.bridge.playPvAudioCue(2, 'atelier');
-      this.setCard('ACOUSTICS · JSOUND ENGIN 1.2', '建築空間が奏でる128本残響', '4次3D音線追跡 × 192kHz物理合成', 3, totalActs);
+      this.setCard('ACOUSTICS · JSOUND ENGIN 1.3', '建築空間が奏でる230本立体残響', '5次3D音線追跡 × 384kHz 8×OS物理合成', 3, totalActs);
     });
 
     this.addCue(13.8, () => {
-      this.bridge.poseHands('salute', 'salute', { pOffset: [0.1, 0.14, 0.02], nOffset: [-0.1, 0.14, -0.02] });
+      this.bridge.poseHands('open_offer', 'salute', { pOffset: [0.1, 0.14, 0.02], nOffset: [-0.1, 0.14, -0.02] });
       this.bridge.triggerVictoryShower();
       this.bridge.playSpline({
         positions: [
@@ -523,7 +524,7 @@ export class PVDirector {
         fovEnd: 40,
       });
       this.bridge.playPvAudioCue(5, 'atelier');
-      this.setCard('JANKEN · KIWAMI 3D', '極 — 美術館級3Dじゃんけん', 'Zero-Neon Museum Craft Edition', 4, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '極 — FINGER S1.0 × JSound 1.3', 'Zero-Neon Museum Craft Edition', 4, totalActs, true);
     });
 
     this.addCue(17.9, () => {
@@ -735,7 +736,7 @@ export class PVDirector {
         this.card = {
           badge: 'JANKEN · KIWAMI 3D',
           title: '極 — KIWAMI',
-          subtitle: 'JNV1.0 · JHand 1.1 · JSound 1.2 · KHDR · Shadow Flame 1.0',
+          subtitle: 'FINGER S1.0 · JHand 1.1 · JSound 1.3 · KHDR · Shadow Flame 1.0',
           actIndex: 1,
           actTotal: 1,
           showHanko: true,

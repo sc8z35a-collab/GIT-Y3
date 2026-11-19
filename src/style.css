@@ -1472,6 +1472,11 @@ html.immersive-fullscreen .bottom-dock {
   transition: all 140ms ease;
 }
 
+.swatch-btn.hero-swatch {
+  grid-column: span 2;
+  background: linear-gradient(90deg, rgba(242, 204, 176, 0.08), rgba(212, 175, 104, 0.06));
+}
+
 .swatch-btn:hover { border-color: var(--gold-border); color: var(--washi-primary); }
 .swatch-btn.active {
   border-color: var(--gold-bright);
@@ -1487,23 +1492,42 @@ html.immersive-fullscreen .bottom-dock {
   flex-shrink: 0;
 }
 
-/* JSound Engin 1.2 — 15-Instrument 3x5 Physical Audition Deck */
+/* FINGER S1.0 Flagship Anatomy Spec Caption */
+.finger-s1-caption {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(236, 198, 168, 0.06);
+  border: 1px solid rgba(212, 175, 104, 0.22);
+  font-size: 9.8px;
+  line-height: 1.48;
+  color: var(--washi-secondary);
+}
+
+/* JSound Engin 1.3 — 24-Instrument 4×6 Physical Audition Deck */
 .audition-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
 }
 
+.audition-grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3.5px;
+}
+
 .audition-btn {
-  padding: 5px 3px;
+  padding: 5px 2px;
   border-radius: 6px;
   background: rgba(255, 248, 232, 0.04);
   border: 1px solid var(--hairline);
   color: var(--washi-secondary);
   font-family: var(--font-serif);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: all 130ms ease;
 }
@@ -1516,6 +1540,60 @@ html.immersive-fullscreen .bottom-dock {
 
 .audition-btn:active,
 .audition-btn.struck {
+  border-color: var(--gold-bright);
+  background: rgba(212, 175, 104, 0.28);
+  color: #fffaf0;
+  transform: scale(0.95);
+}
+
+/* JHand 36-Pose Interactive Motion Showcase Deck */
+.pose-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 26px;
+  align-content: start;
+  gap: 4px;
+  height: 158px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.pose-gallery-grid::-webkit-scrollbar { width: 4px; }
+.pose-gallery-grid::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 104, 0.28);
+  border-radius: 3px;
+}
+
+.pose-chip-btn {
+  height: 26px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgba(255, 248, 232, 0.035);
+  border: 1px solid var(--hairline);
+  color: var(--washi-secondary);
+  font-family: var(--font-serif);
+  font-size: 9.8px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 130ms ease;
+}
+
+.pose-chip-btn:hover {
+  border-color: var(--gold-border-strong);
+  background: rgba(212, 175, 104, 0.14);
+  color: var(--gold-bright);
+}
+
+.pose-chip-btn:active,
+.pose-chip-btn.struck {
   border-color: var(--gold-bright);
   background: rgba(212, 175, 104, 0.28);
   color: #fffaf0;

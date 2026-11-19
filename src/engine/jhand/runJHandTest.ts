@@ -40,9 +40,27 @@ const poses: HandPoseKey[] = [
   'finger_gun',
   'palm_meditate',
   'victory_fist',
+  'lotus_mudra',
+  'sword_seal',
+  'tiger_palm',
+  'iron_knuckle',
+  'tea_whisk',
+  'fan_hold',
+  'brush_grip',
+  'koto_pluck',
+  'snap_ready',
+  'snap_release',
+  'peace_tilt',
+  'open_offer',
+  'fist_pump',
+  'defeat_slump',
+  'stealth_curl',
+  'wave_flourish',
+  'counter_parry',
+  'zen_circle',
 ];
 
-// 1. 18,000-step ROM Compliance, Numerical Stability & 9-Channel Foley Audit across ALL 18 poses
+// 1. 36,000-step ROM Compliance, Numerical Stability & 9-Channel Foley Audit across ALL 36 poses
 let allFinite = true;
 let allInRom = true;
 const seenFoleyTypes = new Set<string>();
@@ -55,6 +73,10 @@ for (const pose of poses) {
   if (pose === 'knuckle_crack') engine.triggerKnuckleFlex();
   if (pose === 'victory_fist') engine.triggerVictoryRoll();
   if (pose === 'guard') engine.triggerNpcTell('poised');
+  if (pose === 'snap_release') engine.triggerFingerSnap();
+  if (pose === 'wave_flourish') engine.triggerWaveFlourish();
+  if (pose === 'sword_seal') engine.triggerSwordSealPulse();
+  if (pose === 'zen_circle') engine.triggerZenBreath();
   for (let i = 0; i < 1000; i++) {
     const f = engine.step(
       1 / 120,
@@ -128,10 +150,14 @@ for (const pose of poses) {
   }
 }
 
-assert(allFinite, `18,000 sub-steps across all ${poses.length} anatomical poses strictly finite (zero NaN/Inf)`);
+assert(
+  engine.getPoseCount() === 36 && poses.length === 36,
+  `36 anatomical hand poses registered & audited (${engine.getPoseCount()} poses)`
+);
+assert(allFinite, `36,000 sub-steps across all ${poses.length} anatomical poses strictly finite (zero NaN/Inf)`);
 assert(allInRom, `100% physiological Kapandji ROM compliance across all 38-DOF joints & ${poses.length} poses`);
 assert(
-  totalFoleyEvents >= 8 && seenFoleyTypes.size >= 4,
+  totalFoleyEvents >= 12 && seenFoleyTypes.size >= 4,
   `9-channel kinetic micro-Foley stream active (${totalFoleyEvents} events, ${seenFoleyTypes.size} types: ${[...seenFoleyTypes].join(', ')})`
 );
 

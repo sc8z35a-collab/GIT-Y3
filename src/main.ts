@@ -1,11 +1,12 @@
 /**
- * Application Bootstrap for JANKEN · 極 v1.2 (3D Photorealistic Rock-Scissors-Paper).
+ * Application Bootstrap for JANKEN · 極 v1.3 (3D Photorealistic Rock-Scissors-Paper).
  * Connects:
+ *  - FINGER S1.0 Hyper-Real Anatomical Hand Sculpting, Dynamic Wrinkles & GLSL Skin SSS
  *  - JNV1.0 Cognitive NPC Core (100% SHA-256 Pre-Commit + Non-Cheating Feint Tell)
  *  - Tactical Gameplay Loop: 4 Modes (Classic / Survival / Blitz 3.5s / Endless),
  *    Spirit Gauge (気迫) + Overdrive (極一撃 2-Point Strike), Feint (牽制), Win Streaks
- *  - GameScene (KHDR + Shadow Flame 1.0 + JHand 1.1 18-Pose + Camera Director 2.0 + PV Director)
- *  - JSound Engin 1.2 (192kHz 4×OS, 18 Instruments, 128-Ray 3D Binaural Acoustics)
+ *  - GameScene (KHDR + Shadow Flame 1.0 + JHand 1.1 36-Pose C² Silky + Camera Director 2.1 + PV Director)
+ *  - JSound Engin 1.3 (384kHz 8×OS, 26 Instruments, 43 Materials, 230-Ray 3D Binaural Acoustics)
  *  - Compact Luxury Mobile-Fullscreen GameUI
  */
 
@@ -144,6 +145,14 @@ class JankenKiwamiApp {
         this.sound.playWoodTap(mode === 'pro' ? 920 : mode === 'flash' ? 780 : 580);
         this.scene.applyShadowFlame(mode);
         this.ui.syncSettings(this.scene.getSettings());
+      },
+      onToggleFingerS1: (enabled) => {
+        this.sound.playWoodTap(enabled ? 940 : 620);
+        this.scene.setFingerS1Enabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onPreviewPose: (pose) => {
+        this.scene.previewPoseShowcase(pose);
       },
       onChangeStage: (stage) => {
         this.scene.applyStage(stage, true);
