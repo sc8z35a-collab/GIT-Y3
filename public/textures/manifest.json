@@ -1,0 +1,552 @@
+{
+  "tatami": {
+    "albedo": "textures/tatami_albedo.jpg",
+    "normal": "textures/tatami_normal.jpg",
+    "roughness": "textures/tatami_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_42-4.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "oak_floor": {
+    "albedo": "textures/oak_floor_albedo.jpg",
+    "normal": "textures/oak_floor_normal.jpg",
+    "roughness": "textures/oak_floor_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_42-4.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "shikkui_cream": {
+    "albedo": "textures/shikkui_cream_albedo.jpg",
+    "normal": "textures/shikkui_cream_normal.jpg",
+    "roughness": "textures/shikkui_cream_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_42-4.png",
+    "cell": [
+      0,
+      2
+    ]
+  },
+  "cedar_panel": {
+    "albedo": "textures/cedar_panel_albedo.jpg",
+    "normal": "textures/cedar_panel_normal.jpg",
+    "roughness": "textures/cedar_panel_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_42-4.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "sakura_cloth": {
+    "albedo": "textures/sakura_cloth_albedo.jpg",
+    "normal": "textures/sakura_cloth_normal.jpg",
+    "roughness": "textures/sakura_cloth_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_44-6.png",
+    "cell": [
+      1,
+      0
+    ]
+  },
+  "zabuton_red": {
+    "albedo": "textures/zabuton_red_albedo.jpg",
+    "normal": "textures/zabuton_red_normal.jpg",
+    "roughness": "textures/zabuton_red_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_44-6.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "shoji_doors": {
+    "albedo": "textures/shoji_doors_albedo.jpg",
+    "normal": "textures/shoji_doors_normal.jpg",
+    "roughness": "textures/shoji_doors_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_36-3.png",
+    "cell": [
+      0,
+      2
+    ]
+  },
+  "tansu_chest": {
+    "albedo": "textures/tansu_chest_albedo.jpg",
+    "normal": "textures/tansu_chest_normal.jpg",
+    "roughness": "textures/tansu_chest_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_36-3.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "noren_indigo": {
+    "albedo": "textures/noren_indigo_albedo.jpg",
+    "normal": "textures/noren_indigo_normal.jpg",
+    "roughness": "textures/noren_indigo_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_46-10.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "wood_plaques": {
+    "albedo": "textures/wood_plaques_albedo.jpg",
+    "normal": "textures/wood_plaques_normal.jpg",
+    "roughness": "textures/wood_plaques_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_46-10.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "window_city_sky": {
+    "albedo": "textures/window_city_sky_albedo.jpg",
+    "normal": "textures/window_city_sky_normal.jpg",
+    "roughness": "textures/window_city_sky_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_44-7.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "namako_kabe": {
+    "albedo": "textures/namako_kabe_albedo.jpg",
+    "normal": "textures/namako_kabe_normal.jpg",
+    "roughness": "textures/namako_kabe_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_47-3.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "yakisugi_wood": {
+    "albedo": "textures/yakisugi_wood_albedo.jpg",
+    "normal": "textures/yakisugi_wood_normal.jpg",
+    "roughness": "textures/yakisugi_wood_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_47-3.png",
+    "cell": [
+      0,
+      2
+    ]
+  },
+  "kumiko_lattice": {
+    "albedo": "textures/kumiko_lattice_albedo.jpg",
+    "normal": "textures/kumiko_lattice_normal.jpg",
+    "roughness": "textures/kumiko_lattice_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_47-3.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "bamboo_sudare": {
+    "albedo": "textures/bamboo_sudare_albedo.jpg",
+    "normal": "textures/bamboo_sudare_normal.jpg",
+    "roughness": "textures/bamboo_sudare_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_47-3.png",
+    "cell": [
+      1,
+      0
+    ]
+  },
+  "marble_brass_floor": {
+    "albedo": "textures/marble_brass_floor_albedo.jpg",
+    "normal": "textures/marble_brass_floor_normal.jpg",
+    "roughness": "textures/marble_brass_floor_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "walnut_herringbone": {
+    "albedo": "textures/walnut_herringbone_albedo.jpg",
+    "normal": "textures/walnut_herringbone_normal.jpg",
+    "roughness": "textures/walnut_herringbone_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "emerald_velvet_wall": {
+    "albedo": "textures/emerald_velvet_wall_albedo.jpg",
+    "normal": "textures/emerald_velvet_wall_normal.jpg",
+    "roughness": "textures/emerald_velvet_wall_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      1,
+      2
+    ]
+  },
+  "champagne_steel": {
+    "albedo": "textures/champagne_steel_albedo.jpg",
+    "normal": "textures/champagne_steel_normal.jpg",
+    "roughness": "textures/champagne_steel_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "travertine_stone": {
+    "albedo": "textures/travertine_stone_albedo.jpg",
+    "normal": "textures/travertine_stone_normal.jpg",
+    "roughness": "textures/travertine_stone_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "brushed_bronze": {
+    "albedo": "textures/brushed_bronze_albedo.jpg",
+    "normal": "textures/brushed_bronze_normal.jpg",
+    "roughness": "textures/brushed_bronze_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_46-2.png",
+    "cell": [
+      1,
+      0
+    ]
+  },
+  "library_books": {
+    "albedo": "textures/library_books_albedo.jpg",
+    "normal": "textures/library_books_normal.jpg",
+    "roughness": "textures/library_books_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_36-3.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "grey_marble_slab": {
+    "albedo": "textures/grey_marble_slab_albedo.jpg",
+    "normal": "textures/grey_marble_slab_normal.jpg",
+    "roughness": "textures/grey_marble_slab_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_40-1.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "shrine_facade": {
+    "albedo": "textures/shrine_facade_albedo.jpg",
+    "normal": "textures/shrine_facade_normal.jpg",
+    "roughness": "textures/shrine_facade_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_47-11.png",
+    "cell": [
+      2,
+      2
+    ]
+  },
+  "pebble_aggregate": {
+    "albedo": "textures/pebble_aggregate_albedo.jpg",
+    "normal": "textures/pebble_aggregate_normal.jpg",
+    "roughness": "textures/pebble_aggregate_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_41_56-1.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "pale_granite": {
+    "albedo": "textures/pale_granite_albedo.jpg",
+    "normal": "textures/pale_granite_normal.jpg",
+    "roughness": "textures/pale_granite_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      2,
+      2
+    ]
+  },
+  "dark_slate_tile": {
+    "albedo": "textures/dark_slate_tile_albedo.jpg",
+    "normal": "textures/dark_slate_tile_normal.jpg",
+    "roughness": "textures/dark_slate_tile_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      0,
+      2
+    ]
+  },
+  "verdigris_copper": {
+    "albedo": "textures/verdigris_copper_albedo.jpg",
+    "normal": "textures/verdigris_copper_normal.jpg",
+    "roughness": "textures/verdigris_copper_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_46-2.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "stepping_stones": {
+    "albedo": "textures/stepping_stones_albedo.jpg",
+    "normal": "textures/stepping_stones_normal.jpg",
+    "roughness": "textures/stepping_stones_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "velvet_moss": {
+    "albedo": "textures/velvet_moss_albedo.jpg",
+    "normal": "textures/velvet_moss_normal.jpg",
+    "roughness": "textures/velvet_moss_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      1,
+      2
+    ]
+  },
+  "vermilion_wood": {
+    "albedo": "textures/vermilion_wood_albedo.jpg",
+    "normal": "textures/vermilion_wood_normal.jpg",
+    "roughness": "textures/vermilion_wood_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "koi_pond": {
+    "albedo": "textures/koi_pond_albedo.jpg",
+    "normal": "textures/koi_pond_normal.jpg",
+    "roughness": "textures/koi_pond_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_46-9.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "blue_sky": {
+    "albedo": "textures/blue_sky_albedo.jpg",
+    "normal": "textures/blue_sky_normal.jpg",
+    "roughness": "textures/blue_sky_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_46-9.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "bamboo_fence": {
+    "albedo": "textures/bamboo_fence_albedo.jpg",
+    "normal": "textures/bamboo_fence_normal.jpg",
+    "roughness": "textures/bamboo_fence_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_47-3.png",
+    "cell": [
+      2,
+      2
+    ]
+  },
+  "onsen_water": {
+    "albedo": "textures/onsen_water_albedo.jpg",
+    "normal": "textures/onsen_water_normal.jpg",
+    "roughness": "textures/onsen_water_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_16_24_43-5.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "onsen_waterfall": {
+    "albedo": "textures/onsen_waterfall_albedo.jpg",
+    "normal": "textures/onsen_waterfall_normal.jpg",
+    "roughness": "textures/onsen_waterfall_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_16_24_43-5.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "travertine_pools": {
+    "albedo": "textures/travertine_pools_albedo.jpg",
+    "normal": "textures/travertine_pools_normal.jpg",
+    "roughness": "textures/travertine_pools_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_16_24_43-5.png",
+    "cell": [
+      1,
+      0
+    ]
+  },
+  "lily_pond": {
+    "albedo": "textures/lily_pond_albedo.jpg",
+    "normal": "textures/lily_pond_normal.jpg",
+    "roughness": "textures/lily_pond_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "green_bamboo": {
+    "albedo": "textures/green_bamboo_albedo.jpg",
+    "normal": "textures/green_bamboo_normal.jpg",
+    "roughness": "textures/green_bamboo_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      2,
+      2
+    ]
+  },
+  "mossy_boulder_wall": {
+    "albedo": "textures/mossy_boulder_wall_albedo.jpg",
+    "normal": "textures/mossy_boulder_wall_normal.jpg",
+    "roughness": "textures/mossy_boulder_wall_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_13_00_27-3.png",
+    "cell": [
+      0,
+      2
+    ]
+  },
+  "botanical_wall": {
+    "albedo": "textures/botanical_wall_albedo.jpg",
+    "normal": "textures/botanical_wall_normal.jpg",
+    "roughness": "textures/botanical_wall_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_48-4.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "stacked_logs": {
+    "albedo": "textures/stacked_logs_albedo.jpg",
+    "normal": "textures/stacked_logs_normal.jpg",
+    "roughness": "textures/stacked_logs_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_15_43_15-5.png",
+    "cell": [
+      2,
+      2
+    ]
+  },
+  "stone_basin": {
+    "albedo": "textures/stone_basin_albedo.jpg",
+    "normal": "textures/stone_basin_normal.jpg",
+    "roughness": "textures/stone_basin_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_15_43_15-5.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "glazed_amber_brick": {
+    "albedo": "textures/glazed_amber_brick_albedo.jpg",
+    "normal": "textures/glazed_amber_brick_normal.jpg",
+    "roughness": "textures/glazed_amber_brick_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "terracotta_louvers": {
+    "albedo": "textures/terracotta_louvers_albedo.jpg",
+    "normal": "textures/terracotta_louvers_normal.jpg",
+    "roughness": "textures/terracotta_louvers_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      1,
+      2
+    ]
+  },
+  "sandstone_ashlar": {
+    "albedo": "textures/sandstone_ashlar_albedo.jpg",
+    "normal": "textures/sandstone_ashlar_normal.jpg",
+    "roughness": "textures/sandstone_ashlar_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_44-1.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "corten_iron": {
+    "albedo": "textures/corten_iron_albedo.jpg",
+    "normal": "textures/corten_iron_normal.jpg",
+    "roughness": "textures/corten_iron_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      2,
+      0
+    ]
+  },
+  "hex_forged_mesh": {
+    "albedo": "textures/hex_forged_mesh_albedo.jpg",
+    "normal": "textures/hex_forged_mesh_normal.jpg",
+    "roughness": "textures/hex_forged_mesh_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_48_38-4.png",
+    "cell": [
+      2,
+      1
+    ]
+  },
+  "bolted_timber": {
+    "albedo": "textures/bolted_timber_albedo.jpg",
+    "normal": "textures/bolted_timber_normal.jpg",
+    "roughness": "textures/bolted_timber_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_41_56-1.png",
+    "cell": [
+      1,
+      0
+    ]
+  },
+  "brushed_steel_plate": {
+    "albedo": "textures/brushed_steel_plate_albedo.jpg",
+    "normal": "textures/brushed_steel_plate_normal.jpg",
+    "roughness": "textures/brushed_steel_plate_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_10_41_56-1.png",
+    "cell": [
+      1,
+      1
+    ]
+  },
+  "industrial_pipes": {
+    "albedo": "textures/industrial_pipes_albedo.jpg",
+    "normal": "textures/industrial_pipes_normal.jpg",
+    "roughness": "textures/industrial_pipes_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_46-9.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "chalkboard": {
+    "albedo": "textures/chalkboard_albedo.jpg",
+    "normal": "textures/chalkboard_normal.jpg",
+    "roughness": "textures/chalkboard_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月17日_08_48_47-11.png",
+    "cell": [
+      0,
+      0
+    ]
+  },
+  "cedar_siding": {
+    "albedo": "textures/cedar_siding_albedo.jpg",
+    "normal": "textures/cedar_siding_normal.jpg",
+    "roughness": "textures/cedar_siding_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_18_48-4.png",
+    "cell": [
+      1,
+      2
+    ]
+  },
+  "weathered_concrete": {
+    "albedo": "textures/weathered_concrete_albedo.jpg",
+    "normal": "textures/weathered_concrete_normal.jpg",
+    "roughness": "textures/weathered_concrete_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_20_06-1.png",
+    "cell": [
+      0,
+      1
+    ]
+  },
+  "sky_glass_facade": {
+    "albedo": "textures/sky_glass_facade_albedo.jpg",
+    "normal": "textures/sky_glass_facade_normal.jpg",
+    "roughness": "textures/sky_glass_facade_rough.jpg",
+    "source": "ChatGPT_画像_2026年11月16日_16_20_09-3.png",
+    "cell": [
+      2,
+      0
+    ]
+  }
+}
