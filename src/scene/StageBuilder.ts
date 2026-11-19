@@ -27,6 +27,7 @@ export interface StageDefinition {
   id: StageId;
   nameJp: string;
   subtitleJp: string;
+  previewTexture: string;
   sunDirection: [number, number, number];
   sunColor: number;
   sunIntensity: number;
@@ -44,8 +45,9 @@ export interface StageDefinition {
 export const STAGE_DEFINITIONS: Record<StageId, StageDefinition> = {
   zashiki: {
     id: 'zashiki',
-    nameJp: '和室・陽だまりの座敷',
-    subtitleJp: '畳 · 障子 · 時代箪笥 · 縁側の錦鯉',
+    nameJp: '和室・座敷',
+    subtitleJp: '畳 · 障子 · 時代箪笥',
+    previewTexture: '/textures/tansu_chest_albedo.jpg',
     sunDirection: [2.8, 3.8, 1.9],
     sunColor: 0xffdfad,
     sunIntensity: 3.25,
@@ -61,8 +63,9 @@ export const STAGE_DEFINITIONS: Record<StageId, StageDefinition> = {
   },
   salon: {
     id: 'salon',
-    nameJp: '貴賓室・大理石と真鍮の間',
-    subtitleJp: '真鍮象嵌大理石 · 寄木 · 濃緑ベルベット書庫',
+    nameJp: '貴賓室・真鍮の間',
+    subtitleJp: '大理石 · 寄木 · 書庫',
+    previewTexture: '/textures/marble_brass_floor_albedo.jpg',
     sunDirection: [2.6, 4.3, 1.8],
     sunColor: 0xffe6c2,
     sunIntensity: 3.4,
@@ -78,8 +81,9 @@ export const STAGE_DEFINITIONS: Record<StageId, StageDefinition> = {
   },
   shrine: {
     id: 'shrine',
-    nameJp: '社殿・苔庭の拝殿',
-    subtitleJp: '拝殿 · 洗い出し石庭 · 苔飛び石 · 朱漆柱',
+    nameJp: '社殿・苔庭',
+    subtitleJp: '拝殿 · 苔飛び石 · 朱柱',
+    previewTexture: '/textures/shrine_facade_albedo.jpg',
     sunDirection: [3.0, 4.8, 1.8],
     sunColor: 0xffebc9,
     sunIntensity: 3.6,
@@ -95,8 +99,9 @@ export const STAGE_DEFINITIONS: Record<StageId, StageDefinition> = {
   },
   onsen: {
     id: 'onsen',
-    nameJp: '湯けむり・石庭の離れ',
-    subtitleJp: '石灰華の滝 · 碧水コースティクス · 青竹と苔岩',
+    nameJp: '湯けむり・離れ',
+    subtitleJp: '石灰華の滝 · 碧水 · 青竹',
+    previewTexture: '/textures/onsen_waterfall_albedo.jpg',
     sunDirection: [2.6, 4.5, 2.0],
     sunColor: 0xffeed2,
     sunIntensity: 3.35,
@@ -112,8 +117,9 @@ export const STAGE_DEFINITIONS: Record<StageId, StageDefinition> = {
   },
   atelier: {
     id: 'atelier',
-    nameJp: '工房・赤煉瓦と鉄のアトリエ',
-    subtitleJp: '施釉煉瓦 · 錆鉄 · テラコッタルーバー · 黒板',
+    nameJp: '赤煉瓦アトリエ',
+    subtitleJp: '施釉煉瓦 · 錆鉄 · 黒板',
+    previewTexture: '/textures/glazed_amber_brick_albedo.jpg',
     sunDirection: [3.2, 3.7, 1.7],
     sunColor: 0xffcfa0,
     sunIntensity: 3.45,
@@ -193,11 +199,13 @@ export class StageBuilder {
   private clockworkTargetAngle = 0;
   private clockworkSpinSpeed = 0.4;
 
-  // Physical 3D Tabletop Victory Stones (up to 9 slots per side)
+  // Physical 3D Tabletop Victory Stones (up to 9 slots per side) with ballistic bounce physics
   private playerTokens: THREE.Mesh[] = [];
   private npcTokens: THREE.Mesh[] = [];
   private playerTokenYTargets: number[] = [];
   private npcTokenYTargets: number[] = [];
+  private playerTokenVelY: number[] = [];
+  private npcTokenVelY: number[] = [];
 
   // Shadow Flame Analytic Tabletop Contact-AO Shader
   private contactAoMat!: THREE.ShaderMaterial;
@@ -389,6 +397,7 @@ export class StageBuilder {
       this.propsGroup.add(pStone);
       this.playerTokens.push(pStone);
       this.playerTokenYTargets.push(-0.05);
+      this.playerTokenVelY.push(0);
 
       const nStone = new THREE.Mesh(stoneGeo, npcStoneMat);
       nStone.position.set(0.32 + xOff, -0.05, -0.51);
@@ -398,6 +407,7 @@ export class StageBuilder {
       this.propsGroup.add(nStone);
       this.npcTokens.push(nStone);
       this.npcTokenYTargets.push(-0.05);
+      this.npcTokenVelY.push(0);
     }
   }
 
@@ -1093,19 +1103,24 @@ export class StageBuilder {
 
   /**
    * Update 3D physical victory stones placed in the tabletop scoreboard trays.
+   * Returns true if a brand-new stone was dropped (used to trigger stone-bounce Foley!).
    */
-  public setScores(playerWins: number, npcWins: number): void {
+  public setScores(playerWins: number, npcWins: number): boolean {
     const pCount = Math.min(this.playerTokens.length, playerWins);
     const nCount = Math.min(this.npcTokens.length, npcWins);
+    let freshlyDropped = false;
 
     for (let i = 0; i < this.playerTokens.length; i++) {
       const active = i < pCount;
       if (active && !this.playerTokens[i].visible) {
         this.playerTokens[i].visible = true;
-        this.playerTokens[i].position.y = 0.24; // Drop neatly from above onto tray!
+        this.playerTokens[i].position.y = 0.34;
+        this.playerTokenVelY[i] = -0.35;
+        freshlyDropped = true;
       }
       if (!active) {
         this.playerTokens[i].visible = false;
+        this.playerTokenVelY[i] = 0;
       }
       this.playerTokenYTargets[i] = active ? 0.033 : -0.05;
     }
@@ -1114,13 +1129,18 @@ export class StageBuilder {
       const active = i < nCount;
       if (active && !this.npcTokens[i].visible) {
         this.npcTokens[i].visible = true;
-        this.npcTokens[i].position.y = 0.24;
+        this.npcTokens[i].position.y = 0.34;
+        this.npcTokenVelY[i] = -0.35;
+        freshlyDropped = true;
       }
       if (!active) {
         this.npcTokens[i].visible = false;
+        this.npcTokenVelY[i] = 0;
       }
       this.npcTokenYTargets[i] = active ? 0.033 : -0.05;
     }
+
+    return freshlyDropped;
   }
 
   /**
@@ -1128,11 +1148,11 @@ export class StageBuilder {
    */
   public syncJNVClockwork(confidence: number, volatility: number, pulse = false): void {
     this.clockworkTargetAngle = (confidence - 0.5) * Math.PI * 1.4;
-    this.clockworkSpinSpeed = 0.35 + volatility * 1.65 + (pulse ? 3.5 : 0);
+    this.clockworkSpinSpeed = 0.35 + volatility * 1.65 + (pulse ? 4.8 : 0);
   }
 
   /**
-   * Update Shadow Flame Analytic Contact-AO plane, water ripples, clockwork gears, and stone drops.
+   * Update Shadow Flame Analytic Contact-AO plane, water ripples, clockwork gears, and ballistic bouncing stones.
    */
   public update(
     dt: number,
@@ -1155,26 +1175,29 @@ export class StageBuilder {
     this.clockworkNeedle.rotation.y = THREE.MathUtils.lerp(
       this.clockworkNeedle.rotation.y,
       this.clockworkTargetAngle,
-      1 - Math.exp(-6.0 * safeDt)
+      1 - Math.exp(-6.5 * safeDt)
     );
 
-    // Animate dropping Go-stone victory counters
-    const dropAlpha = 1 - Math.exp(-14.0 * safeDt);
+    // Ballistic gravity + elastic bounce for physical Go-stone victory counters!
+    const stepStone = (mesh: THREE.Mesh, velArr: number[], targetY: number, idx: number) => {
+      if (!mesh.visible) return;
+      if (mesh.position.y > targetY + 0.0005 || Math.abs(velArr[idx]) > 0.01) {
+        velArr[idx] -= 7.2 * safeDt;
+        mesh.position.y += velArr[idx] * safeDt;
+        if (mesh.position.y <= targetY) {
+          mesh.position.y = targetY;
+          if (Math.abs(velArr[idx]) > 0.24) {
+            velArr[idx] = Math.abs(velArr[idx]) * 0.42; // Crisp ceramic bounce!
+          } else {
+            velArr[idx] = 0;
+          }
+        }
+      }
+    };
+
     for (let i = 0; i < this.playerTokens.length; i++) {
-      if (this.playerTokens[i].visible) {
-        this.playerTokens[i].position.y = THREE.MathUtils.lerp(
-          this.playerTokens[i].position.y,
-          this.playerTokenYTargets[i],
-          dropAlpha
-        );
-      }
-      if (this.npcTokens[i].visible) {
-        this.npcTokens[i].position.y = THREE.MathUtils.lerp(
-          this.npcTokens[i].position.y,
-          this.npcTokenYTargets[i],
-          dropAlpha
-        );
-      }
+      stepStone(this.playerTokens[i], this.playerTokenVelY, this.playerTokenYTargets[i], i);
+      stepStone(this.npcTokens[i], this.npcTokenVelY, this.npcTokenYTargets[i], i);
     }
 
     // Subtle organic water surface drift on Koi Pond / Onsen caustics
