@@ -1,7 +1,15 @@
 /**
- * Procedural Physical Foley Web Audio Engine (Zero External Audio Assets).
- * Synthesizes authentic wooden hyoshigi beats, brass clockwork seal locks,
- * stone/shear/parchment clash acoustics, and warm temple-bell resonance.
+ * ★ Layered Procedural Physical Foley Web Audio Engine (Zero External Assets) ★
+ *
+ * Synthesizes authentic acoustic craft audio:
+ *  - Crisp hinoki wood tile taps & tactile UI feedback
+ *  - Filtered silk/fabric air-whoosh sweeps during 3D hand windup & clash lunge
+ *  - Wooden hyoshigi cadence beats (`じゃん・けん・ぽん！`)
+ *  - Watchmaker brass escapement seal lock
+ *  - Move-specific clash acoustics (heavy timber-stone crush, twin metallic shear snips,
+ *    parchment snap)
+ *  - Ballistic ceramic Go-stone double-bounce clack onto wooden score tray
+ *  - Warm resonant Japanese temple-bell (rin) harmonic triad for Match Victory!
  */
 
 import { Move, PAPER, ROCK, SCISSORS } from '../engine/jnv1/types';
@@ -44,6 +52,16 @@ export class SoundEngine {
     return this.ctx;
   }
 
+  private createNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffer {
+    const length = Math.max(1, Math.floor(ctx.sampleRate * durationSec));
+    const buf = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buf;
+  }
+
   /** Crisp wooden tile hover/click tactile clack */
   public playWoodTap(pitch = 680): void {
     const ctx = this.ensureContext();
@@ -57,13 +75,42 @@ export class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(pitch * 0.42, now + 0.048);
 
     gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(0.14, now + 0.003);
+    gain.gain.linearRampToValueAtTime(0.13, now + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.055);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.06);
+  }
+
+  /** Filtered silk/sleeve air-whoosh synced with dramatic hand windup or clash strike */
+  public playWhoosh(intensity = 1.0, pitchMult = 1.0): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const dur = 0.22;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.createNoiseBuffer(ctx, dur);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.setValueAtTime(2.6, now);
+    filter.frequency.setValueAtTime(340 * pitchMult, now);
+    filter.frequency.exponentialRampToValueAtTime(1480 * pitchMult, now + dur * 0.55);
+    filter.frequency.exponentialRampToValueAtTime(420 * pitchMult, now + dur);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.11 * intensity, now + dur * 0.32);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(now);
+    src.stop(now + dur + 0.02);
   }
 
   /** Precision watchmaker brass escapement click when JNV1.0 seals its SHA-256 commit */
@@ -79,133 +126,193 @@ export class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(i === 0 ? 1850 : 2420, t);
       osc.frequency.exponentialRampToValueAtTime(920, t + 0.032);
-      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.setValueAtTime(0.055, t);
       gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.038);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(t);
-      osc.stop(t + 0.04);
+      osc.stop(t + 0.042);
     }
   }
 
-  /** Wooden hyoshigi rhythmic anticipation beat ("Jan..." / "Ken...") */
+  /** Traditional wooden hyoshigi percussion beat during "Jan - Ken - Pon" windup */
   public playBeat(step: 1 | 2): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const baseFreq = step === 1 ? 520 : 620;
+    const freq = step === 1 ? 520 : 660;
 
-    // Resonant hardwood body + harmonic click
-    for (const mult of [1.0, 2.32, 3.85]) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = mult === 1.0 ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(baseFreq * mult, now);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * mult * 0.82, now + 0.09);
+    // Resonant hardwood body + bright clack overtone
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc1.type = 'triangle';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, now);
+    osc1.frequency.exponentialRampToValueAtTime(freq * 0.56, now + 0.095);
+    osc2.frequency.setValueAtTime(freq * 2.45, now);
+    osc2.frequency.exponentialRampToValueAtTime(freq * 1.4, now + 0.045);
 
-      const amp = mult === 1.0 ? 0.16 : 0.05 / mult;
-      gain.gain.setValueAtTime(amp, now);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.11);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.22, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.11);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
-    }
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.12);
+    osc2.stop(now + 0.12);
+
+    this.playWhoosh(step === 1 ? 0.6 : 0.88, step === 1 ? 0.9 : 1.15);
   }
 
-  /** Distinct physical clash impact acoustic based on winning move & round outcome */
-  public playClashImpact(outcome: 'WIN' | 'LOSS' | 'DRAW', winningMove: Move): void {
+  /** Crisp twin metallic shear snips for Scissors victory flourish */
+  public playScissorsDoubleSnip(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
     const now = ctx.currentTime;
 
-    // 1. Low wooden table thump
-    const thump = ctx.createOscillator();
-    const thumpGain = ctx.createGain();
-    thump.type = 'sine';
-    thump.frequency.setValueAtTime(winningMove === ROCK ? 135 : 165, now);
-    thump.frequency.exponentialRampToValueAtTime(42, now + 0.16);
-    thumpGain.gain.setValueAtTime(0.28, now);
-    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
-    thump.connect(thumpGain);
-    thumpGain.connect(ctx.destination);
-    thump.start(now);
-    thump.stop(now + 0.2);
-
-    // 2. Material signature transient (Stone knock / Metallic scissor shear / Crisp paper snap)
-    if (winningMove === SCISSORS) {
-      // Crisp forged steel blade ring
-      for (const f of [2240, 3410, 4880]) {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(f, now);
-        o.frequency.exponentialRampToValueAtTime(f * 0.94, now + 0.22);
-        g.gain.setValueAtTime(0.045, now);
-        g.gain.exponentialRampToValueAtTime(0.0006, now + 0.24);
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.start(now);
-        o.stop(now + 0.25);
-      }
-    } else if (winningMove === PAPER) {
-      // Filtered parchment air-snap noise burst
-      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.12), ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < data.length; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.025));
-      }
+    for (let i = 0; i < 2; i++) {
+      const t = now + i * 0.15;
       const src = ctx.createBufferSource();
-      src.buffer = buf;
-      const filt = ctx.createBiquadFilter();
-      filt.type = 'bandpass';
-      filt.frequency.value = 1450;
-      filt.Q.value = 1.4;
+      src.buffer = this.createNoiseBuffer(ctx, 0.07);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'bandpass';
+      hp.frequency.setValueAtTime(3400 + i * 420, t);
+      hp.Q.setValueAtTime(5.2, t);
       const g = ctx.createGain();
-      g.gain.value = 0.26;
-      src.connect(filt);
-      filt.connect(g);
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+      src.connect(hp);
+      hp.connect(g);
       g.connect(ctx.destination);
+      src.start(t);
+      src.stop(t + 0.075);
+    }
+  }
+
+  /** Ceramic Go-stone double bounce tap onto carved hardwood scoreboard tray */
+  public playGoStoneBounce(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const taps = [
+      { dt: 0.0, amp: 0.14, freq: 1480 },
+      { dt: 0.12, amp: 0.065, freq: 1620 },
+      { dt: 0.19, amp: 0.025, freq: 1710 },
+    ];
+    for (const tap of taps) {
+      const t = now + tap.dt;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(tap.freq, t);
+      osc.frequency.exponentialRampToValueAtTime(tap.freq * 0.48, t + 0.028);
+      gain.gain.setValueAtTime(tap.amp, t);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.034);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.038);
+    }
+  }
+
+  /** Rich physical impact & acoustic outcome chime on "PON!!" */
+  public playClashImpact(outcome: 'WIN' | 'LOSS' | 'DRAW', winnerMove: Move): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 1. Physical contact body impact tailored to Rock / Scissors / Paper
+    if (winnerMove === ROCK) {
+      // Heavy taiko-wood + stone thump
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(165, now);
+      osc.frequency.exponentialRampToValueAtTime(42, now + 0.22);
+      gain.gain.setValueAtTime(0.34, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.27);
+    } else if (winnerMove === SCISSORS) {
+      // Crisp forged-steel blade shimmer
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(2400, now);
+      osc.frequency.exponentialRampToValueAtTime(1180, now + 0.14);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.18);
+    } else if (winnerMove === PAPER) {
+      // Crisp washi-parchment & sweeping air snap
+      const src = ctx.createBufferSource();
+      src.buffer = this.createNoiseBuffer(ctx, 0.12);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(1250, now);
+      bp.Q.setValueAtTime(1.5, now);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      src.connect(bp);
+      bp.connect(gain);
+      gain.connect(ctx.destination);
       src.start(now);
+      src.stop(now + 0.13);
     }
 
-    // 3. Outcome harmonic chord (warm pentatonic bronze bell on WIN, deep muted wood on LOSS, crisp double-click on DRAW)
-    if (outcome === 'WIN') {
-      const notes = [523.25, 659.25, 783.99]; // C5 - E5 - G5 warm acoustic chime
-      notes.forEach((freq, idx) => {
-        const t = now + 0.05 + idx * 0.055;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(freq, t);
-        g.gain.setValueAtTime(0.001, t);
-        g.gain.linearRampToValueAtTime(0.095, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0008, t + 0.52);
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.start(t);
-        o.stop(t + 0.55);
-      });
-    } else if (outcome === 'LOSS') {
-      const notes = [293.66, 246.94]; // D4 -> B3 dignified somber tone
-      notes.forEach((freq, idx) => {
-        const t = now + 0.06 + idx * 0.09;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'triangle';
-        o.frequency.setValueAtTime(freq, t);
-        g.gain.setValueAtTime(0.085, t);
-        g.gain.exponentialRampToValueAtTime(0.0008, t + 0.36);
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.start(t);
-        o.stop(t + 0.38);
-      });
-    } else {
-      // Crisp Aiko double-knock
-      this.playWoodTap(840);
-      setTimeout(() => this.playWoodTap(960), 95);
-    }
+    // 2. Warm acoustic outcome bell resonance
+    const notes =
+      outcome === 'WIN'
+        ? [523.25, 659.25, 783.99] // Warm C5 major triad (gold chime)
+        : outcome === 'LOSS'
+        ? [392.0, 311.13] // Deep muted bronze minor interval
+        : [440.0, 587.33]; // Crisp neutral bamboo fifth
+
+    notes.forEach((freq, idx) => {
+      const t = now + idx * 0.052;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(outcome === 'WIN' ? 0.12 : 0.085, t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0007, t + 0.62);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.65);
+    });
+  }
+
+  /** Ceremonial resonant Japanese brass rin-bell chord on Match Victory */
+  public playMatchVictoryChord(playerWon: boolean): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const freqs = playerWon ? [523.25, 659.25, 783.99, 1046.5] : [329.63, 293.66, 220.0];
+    freqs.forEach((f, idx) => {
+      const t = now + idx * 0.085;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.11, t + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0006, t + 1.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 1.5);
+    });
   }
 }

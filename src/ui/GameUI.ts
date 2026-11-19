@@ -1,13 +1,15 @@
 /**
- * Interactive UI Controller for JANKEN · 極 (3D Architectural Duel).
- * Renders:
- *  - Minimal top header bar + live render telemetry (Resolution / FPS / KHDR / Shadow Flame)
- *  - Match Scoreboard (Best-of-5 / Best-of-9 / Endless)
- *  - Tactile Rock / Scissors / Paper hand dock with live JNV1.0 SHA-256 Pre-Commit Seal
- *  - Left Slide-out Drawer: Graphics Studio (HD/FHD/1.5K/2K, 60/120/Unlimited FPS, KHDR ON/OFF + A/B Split,
- *    Shadow Flame 1.0 Standard/Flash/Pro, 5 Photorealistic Stages, Hand Materials)
- *  - Right Slide-out Drawer: JNV1.0 Cognitive Core Inspector (Personas, SHA-256 Seal Verification,
- *    Last-Round Prediction Post-Mortem, Top-6 Experts Leaderboard, Player Behavioral Profile, Live 1,600-Round Benchmark!)
+ * ★ Ultra-Rich, Zero-Clutter Museum-Lacquer & Gold-Leaf UI Controller — JANKEN · 極 ★
+ *
+ * Strictly ZERO NEON & ZERO visual clutter on the 3D battle canvas:
+ *  - Top-Left: Sculpted Vermilion Hanko (`極`) + Gold-Etched Serif Title (optional micro telemetry pill)
+ *  - Top-Center: Urushi-Lacquer & Brass Match Crest with animated Ivory/Bronze Go-Stone Victory Pips
+ *  - Top-Right: 4 Iconic Brushed-Brass Medallion Buttons (Graphics, JNV1.0, Sound, Reset)
+ *  - Center Stage: Borderless Calligraphic Ink-Brush Theatre (`じゃーん / けーん / ぽん！`)
+ *    + Slamming Vermilion Hanko Stamp (`勝` / `敗` / `分`) with zero debug box clutter
+ *  - Bottom Dock: 3 Interactive 3D-Tilt & Gold-Sheen Urushi Hand Cards (`グー / チョキ / パー`)
+ *    with bespoke woodblock/gold-inlay SVG artwork + expanding gold-ink press ripples
+ *  - Slide-out Drawers: Visual PBR-Thumbnail Graphics Studio + Clean JNV1.0 Cognitive Inspector
  */
 
 import { runJNV1Benchmark, BenchmarkBotResult } from '../engine/jnv1/benchmark';
@@ -54,18 +56,49 @@ export interface GameUIHandlers {
   onToggleSound: () => boolean;
 }
 
-const HAND_MATERIAL_OPTIONS: Array<{ id: HandMaterialPreset; label: string }> = [
-  { id: 'hinoki_ivory', label: '檜象牙' },
-  { id: 'karakuri_bronze', label: 'からくり真鍮' },
-  { id: 'bisque_porcelain', label: '京白磁' },
-  { id: 'obsidian_gold', label: '黒曜金継' },
+const HAND_MATERIAL_OPTIONS: Array<{ id: HandMaterialPreset; label: string; swatch: string }> = [
+  { id: 'hinoki_ivory', label: '檜象牙', swatch: 'linear-gradient(135deg, #f5e6ce 0%, #d4b282 100%)' },
+  { id: 'karakuri_bronze', label: '真鍮銅', swatch: 'linear-gradient(135deg, #cfa16b 0%, #6d4c2b 100%)' },
+  { id: 'bisque_porcelain', label: '京白磁', swatch: 'linear-gradient(135deg, #fcfaf6 0%, #d8d2c7 100%)' },
+  { id: 'obsidian_gold', label: '黒曜金', swatch: 'linear-gradient(135deg, #43464c 0%, #1b1c1f 65%, #d6b268 100%)' },
 ];
 
-const SVG_ICONS: Record<Move, string> = {
-  [ROCK]: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12V9a2 2 0 0 1 4 0v1"/><path d="M10 9V8a2 2 0 0 1 4 0v2"/><path d="M14 9.5a2 2 0 0 1 4 0V14a6 6 0 0 1-6 6H9.5A5.5 5.5 0 0 1 4 14.5V12a2 2 0 0 1 2-2Z"/><path d="M6 12h8"/></svg>`,
-  [SCISSORS]: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12.5 11.2 14.5 4.6a1.5 1.5 0 1 1 2.86.88L15.2 12.5"/><path d="M15.2 12.5a2 2 0 0 1 3.3 1.5V15a6 6 0 0 1-6 6H10a5 5 0 0 1-5-5v-2.5a2 2 0 0 1 4 0"/></svg>`,
-  [PAPER]: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12V5a1.5 1.5 0 0 1 3 0v6"/><path d="M10 11V3.8a1.5 1.5 0 0 1 3 0V11"/><path d="M13 11V4.8a1.5 1.5 0 0 1 3 0V12"/><path d="M16 12V7.5a1.5 1.5 0 0 1 3 0V15a6.5 6.5 0 0 1-6.5 6.5H10A5.5 5.5 0 0 1 4.5 16v-3.5a1.5 1.5 0 0 1 3 0"/></svg>`,
+/** Bespoke Gold-Inlay Fine-Craft Hand Medallion Artwork (Zero Cliché Emojis) */
+const ARTISAN_HAND_SVG: Record<Move, string> = {
+  [ROCK]: `<svg class="hand-emblem" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>
+    <circle cx="32" cy="32" r="23.5" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2 3" stroke-width="1"/>
+    <path d="M18 33V25.5C18 23.0 20.0 21 22.5 21C24.4 21 26 22.2 26.7 23.8V21.8C26.7 19.3 28.7 17.3 31.2 17.3C33.4 17.3 35.2 18.8 35.6 20.8C36.4 19.5 37.8 18.6 39.5 18.6C42.0 18.6 44 20.6 44 23.1V25.4C45.8 25.7 47.2 27.3 47.2 29.2V36.8C47.2 44.6 40.9 50.8 33.1 50.8H29.4C22.4 50.8 16.8 45.2 16.8 38.2V34.5C16.8 33.6 17.3 33 18 33Z" fill="currentColor" fill-opacity="0.11" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M26.7 23.8V31.5M35.6 20.8V31.5M44 25.4V32.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M18 33.2H31.8C34.2 33.2 36 35.0 36 37.3C36 39.4 34.4 41.0 32.3 41.2L26.2 41.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="32" cy="45.2" r="1.5" fill="currentColor" fill-opacity="0.6"/>
+  </svg>`,
+  [SCISSORS]: `<svg class="hand-emblem" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>
+    <circle cx="32" cy="32" r="23.5" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2 3" stroke-width="1"/>
+    <path d="M26.2 32.5L21.6 14.2C21.1 12.1 22.4 10 24.5 9.5C26.6 9.0 28.7 10.3 29.2 12.4L33.0 28.2L37.4 12.6C38.0 10.5 40.1 9.3 42.2 9.9C44.3 10.5 45.5 12.6 44.9 14.7L39.6 32.6" fill="currentColor" fill-opacity="0.11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M39.6 32.6C42.2 32.6 44.5 34.4 44.8 37.1L45.1 39.6C45.7 46.1 40.6 51.8 34.0 51.8H28.8C22.4 51.8 17.5 46.6 17.8 40.2L18.1 35.8C18.3 33.4 20.3 31.6 22.7 31.6C24.2 31.6 25.5 32.2 26.2 32.5" fill="currentColor" fill-opacity="0.11" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M24.2 36.2H34.4C36.4 36.2 38.0 37.8 38.0 39.8C38.0 41.8 36.4 43.3 34.4 43.3H28.8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    <path d="M26.2 20.5L27.6 20.1M39.8 20.3L41.2 20.7" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`,
+  [PAPER]: `<svg class="hand-emblem" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>
+    <circle cx="32" cy="32" r="23.5" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2 3" stroke-width="1"/>
+    <path d="M20.5 35.8L14.5 29.8C13.0 28.3 13.0 25.9 14.5 24.4C16.0 22.9 18.4 22.9 19.9 24.4L23.2 27.7V16.4C23.2 14.3 24.9 12.6 27.0 12.6C29.1 12.6 30.8 14.3 30.8 16.4V26.2V12.8C30.8 10.7 32.5 9.0 34.6 9.0C36.7 9.0 38.4 10.7 38.4 12.8V26.4V15.4C38.4 13.4 40.0 11.8 42.0 11.8C44.0 11.8 45.6 13.4 45.6 15.4V28.2V21.2C45.6 19.4 47.0 18.0 48.8 18.0C50.6 18.0 52.0 19.4 52.0 21.2V37.6C52.0 45.8 45.3 52.4 37.1 52.4H32.2C25.5 52.4 20.5 47.5 20.5 40.8V35.8Z" fill="currentColor" fill-opacity="0.11" stroke="currentColor" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M27.6 39.2C30.4 36.8 35.0 36.2 39.8 37.8" stroke="currentColor" stroke-opacity="0.45" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`,
 };
+
+const NAV_ICONS = {
+  graphics: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>`,
+  inspector: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.34 6.34l1.42 1.42M16.24 16.24l1.42 1.42M17.66 6.34l-1.42 1.42M7.76 16.24l-1.42 1.42"/></svg>`,
+  soundOn: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
+  soundOff: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`,
+  reset: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>`,
+  lock: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+};
+
+const CORNER_FILIGREE = `<svg class="corner-orn tl" viewBox="0 0 14 14" fill="none"><path d="M1 13V3C1 1.9 1.9 1 3 1H13" stroke="currentColor" stroke-width="1.1"/></svg><svg class="corner-orn tr" viewBox="0 0 14 14" fill="none"><path d="M13 13V3C13 1.9 12.1 1 11 1H1" stroke="currentColor" stroke-width="1.1"/></svg><svg class="corner-orn bl" viewBox="0 0 14 14" fill="none"><path d="M1 1V11C1 12.1 1.9 13 3 13H13" stroke="currentColor" stroke-width="1.1"/></svg><svg class="corner-orn br" viewBox="0 0 14 14" fill="none"><path d="M13 1V11C13 12.1 12.1 13 11 13H1" stroke="currentColor" stroke-width="1.1"/></svg>`;
 
 export class GameUI {
   private readonly root: HTMLElement;
@@ -73,22 +106,34 @@ export class GameUI {
 
   private graphicsOpen = false;
   private inspectorOpen = false;
+  private showHudTelemetry = false;
   private soundOn = true;
   private currentSettings: GraphicsSettings;
   private currentPersona: JNVPersonaId = 'apex';
   private matchFormat: MatchFormat = 'bo5';
   private benchmarkCache: BenchmarkBotResult[] | null = null;
+  private lastMetrics: RenderMetrics | null = null;
 
-  // Key DOM refs
-  private perfStripEl!: HTMLElement;
+  private playerWinsCache = 0;
+  private npcWinsCache = 0;
+  private activeMoveSelection: Move | null = null;
+
+  // DOM refs
+  private microTelemetryEl!: HTMLElement;
   private scorePlayerEl!: HTMLElement;
   private scoreNpcEl!: HTMLElement;
-  private scoreRoundEl!: HTMLElement;
-  private calloutEl!: HTMLElement;
-  private calloutTitleEl!: HTMLElement;
-  private calloutSubEl!: HTMLElement;
-  private calloutMatchupEl!: HTMLElement;
-  private sealBarEl!: HTMLElement;
+  private playerPipsEl!: HTMLElement;
+  private npcPipsEl!: HTMLElement;
+  private roundCrestEl!: HTMLElement;
+  private drawDotEl!: HTMLElement;
+
+  private theatreEl!: HTMLElement;
+  private theatreBrushEl!: HTMLElement;
+  private theatreTextEl!: HTMLElement;
+  private theatreStampEl!: HTMLElement;
+  private theatreHideTimer = 0;
+
+  private sealPillEl!: HTMLElement;
   private handButtons: HTMLButtonElement[] = [];
 
   private graphicsDrawerEl!: HTMLElement;
@@ -104,8 +149,8 @@ export class GameUI {
   private splitHandleEl!: HTMLElement;
 
   private modalBackdropEl!: HTMLElement;
+  private modalCrestEl!: HTMLElement;
   private modalTitleEl!: HTMLElement;
-  private modalDescEl!: HTMLElement;
   private modalStatsEl!: HTMLElement;
 
   private lastTelemetry: JNVRoundTelemetry | null = null;
@@ -122,191 +167,237 @@ export class GameUI {
     this.currentPersona = initialPersona;
     this.handlers = handlers;
 
-    this.mountSkeleton();
+    this.buildShell();
     this.renderGraphicsDrawer();
     this.renderInspectorDrawer();
     this.bindKeyboardShortcuts();
     this.bindSplitDrag();
   }
 
-  private mountSkeleton(): void {
+  private buildShell(): void {
     this.root.innerHTML = `
+      <!-- KHDR vs Standard SDR Live A/B Split Overlay -->
+      <div class="khdr-split-overlay" id="khdr-split-overlay">
+        <div class="khdr-split-label left">標準 SDR</div>
+        <div class="khdr-split-label right">KHDR ON</div>
+        <div class="khdr-split-handle" id="khdr-split-handle" title="ドラッグしてKHDR比較位置を移動">
+          <div class="khdr-split-knob">⇄</div>
+        </div>
+      </div>
+
+      <!-- Minimal Luxury Header -->
       <header class="top-bar">
         <div class="brand-cluster">
-          <div class="brand-plate">
-            <div class="brand-hanko" aria-hidden="true">極</div>
-            <div class="brand-titles">
-              <h1>JANKEN · 極</h1>
-              <p>PHOTOREALISTIC 3D DUEL · JNV1.0 CORE</p>
+          <div class="brand-crest">
+            <div class="hanko-seal">極</div>
+            <div class="brand-wordmark">
+              <h1>JANKEN</h1>
+              <span class="brand-dot">·</span>
+              <span class="brand-jp">極</span>
             </div>
           </div>
-          <div class="perf-strip" id="perf-strip">
-            <span class="perf-chip"><strong>--</strong> FPS</span>
-            <span class="perf-sep">|</span>
-            <span class="perf-chip"><strong>FHD</strong></span>
-            <span class="perf-sep">|</span>
-            <span class="perf-chip accent"><strong>KHDR ON</strong></span>
-            <span class="perf-sep">|</span>
-            <span class="perf-chip accent"><strong>SF 1.0 Pro</strong></span>
+          <div class="micro-telemetry" id="micro-telemetry" style="display:none"></div>
+        </div>
+
+        <!-- Sculptural Urushi & Brass Match Crest -->
+        <div class="match-crest" id="match-crest">
+          ${CORNER_FILIGREE}
+          <div class="crest-side player">
+            <div class="crest-pips" id="player-pips"></div>
+            <div class="crest-num" id="score-player">0</div>
+          </div>
+          <div class="crest-center">
+            <div class="round-medallion" id="round-crest">壱</div>
+            <div class="draw-indicator" id="draw-dot" title="あいこ中"></div>
+          </div>
+          <div class="crest-side npc">
+            <div class="crest-num" id="score-npc">0</div>
+            <div class="crest-pips" id="npc-pips"></div>
           </div>
         </div>
 
-        <div class="scoreboard" aria-label="対戦スコア">
-          <div class="score-side player">
-            <span class="label">あなた</span>
-            <span class="num" id="score-player">0</span>
-          </div>
-          <div class="score-center">
-            <span class="score-round" id="score-round">ROUND 1 · 引分 0</span>
-            <select id="match-format-select" class="match-mode-select" aria-label="試合形式">
-              <option value="bo5">3本先取 (5本勝負)</option>
-              <option value="bo9">5本先取 (9本勝負)</option>
-              <option value="endless">無制限 (エンドレス)</option>
-            </select>
-          </div>
-          <div class="score-side npc">
-            <span class="label">JNV1.0</span>
-            <span class="num" id="score-npc">0</span>
-          </div>
-        </div>
-
-        <div class="top-actions">
-          <button id="btn-graphics" class="nav-btn" type="button">
-            <span>映像・舞台</span>
-            <span class="tag">KHDR / SF1.0</span>
+        <!-- Sculpted Brass & Lacquer Icon Medallions -->
+        <nav class="top-actions" aria-label="設定">
+          <button class="icon-medallion" id="btn-graphics" data-tip="映像・舞台 (G)" aria-label="映像・舞台設定">
+            ${NAV_ICONS.graphics}
           </button>
-          <button id="btn-inspector" class="nav-btn" type="button">
-            <span>JNV1.0 解析</span>
-            <span class="tag">36 EXP</span>
+          <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 解析 (J)" aria-label="JNV1.0 解析">
+            ${NAV_ICONS.inspector}
+            <span class="medallion-seal-dot"></span>
           </button>
-          <button id="btn-sound" class="nav-btn" type="button" title="音響オンオフ">
-            <span>音響 ON</span>
+          <button class="icon-medallion" id="btn-sound" data-tip="音響 ON/OFF" aria-label="音響切替">
+            ${NAV_ICONS.soundOn}
           </button>
-        </div>
+          <button class="icon-medallion" id="btn-reset-match" data-tip="最初から" aria-label="試合をリセット">
+            ${NAV_ICONS.reset}
+          </button>
+        </nav>
       </header>
 
-      <main class="center-stage-hud">
-        <div class="callout-banner" id="callout-banner" role="status" aria-live="polite">
-          <div class="callout-title" id="callout-title">いざ勝負</div>
-          <div class="callout-matchup" id="callout-matchup"></div>
-          <div class="callout-sub" id="callout-sub"></div>
+      <!-- Borderless Calligraphic Battle Theatre (Zero Boxes!) -->
+      <div class="battle-theatre" aria-live="polite">
+        <div class="theatre-stage" id="theatre-stage">
+          <svg class="ink-brush-sweep" id="theatre-brush" viewBox="0 0 420 90" fill="none" preserveAspectRatio="none">
+            <path d="M18 52 C110 26, 290 22, 402 44 C320 58, 130 66, 26 58 Z" fill="url(#sumiGrad)"/>
+            <path class="brush-gold-line" d="M36 62 C155 44, 280 42, 388 50" stroke="url(#goldHair)" stroke-width="1.6" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="sumiGrad" x1="0" y1="0" x2="420" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#14110e" stop-opacity="0"/>
+                <stop offset="22%" stop-color="#14110e" stop-opacity="0.72"/>
+                <stop offset="78%" stop-color="#14110e" stop-opacity="0.72"/>
+                <stop offset="100%" stop-color="#14110e" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="goldHair" x1="36" y1="0" x2="388" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#d4b06a" stop-opacity="0"/>
+                <stop offset="50%" stop-color="#e8c882" stop-opacity="0.85"/>
+                <stop offset="100%" stop-color="#d4b06a" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="theatre-lockup">
+            <div class="theatre-text" id="theatre-text"></div>
+            <div class="theatre-stamp" id="theatre-stamp"></div>
+          </div>
         </div>
-      </main>
+      </div>
 
+      <!-- Bottom Tactile Urushi-Lacquer & Gold-Leaf Artisan Dock -->
       <footer class="bottom-dock">
-        <div class="seal-bar" id="seal-bar">
-          <span class="seal-dot"></span>
-          <span class="persona-badge">JNV1.0-APEX</span>
-          <span>事前封印済 SHA-256:</span>
-          <span class="hash">計算中…</span>
-        </div>
-
-        <div class="hand-controls-row" role="group" aria-label="手を選択">
-          ${([ROCK, SCISSORS, PAPER] as const)
+        <div class="hand-cards" id="hand-dock">
+          ${([ROCK, SCISSORS, PAPER] as Move[])
             .map(
-              (m) => `
-            <button class="hand-btn" data-move="${m}" id="btn-move-${MOVE_META[m].id}" type="button">
-              <span class="hand-icon">${SVG_ICONS[m]}</span>
-              <span class="hand-text">
-                <span class="jp">${MOVE_META[m].jp}</span>
-                <span class="en">${MOVE_META[m].en}</span>
-              </span>
-              <span class="hand-key">${MOVE_META[m].key}</span>
-            </button>
-          `
+              (m, idx) => `
+              <button class="artisan-card" id="btn-move-${MOVE_META[m].id}" data-move="${m}">
+                ${CORNER_FILIGREE}
+                <div class="card-sheen"></div>
+                <div class="card-ripple"></div>
+                <div class="card-art">${ARTISAN_HAND_SVG[m]}</div>
+                <div class="card-footer">
+                  <span class="card-jp">${MOVE_META[m].jp}</span>
+                  <span class="card-key">${idx + 1}</span>
+                </div>
+              </button>
+            `
             )
             .join('')}
         </div>
 
-        <div class="bottom-meta">
-          <span>ドラッグで3D視点回転 · ダブルクリックで視点復帰 · キー [1][2][3] で即出し</span>
-          <button id="btn-reset-match" class="link-btn" type="button">試合をリセット</button>
-        </div>
+        <!-- Subtle Clickable SHA-256 Proof Seal Chip (Opens Inspector) -->
+        <button class="seal-chip" id="seal-chip" title="クリックでJNV1.0事前封印SHA-256ハッシュを確認">
+          ${NAV_ICONS.lock}
+          <span id="seal-chip-label">SHA-256</span>
+        </button>
       </footer>
 
-      <div class="khdr-split-overlay" id="khdr-split-overlay">
-        <div class="khdr-split-label left">← 標準 SDR (KHDR OFF)</div>
-        <div class="khdr-split-label right">独自 KHDR ON →</div>
-        <div class="khdr-split-handle" id="khdr-split-handle" title="左右にドラッグしてKHDR比較">⇄</div>
-      </div>
-
+      <!-- Left Slide-Out Drawer: Graphics Studio -->
       <aside class="drawer left" id="drawer-graphics" aria-label="映像・舞台設定">
         <div class="drawer-header">
-          <div>
-            <h2>映像エンジン・舞台設定</h2>
-            <div class="subtitle">HD〜2K · KHDR · SHADOW FLAME 1.0</div>
+          <div class="drawer-title">
+            <h2>映像 · 舞台</h2>
+            <span class="drawer-badge">KHDR / SF 1.0</span>
           </div>
-          <button class="drawer-close" id="close-graphics" type="button" aria-label="閉じる">×</button>
+          <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
-        <div class="drawer-body" id="graphics-drawer-body"></div>
+        <div class="drawer-body" id="graphics-body"></div>
       </aside>
 
-      <aside class="drawer right" id="drawer-inspector" aria-label="JNV1.0 頭脳解析">
+      <!-- Right Slide-Out Drawer: JNV1.0 Cognitive Core Inspector -->
+      <aside class="drawer right" id="drawer-inspector" aria-label="JNV1.0解析">
         <div class="drawer-header">
-          <div>
-            <h2>JNV1.0 独自NPCコア解析</h2>
-            <div class="subtitle">NON-STATIONARY INFERENCE &amp; VOLATILITY ENGINE</div>
+          <div class="drawer-title">
+            <h2>JNV1.0 解析</h2>
+            <span class="drawer-badge">36 EXP</span>
           </div>
-          <button class="drawer-close" id="close-inspector" type="button" aria-label="閉じる">×</button>
+          <button class="drawer-close" id="close-inspector" aria-label="閉じる">✕</button>
         </div>
-        <div class="drawer-body" id="inspector-drawer-body"></div>
+        <div class="drawer-body" id="inspector-body"></div>
       </aside>
 
-      <div class="match-modal-backdrop" id="match-modal">
-        <div class="match-modal">
-          <h3 id="modal-title">勝負あり</h3>
-          <p id="modal-desc"></p>
-          <div class="match-modal-stats" id="modal-stats"></div>
-          <button id="btn-modal-rematch" class="action-btn" type="button">もう一局挑む（学習継続・再戦）</button>
-          <button id="btn-modal-fresh" class="seg-btn" type="button">JNV1.0記憶を初期化して新規対戦</button>
+      <!-- Ceremonial Match-End Modal -->
+      <div class="modal-backdrop" id="match-modal">
+        <div class="modal-card">
+          ${CORNER_FILIGREE}
+          <div class="modal-crest" id="modal-crest">勝</div>
+          <h2 id="modal-title">勝 利</h2>
+          <div class="modal-stats" id="modal-stats"></div>
+          <div class="modal-actions">
+            <button class="modal-btn primary" id="modal-rematch-keep">もう一度</button>
+            <button class="modal-btn secondary" id="modal-rematch-fresh">記憶を初期化して再戦</button>
+          </div>
         </div>
       </div>
     `;
 
-    this.perfStripEl = this.root.querySelector('#perf-strip')!;
+    this.microTelemetryEl = this.root.querySelector('#micro-telemetry')!;
     this.scorePlayerEl = this.root.querySelector('#score-player')!;
     this.scoreNpcEl = this.root.querySelector('#score-npc')!;
-    this.scoreRoundEl = this.root.querySelector('#score-round')!;
-    this.calloutEl = this.root.querySelector('#callout-banner')!;
-    this.calloutTitleEl = this.root.querySelector('#callout-title')!;
-    this.calloutSubEl = this.root.querySelector('#callout-sub')!;
-    this.calloutMatchupEl = this.root.querySelector('#callout-matchup')!;
-    this.sealBarEl = this.root.querySelector('#seal-bar')!;
+    this.playerPipsEl = this.root.querySelector('#player-pips')!;
+    this.npcPipsEl = this.root.querySelector('#npc-pips')!;
+    this.roundCrestEl = this.root.querySelector('#round-crest')!;
+    this.drawDotEl = this.root.querySelector('#draw-dot')!;
+
+    this.theatreEl = this.root.querySelector('#theatre-stage')!;
+    this.theatreBrushEl = this.root.querySelector('#theatre-brush')!;
+    this.theatreTextEl = this.root.querySelector('#theatre-text')!;
+    this.theatreStampEl = this.root.querySelector('#theatre-stamp')!;
+    this.sealPillEl = this.root.querySelector('#seal-chip')!;
 
     this.graphicsDrawerEl = this.root.querySelector('#drawer-graphics')!;
     this.inspectorDrawerEl = this.root.querySelector('#drawer-inspector')!;
     this.graphicsNavBtn = this.root.querySelector('#btn-graphics')!;
     this.inspectorNavBtn = this.root.querySelector('#btn-inspector')!;
     this.soundNavBtn = this.root.querySelector('#btn-sound')!;
-    this.graphicsBodyEl = this.root.querySelector('#graphics-drawer-body')!;
-    this.inspectorBodyEl = this.root.querySelector('#inspector-drawer-body')!;
+
+    this.graphicsBodyEl = this.root.querySelector('#graphics-body')!;
+    this.inspectorBodyEl = this.root.querySelector('#inspector-body')!;
 
     this.splitOverlayEl = this.root.querySelector('#khdr-split-overlay')!;
     this.splitHandleEl = this.root.querySelector('#khdr-split-handle')!;
 
     this.modalBackdropEl = this.root.querySelector('#match-modal')!;
+    this.modalCrestEl = this.root.querySelector('#modal-crest')!;
     this.modalTitleEl = this.root.querySelector('#modal-title')!;
-    this.modalDescEl = this.root.querySelector('#modal-desc')!;
     this.modalStatsEl = this.root.querySelector('#modal-stats')!;
 
-    this.handButtons = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.hand-btn'));
+    // Bind 3D-tilt, pointer gold-sheen, and spring click ripples on the 3 Artisan Hand Cards!
+    this.handButtons = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.artisan-card'));
     for (const btn of this.handButtons) {
       const move = Number(btn.dataset.move) as Move;
-      btn.addEventListener('click', () => this.handlers.onSelectMove(move));
-      btn.addEventListener('mouseenter', () => this.handlers.onHoverMove(move));
-      btn.addEventListener('mouseleave', () => this.handlers.onHoverMove(null));
+      btn.addEventListener('pointerenter', () => this.handlers.onHoverMove(move));
+      btn.addEventListener('pointerleave', () => {
+        btn.style.removeProperty('--rx');
+        btn.style.removeProperty('--ry');
+        this.handlers.onHoverMove(null);
+      });
+      btn.addEventListener('pointermove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / Math.max(1, rect.width);
+        const ny = (e.clientY - rect.top) / Math.max(1, rect.height);
+        btn.style.setProperty('--mx', `${(nx * 100).toFixed(1)}%`);
+        btn.style.setProperty('--my', `${(ny * 100).toFixed(1)}%`);
+        btn.style.setProperty('--rx', `${((0.5 - ny) * 10).toFixed(2)}deg`);
+        btn.style.setProperty('--ry', `${((nx - 0.5) * 12).toFixed(2)}deg`);
+      });
+      btn.addEventListener('click', () => {
+        this.triggerCardRipple(btn, move);
+        this.handlers.onSelectMove(move);
+      });
     }
 
+    // Top-right medallion toggles
     this.graphicsNavBtn.addEventListener('click', () => {
       this.graphicsOpen = !this.graphicsOpen;
-      this.syncDrawers();
-    });
-    this.inspectorNavBtn.addEventListener('click', () => {
-      this.inspectorOpen = !this.inspectorOpen;
+      if (this.graphicsOpen) this.inspectorOpen = false;
       this.syncDrawers();
     });
     this.root.querySelector('#close-graphics')!.addEventListener('click', () => {
       this.graphicsOpen = false;
+      this.syncDrawers();
+    });
+
+    this.inspectorNavBtn.addEventListener('click', () => {
+      this.inspectorOpen = !this.inspectorOpen;
+      if (this.inspectorOpen) this.graphicsOpen = false;
       this.syncDrawers();
     });
     this.root.querySelector('#close-inspector')!.addEventListener('click', () => {
@@ -314,22 +405,32 @@ export class GameUI {
       this.syncDrawers();
     });
 
-    this.soundNavBtn.addEventListener('click', () => {
-      this.soundOn = this.handlers.onToggleSound();
-      this.soundNavBtn.innerHTML = `<span>音響 ${this.soundOn ? 'ON' : 'OFF'}</span>`;
+    this.sealPillEl.addEventListener('click', () => {
+      this.inspectorOpen = true;
+      this.graphicsOpen = false;
+      this.syncDrawers();
     });
 
-    const fmtSelect = this.root.querySelector<HTMLSelectElement>('#match-format-select')!;
-    fmtSelect.value = this.matchFormat;
-    fmtSelect.addEventListener('change', () => {
-      this.matchFormat = fmtSelect.value as MatchFormat;
-      this.handlers.onChangeMatchFormat(this.matchFormat);
+    this.soundNavBtn.addEventListener('click', () => {
+      this.soundOn = this.handlers.onToggleSound();
+      this.soundNavBtn.innerHTML = this.soundOn ? NAV_ICONS.soundOn : NAV_ICONS.soundOff;
+      this.soundNavBtn.classList.toggle('muted', !this.soundOn);
     });
 
     this.root.querySelector('#btn-reset-match')!.addEventListener('click', () => {
       this.closeMatchModal();
       this.handlers.onResetMatch();
     });
+  }
+
+  private triggerCardRipple(btn: HTMLButtonElement, move: Move): void {
+    this.activeMoveSelection = move;
+    for (const b of this.handButtons) {
+      b.classList.toggle('selected', b === btn);
+    }
+    btn.classList.remove('rippling');
+    void btn.offsetWidth;
+    btn.classList.add('rippling');
   }
 
   private syncDrawers(): void {
@@ -344,14 +445,26 @@ export class GameUI {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       if (this.modalBackdropEl.classList.contains('open')) return;
       const k = e.key.toLowerCase();
-      if (k === '1' || k === 'a') this.handlers.onSelectMove(ROCK);
-      else if (k === '2' || k === 's') this.handlers.onSelectMove(SCISSORS);
-      else if (k === '3' || k === 'd') this.handlers.onSelectMove(PAPER);
-      else if (k === 'g') {
+      if (k === '1' || k === 'a') {
+        this.triggerCardRipple(this.handButtons[0], ROCK);
+        this.handlers.onSelectMove(ROCK);
+      } else if (k === '2' || k === 's') {
+        this.triggerCardRipple(this.handButtons[1], SCISSORS);
+        this.handlers.onSelectMove(SCISSORS);
+      } else if (k === '3' || k === 'd') {
+        this.triggerCardRipple(this.handButtons[2], PAPER);
+        this.handlers.onSelectMove(PAPER);
+      } else if (k === 'g') {
         this.graphicsOpen = !this.graphicsOpen;
+        if (this.graphicsOpen) this.inspectorOpen = false;
         this.syncDrawers();
       } else if (k === 'j') {
         this.inspectorOpen = !this.inspectorOpen;
+        if (this.inspectorOpen) this.graphicsOpen = false;
+        this.syncDrawers();
+      } else if (k === 'escape') {
+        this.graphicsOpen = false;
+        this.inspectorOpen = false;
         this.syncDrawers();
       }
     });
@@ -377,73 +490,150 @@ export class GameUI {
   }
 
   public setButtonsDisabled(disabled: boolean): void {
-    for (const b of this.handButtons) b.disabled = disabled;
+    for (const b of this.handButtons) {
+      b.disabled = disabled;
+      if (!disabled) {
+        b.classList.remove('selected');
+      }
+    }
+    if (!disabled) this.activeMoveSelection = null;
+  }
+
+  private toKanjiRound(n: number): string {
+    const map = ['', '壱', '弐', '参', '肆', '伍', '陸', '漆', '捌', '玖', '拾'];
+    return n >= 1 && n < map.length ? map[n] : `R${n}`;
   }
 
   public updateScoreboard(
     playerWins: number,
     npcWins: number,
-    draws: number,
-    roundNumber: number
+    _draws: number,
+    roundNumber: number,
+    isAikoStreak = false
   ): void {
+    const pScored = playerWins > this.playerWinsCache;
+    const nScored = npcWins > this.npcWinsCache;
+    this.playerWinsCache = playerWins;
+    this.npcWinsCache = npcWins;
+
     this.scorePlayerEl.textContent = String(playerWins);
     this.scoreNpcEl.textContent = String(npcWins);
-    this.scoreRoundEl.textContent = `ROUND ${roundNumber} · あいこ ${draws}`;
+    if (pScored) this.pulseEl(this.scorePlayerEl, 'pop');
+    if (nScored) this.pulseEl(this.scoreNpcEl, 'pop');
+
+    this.roundCrestEl.textContent = this.toKanjiRound(roundNumber);
+    this.pulseEl(this.roundCrestEl, 'spin-pop');
+    this.drawDotEl.classList.toggle('active', isAikoStreak);
+
+    // Render sculpted Ivory & Bronze Go-Stone victory pips (3 for bo5, 5 for bo9)
+    const pipTotal = this.matchFormat === 'bo5' ? 3 : this.matchFormat === 'bo9' ? 5 : 0;
+    if (pipTotal > 0) {
+      this.playerPipsEl.innerHTML = Array.from({ length: pipTotal }, (_, idx) => {
+        const filled = idx < playerWins;
+        const fresh = pScored && idx === playerWins - 1;
+        return `<span class="go-pip ivory ${filled ? 'filled' : ''} ${fresh ? 'fresh' : ''}"></span>`;
+      }).join('');
+      this.npcPipsEl.innerHTML = Array.from({ length: pipTotal }, (_, idx) => {
+        const filled = idx < npcWins;
+        const fresh = nScored && idx === npcWins - 1;
+        return `<span class="go-pip bronze ${filled ? 'filled' : ''} ${fresh ? 'fresh' : ''}"></span>`;
+      }).join('');
+    } else {
+      this.playerPipsEl.innerHTML = `<span class="endless-tag">∞</span>`;
+      this.npcPipsEl.innerHTML = `<span class="endless-tag">∞</span>`;
+    }
   }
 
-  public updatePreCommitSeal(seal: CommitSeal, personaCode: string): void {
+  private pulseEl(el: Element, cls: string): void {
+    el.classList.remove(cls);
+    void el.getBoundingClientRect();
+    el.classList.add(cls);
+  }
+
+  public updatePreCommitSeal(seal: CommitSeal, _personaCode: string): void {
     this.currentSeal = seal;
-    this.sealBarEl.innerHTML = `
-      <span class="seal-dot"></span>
-      <span class="persona-badge">${personaCode}</span>
-      <span>R${seal.round} 事前封印済 SHA-256:</span>
-      <span class="hash">${seal.shortHash}</span>
-    `;
+    const label = this.sealPillEl.querySelector('#seal-chip-label');
+    if (label) {
+      label.textContent = `SHA-256 ✓`;
+    }
+    this.sealPillEl.title = `R${seal.round} 事前封印済 SHA-256: ${seal.shortHash}（クリックで検証）`;
+    this.pulseEl(this.sealPillEl, 'sealed-pulse');
     this.renderInspectorDrawer();
   }
 
-  public showCallout(
-    title: string,
-    tone: 'neutral' | 'win' | 'loss' | 'draw',
-    matchupText = '',
-    subText = ''
-  ): void {
-    this.calloutTitleEl.textContent = title;
-    this.calloutTitleEl.className = `callout-title ${tone === 'neutral' ? '' : tone}`;
-    this.calloutMatchupEl.textContent = matchupText;
-    this.calloutSubEl.textContent = subText;
-    this.calloutEl.classList.add('visible');
+  /**
+   * Show borderless cinematic Japanese calligraphy (`じゃーん / けーん / ぽん！`)
+   */
+  public showBeatCallout(label: string, beatIndex: 1 | 2 | 3): void {
+    window.clearTimeout(this.theatreHideTimer);
+    this.theatreStampEl.classList.remove('slammed');
+    this.theatreStampEl.textContent = '';
+
+    this.theatreTextEl.className = `theatre-text beat beat-${beatIndex}`;
+    this.theatreTextEl.textContent = label;
+    this.theatreEl.className = 'theatre-stage visible mode-beat';
+
+    this.pulseEl(this.theatreTextEl, 'slam-in');
+    this.pulseEl(this.theatreBrushEl, 'sweep-in');
+  }
+
+  /**
+   * Show borderless iconic verdict calligraphy + slamming carved vermilion Hanko stamp!
+   */
+  public showVerdictStamp(outcome: 'WIN' | 'LOSS' | 'DRAW'): void {
+    window.clearTimeout(this.theatreHideTimer);
+
+    const text = outcome === 'WIN' ? '勝 利' : outcome === 'LOSS' ? '敗 北' : 'あいこ';
+    const stamp = outcome === 'WIN' ? '勝' : outcome === 'LOSS' ? '敗' : '分';
+    const tone = outcome === 'WIN' ? 'win' : outcome === 'LOSS' ? 'loss' : 'draw';
+
+    this.theatreTextEl.className = `theatre-text verdict ${tone}`;
+    this.theatreTextEl.textContent = text;
+    this.theatreStampEl.className = `theatre-stamp ${tone}`;
+    this.theatreStampEl.textContent = stamp;
+    this.theatreEl.className = `theatre-stage visible mode-verdict ${tone}`;
+
+    this.pulseEl(this.theatreTextEl, 'verdict-in');
+    this.pulseEl(this.theatreBrushEl, 'sweep-in');
+    this.pulseEl(this.theatreStampEl, 'slammed');
+
+    // Auto-fade gently so the 3D sculptural arena breathes cleanly before next turn!
+    this.theatreHideTimer = window.setTimeout(() => {
+      this.theatreEl.classList.add('fading');
+    }, 2200);
   }
 
   public hideCallout(): void {
-    this.calloutEl.classList.remove('visible');
+    window.clearTimeout(this.theatreHideTimer);
+    this.theatreEl.className = 'theatre-stage';
   }
 
   public updateRenderMetrics(m: RenderMetrics): void {
-    const fpsModeLabel =
-      this.currentSettings.fpsLimit === 0 ? '無制限' : `${this.currentSettings.fpsLimit}上限`;
+    this.lastMetrics = m;
     const sfShort = SHADOW_FLAME_SPECS[m.shadowFlameMode].shortLabel;
 
-    this.perfStripEl.innerHTML = `
-      <span class="perf-chip"><strong>${m.fps}</strong> FPS <span style="opacity:.6">(${m.frameTimeMs}ms / 1%Low ${m.onePercentLowFps})</span></span>
-      <span class="perf-sep">|</span>
-      <span class="perf-chip"><strong>${this.currentSettings.resolution.toUpperCase()}</strong> ${m.renderWidth}×${m.renderHeight}</span>
-      <span class="perf-sep">|</span>
-      <span class="perf-chip accent"><strong>KHDR ${m.khdrActive ? 'ON' : 'OFF'}</strong></span>
-      <span class="perf-sep">|</span>
-      <span class="perf-chip accent"><strong>${sfShort}</strong> (${m.shadowMapSize}px)</span>
-      <span class="perf-sep">|</span>
-      <span class="perf-chip">${fpsModeLabel} · ${(m.triangles / 1000).toFixed(1)}k tri</span>
-    `;
+    if (this.showHudTelemetry) {
+      this.microTelemetryEl.style.display = 'inline-flex';
+      this.microTelemetryEl.innerHTML = `
+        <span><strong>${m.fps}</strong> FPS</span>
+        <span class="sep">·</span>
+        <span>${this.currentSettings.resolution.toUpperCase()}</span>
+        <span class="sep">·</span>
+        <span class="accent">${m.khdrActive ? 'KHDR' : 'SDR'}</span>
+        <span class="sep">·</span>
+        <span class="accent">${sfShort}</span>
+      `;
+    } else {
+      this.microTelemetryEl.style.display = 'none';
+    }
 
-    // Also refresh live stat cells inside Graphics drawer if open
     const liveEl = this.graphicsBodyEl.querySelector('#live-gpu-stats');
     if (liveEl) {
       liveEl.innerHTML = `
-        <div class="metric-box"><div class="k">実描画解像度</div><div class="v">${m.renderWidth}×${m.renderHeight}</div></div>
-        <div class="metric-box"><div class="k">実測FPS / Frame</div><div class="v good">${m.fps} FPS (${m.frameTimeMs}ms)</div></div>
-        <div class="metric-box"><div class="k">ShadowMap解像度</div><div class="v">${m.shadowMapSize}×${m.shadowMapSize}</div></div>
-        <div class="metric-box"><div class="k">Draw / Triangles</div><div class="v">${m.drawCalls} / ${(m.triangles / 1000).toFixed(1)}k</div></div>
+        <div class="metric-box"><div class="k">実解像度</div><div class="v">${m.renderWidth}×${m.renderHeight}</div></div>
+        <div class="metric-box"><div class="k">実測FPS</div><div class="v good">${m.fps} FPS (${m.frameTimeMs}ms)</div></div>
+        <div class="metric-box"><div class="k">ShadowMap</div><div class="v">${m.shadowMapSize}px</div></div>
+        <div class="metric-box"><div class="k">Draw / Tri</div><div class="v">${m.drawCalls} / ${(m.triangles / 1000).toFixed(1)}k</div></div>
       `;
     }
   }
@@ -468,69 +658,77 @@ export class GameUI {
     onRematchKeepMemory: () => void,
     onRematchFresh: () => void
   ): void {
-    this.modalTitleEl.textContent = winner === 'player' ? '見事、勝利' : 'JNV1.0 の勝利';
-    this.modalDescEl.textContent =
-      winner === 'player'
-        ? 'JNV1.0の36専門家アンサンブルと非定常読心モデルを打ち破りました。再戦するとJNV1.0はあなたの癖をさらに深く学習します。'
-        : 'JNV1.0があなたの行動パターンと心理シフトを捕捉しました。戦術を変化させるか、心理の裏を突いて再挑戦しましょう。';
-
+    this.modalCrestEl.textContent = winner === 'player' ? '勝' : '敗';
+    this.modalCrestEl.className = `modal-crest ${winner === 'player' ? 'win' : 'loss'}`;
+    this.modalTitleEl.textContent = winner === 'player' ? '見 事 、 勝 利' : 'JNV1.0 の 勝 利';
     this.modalStatsEl.innerHTML = `
-      <div class="metric-box"><div class="k">あなた</div><div class="v good">${playerWins}勝</div></div>
-      <div class="metric-box"><div class="k">JNV1.0</div><div class="v warn">${npcWins}勝</div></div>
-      <div class="metric-box"><div class="k">あいこ</div><div class="v">${draws}回</div></div>
+      <div class="stat-pill"><div class="n">${playerWins}</div><div class="l">あなた</div></div>
+      <div class="stat-pill"><div class="n">${draws}</div><div class="l">あいこ</div></div>
+      <div class="stat-pill"><div class="n">${npcWins}</div><div class="l">JNV1.0</div></div>
     `;
+    this.modalBackdropEl.classList.add('open');
 
-    const btnRematch = this.root.querySelector<HTMLButtonElement>('#btn-modal-rematch')!;
-    const btnFresh = this.root.querySelector<HTMLButtonElement>('#btn-modal-fresh')!;
-    btnRematch.onclick = () => {
+    const keepBtn = this.root.querySelector<HTMLButtonElement>('#modal-rematch-keep')!;
+    const freshBtn = this.root.querySelector<HTMLButtonElement>('#modal-rematch-fresh')!;
+    keepBtn.onclick = () => {
       this.closeMatchModal();
       onRematchKeepMemory();
     };
-    btnFresh.onclick = () => {
+    freshBtn.onclick = () => {
       this.closeMatchModal();
       onRematchFresh();
     };
-
-    this.modalBackdropEl.classList.add('open');
   }
 
   public closeMatchModal(): void {
     this.modalBackdropEl.classList.remove('open');
   }
 
+  // ===========================================================================
+  // LEFT DRAWER: ULTRA-CLEAN VISUAL GRAPHICS & STAGE STUDIO
+  // ===========================================================================
   private renderGraphicsDrawer(): void {
     const s = this.currentSettings;
-    const sfSpec = SHADOW_FLAME_SPECS[s.shadowFlame];
+    const m = this.lastMetrics;
+    const fpsOptions: Array<{ v: FpsLimitMode; label: string }> = [
+      { v: 60, label: '60 FPS' },
+      { v: 120, label: '120 FPS' },
+      { v: 0, label: '無制限' },
+    ];
+    const sfOptions: Array<{ v: ShadowFlameMode; label: string; sub: string }> = [
+      { v: 'standard', label: '標準', sub: 'PCF' },
+      { v: 'flash', label: '1.0 Flash', sub: '軽量Vogel' },
+      { v: 'pro', label: '1.0 Pro', sub: 'PCSS+SSCS' },
+    ];
+    const fmtOptions: Array<{ v: MatchFormat; label: string }> = [
+      { v: 'bo5', label: '3本先取' },
+      { v: 'bo9', label: '5本先取' },
+      { v: 'endless', label: '無制限' },
+    ];
 
     this.graphicsBodyEl.innerHTML = `
       <section class="panel-section">
-        <div class="section-title"><span>内部レンダリング解像度</span><span>WebGL2 HalfFloat</span></div>
-        <div class="seg-group cols-4">
+        <div class="section-head"><span class="section-title">解像度</span><span class="section-meta">HalfFloat</span></div>
+        <div class="pill-grid cols-4">
           ${RESOLUTION_LIST.map(
             (r) => `
-            <button class="seg-btn ${s.resolution === r.id ? 'active' : ''}" data-res="${r.id}" type="button">
+            <button class="pill-btn ${s.resolution === r.id ? 'active' : ''}" data-res="${r.id}">
               <span>${r.label}</span>
-              <small>${r.nominalHeight}p</small>
+              <span class="sub">${r.nominalHeight}p</span>
             </button>
           `
           ).join('')}
         </div>
-        <p class="section-note">HD (1280×720) 〜 2K (2560×1440) の実フレームバッファ解像度をリアルタイム切替します。</p>
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>フレームレート制御 (FPS)</span><span>精度ペーサー</span></div>
-        <div class="seg-group cols-3">
-          ${([
-            { v: 60 as FpsLimitMode, label: '60 FPS', sub: '16.7ms' },
-            { v: 120 as FpsLimitMode, label: '120 FPS', sub: '8.3ms' },
-            { v: 0 as FpsLimitMode, label: '無制限', sub: 'Uncapped' },
-          ])
+        <div class="section-head"><span class="section-title">フレームレート</span></div>
+        <div class="pill-grid cols-3">
+          ${fpsOptions
             .map(
               (f) => `
-            <button class="seg-btn ${s.fpsLimit === f.v ? 'active' : ''}" data-fps="${f.v}" type="button">
+            <button class="pill-btn ${s.fpsLimit === f.v ? 'active' : ''}" data-fps="${f.v}">
               <span>${f.label}</span>
-              <small>${f.sub}</small>
             </button>
           `
             )
@@ -539,52 +737,43 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>KHDR 独自拡張HDRパイプライン</span><span>16-bit Linear</span></div>
-        <div class="seg-group cols-2">
-          <button class="seg-btn ${s.khdrEnabled ? 'active' : ''}" data-khdr="on" type="button">
-            <span>KHDR ON</span>
-            <small>二重スケール局所適応</small>
-          </button>
-          <button class="seg-btn ${!s.khdrEnabled ? 'active' : ''}" data-khdr="off" type="button">
-            <span>KHDR OFF</span>
-            <small>標準SDR比較</small>
-          </button>
+        <div class="section-head"><span class="section-title">KHDR</span><span class="section-meta">独自HDR</span></div>
+        <div class="pill-grid cols-2">
+          <button class="pill-btn ${s.khdrEnabled ? 'active' : ''}" data-khdr="on"><span>KHDR ON</span></button>
+          <button class="pill-btn ${!s.khdrEnabled ? 'active' : ''}" data-khdr="off"><span>KHDR OFF</span></button>
         </div>
-        <button class="seg-btn ${s.khdrSplitCompare ? 'active' : ''}" id="btn-khdr-split" type="button" style="width:100%">
-          <span>${s.khdrSplitCompare ? '✓ A/B 分割比較表示中（画面中央のハンドルをドラッグ）' : 'KHDR vs 標準SDR リアルタイム分割比較を開く'}</span>
+        <button class="pill-btn full-pill ${s.khdrSplitCompare ? 'active' : ''}" id="btn-khdr-split">
+          <span>${s.khdrSplitCompare ? '✓ A/B 分割比較中' : 'A/B 分割比較'}</span>
         </button>
-        <p class="section-note">
-          独自技術 <strong>KHDR (Kinetic Dual-Lobe Spectral HDR)</strong>：対数輝度レティネックス局所適応で暗部ディテールと明部ハイライト色度を両立し、物理レンズ光学ベールとブルーノイズディザで自然光階調を極限再現。
-        </p>
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>Shadow Flame 1.0 独自影エンジン</span><span>${sfSpec.shortLabel}</span></div>
-        <div class="seg-group cols-3">
-          <button class="seg-btn ${s.shadowFlame === 'standard' ? 'active' : ''}" data-sf="standard" type="button">
-            <span>標準PCF</span>
-            <small>比較用</small>
-          </button>
-          <button class="seg-btn ${s.shadowFlame === 'flash' ? 'active' : ''}" data-sf="flash" type="button">
-            <span>1.0 Flash</span>
-            <small>軽量・高写実</small>
-          </button>
-          <button class="seg-btn ${s.shadowFlame === 'pro' ? 'active' : ''}" data-sf="pro" type="button">
-            <span>1.0 Pro</span>
-            <small>PCSS + SSCS</small>
-          </button>
+        <div class="section-head"><span class="section-title">Shadow Flame 1.0</span><span class="section-meta">${SHADOW_FLAME_SPECS[s.shadowFlame].shortLabel}</span></div>
+        <div class="pill-grid cols-3">
+          ${sfOptions
+            .map(
+              (sf) => `
+            <button class="pill-btn ${s.shadowFlame === sf.v ? 'active' : ''}" data-sf="${sf.v}">
+              <span>${sf.label}</span>
+              <span class="sub">${sf.sub}</span>
+            </button>
+          `
+            )
+            .join('')}
         </div>
-        <p class="section-note">${sfSpec.descriptionJp}</p>
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>建築ステージ（提供素材PBR構築）</span><span>5舞台</span></div>
-        <div class="stage-list">
+        <div class="section-head"><span class="section-title">建築ステージ</span><span class="section-meta">5舞台</span></div>
+        <div class="stage-visual-grid">
           ${STAGE_LIST.map(
             (st) => `
-            <button class="stage-card-btn ${s.stage === st.id ? 'active' : ''}" data-stage="${st.id}" type="button">
-              <strong>${st.nameJp}</strong>
-              <span>${st.subtitleJp}</span>
+            <button class="stage-thumb-card ${s.stage === st.id ? 'active' : ''}" data-stage="${st.id}">
+              <div class="stage-thumb-img" style="background-image:url('${st.previewTexture}')"></div>
+              <div class="stage-thumb-overlay">
+                <div class="st-name">${st.nameJp}</div>
+                <div class="st-sub">${st.subtitleJp}</div>
+              </div>
             </button>
           `
           ).join('')}
@@ -592,23 +781,25 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>彫刻ハンド仕上げ素材</span><span>物理PBR</span></div>
-        <div class="section-note">あなたの右手素材</div>
-        <div class="seg-group cols-4">
+        <div class="section-head"><span class="section-title">手の工芸素材</span></div>
+        <div class="swatch-row-label">あなた</div>
+        <div class="swatch-grid">
           ${HAND_MATERIAL_OPTIONS.map(
-            (hm) => `
-            <button class="seg-btn ${s.playerHandMaterial === hm.id ? 'active' : ''}" data-pmat="${hm.id}" type="button">
-              <span>${hm.label}</span>
+            (opt) => `
+            <button class="swatch-btn ${s.playerHandMaterial === opt.id ? 'active' : ''}" data-pmat="${opt.id}">
+              <span class="swatch-dot" style="background:${opt.swatch}"></span>
+              <span>${opt.label}</span>
             </button>
           `
           ).join('')}
         </div>
-        <div class="section-note" style="margin-top:4px">JNV1.0 対戦相手ハンド素材</div>
-        <div class="seg-group cols-4">
+        <div class="swatch-row-label">JNV1.0</div>
+        <div class="swatch-grid">
           ${HAND_MATERIAL_OPTIONS.map(
-            (hm) => `
-            <button class="seg-btn ${s.npcHandMaterial === hm.id ? 'active' : ''}" data-nmat="${hm.id}" type="button">
-              <span>${hm.label}</span>
+            (opt) => `
+            <button class="swatch-btn ${s.npcHandMaterial === opt.id ? 'active' : ''}" data-nmat="${opt.id}">
+              <span class="swatch-dot" style="background:${opt.swatch}"></span>
+              <span>${opt.label}</span>
             </button>
           `
           ).join('')}
@@ -616,24 +807,40 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>リアルタイム描画テレメトリ</span></div>
-        <div class="telemetry-grid" id="live-gpu-stats">
-          <div class="metric-box"><div class="k">実描画解像度</div><div class="v">計測中…</div></div>
-          <div class="metric-box"><div class="k">実測FPS / Frame</div><div class="v">--</div></div>
+        <div class="section-head"><span class="section-title">対局形式 · 表示</span></div>
+        <div class="pill-grid cols-3">
+          ${fmtOptions
+            .map(
+              (f) => `
+            <button class="pill-btn ${this.matchFormat === f.v ? 'active' : ''}" data-fmt="${f.v}">
+              <span>${f.label}</span>
+            </button>
+          `
+            )
+            .join('')}
+        </div>
+        <button class="pill-btn full-pill ${this.showHudTelemetry ? 'active' : ''}" id="btn-toggle-telemetry">
+          <span>${this.showHudTelemetry ? '✓ 画面FPSバッジ表示中' : '画面FPSバッジを表示'}</span>
+        </button>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head"><span class="section-title">リアルタイム描画計測</span></div>
+        <div class="metric-grid" id="live-gpu-stats">
+          <div class="metric-box"><div class="k">実解像度</div><div class="v">${m ? `${m.renderWidth}×${m.renderHeight}` : '—'}</div></div>
+          <div class="metric-box"><div class="k">実測FPS</div><div class="v good">${m ? `${m.fps} FPS (${m.frameTimeMs}ms)` : '—'}</div></div>
+          <div class="metric-box"><div class="k">ShadowMap</div><div class="v">${m ? `${m.shadowMapSize}px` : '—'}</div></div>
+          <div class="metric-box"><div class="k">Draw / Tri</div><div class="v">${m ? `${m.drawCalls} / ${(m.triangles / 1000).toFixed(1)}k` : '—'}</div></div>
         </div>
       </section>
     `;
 
-    // Bind Graphics Drawer buttons
+    // Bind listeners
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-res]').forEach((b) => {
-      b.addEventListener('click', () =>
-        this.handlers.onChangeResolution(b.dataset.res as ResolutionPresetId)
-      );
+      b.addEventListener('click', () => this.handlers.onChangeResolution(b.dataset.res as ResolutionPresetId));
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-fps]').forEach((b) => {
-      b.addEventListener('click', () =>
-        this.handlers.onChangeFpsLimit(Number(b.dataset.fps) as FpsLimitMode)
-      );
+      b.addEventListener('click', () => this.handlers.onChangeFpsLimit(Number(b.dataset.fps) as FpsLimitMode));
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-khdr]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onToggleKHDR(b.dataset.khdr === 'on'));
@@ -642,136 +849,98 @@ export class GameUI {
       this.handlers.onToggleKHDRSplit(!this.currentSettings.khdrSplitCompare);
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-sf]').forEach((b) => {
-      b.addEventListener('click', () =>
-        this.handlers.onChangeShadowFlame(b.dataset.sf as ShadowFlameMode)
-      );
+      b.addEventListener('click', () => this.handlers.onChangeShadowFlame(b.dataset.sf as ShadowFlameMode));
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-stage]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onChangeStage(b.dataset.stage as StageId));
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-pmat]').forEach((b) => {
       b.addEventListener('click', () =>
-        this.handlers.onChangeHandMaterials(
-          b.dataset.pmat as HandMaterialPreset,
-          this.currentSettings.npcHandMaterial
-        )
+        this.handlers.onChangeHandMaterials(b.dataset.pmat as HandMaterialPreset, this.currentSettings.npcHandMaterial)
       );
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-nmat]').forEach((b) => {
       b.addEventListener('click', () =>
-        this.handlers.onChangeHandMaterials(
-          this.currentSettings.playerHandMaterial,
-          b.dataset.nmat as HandMaterialPreset
-        )
+        this.handlers.onChangeHandMaterials(this.currentSettings.playerHandMaterial, b.dataset.nmat as HandMaterialPreset)
       );
+    });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-fmt]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.matchFormat = b.dataset.fmt as MatchFormat;
+        this.renderGraphicsDrawer();
+        this.handlers.onChangeMatchFormat(this.matchFormat);
+      });
+    });
+    this.graphicsBodyEl.querySelector('#btn-toggle-telemetry')!.addEventListener('click', () => {
+      this.showHudTelemetry = !this.showHudTelemetry;
+      if (this.lastMetrics) this.updateRenderMetrics(this.lastMetrics);
+      this.renderGraphicsDrawer();
     });
   }
 
+  // ===========================================================================
+  // RIGHT DRAWER: JNV1.0 COGNITIVE CORE INSPECTOR
+  // ===========================================================================
   private renderInspectorDrawer(): void {
     const t = this.lastTelemetry;
     const seal = this.currentSeal;
 
-    const benchHtml = this.benchmarkCache
+    const personaHtml = JNV_PERSONA_LIST.map(
+      (p) => `
+      <button class="persona-card ${this.currentPersona === p.id ? 'active' : ''}" data-persona="${p.id}">
+        <div class="p-code">${p.code}</div>
+        <div class="p-name">${p.nameJp}</div>
+      </button>
+    `
+    ).join('');
+
+    const predEntropy = t
+      ? -t.predictedPlayerDist.reduce((acc, p) => (p > 1e-6 ? acc + p * Math.log2(p) : acc), 0)
+      : 0;
+
+    const telemetryHtml = t
       ? `
-        <table class="bench-table">
-          <thead>
-            <tr><th>対戦相手ボット</th><th class="num">勝率</th><th class="num">純利/100</th><th class="num">証明</th></tr>
-          </thead>
-          <tbody>
-            ${this.benchmarkCache
-              .map(
-                (r) => `
-              <tr>
-                <td>${r.botNameJp.split('（')[0]}</td>
-                <td class="num ${r.decisiveWinRate >= 0.62 ? 'winrate-high' : ''}">${(r.decisiveWinRate * 100).toFixed(1)}%</td>
-                <td class="num">${r.netEdgePer100 >= 0 ? '+' : ''}${r.netEdgePer100.toFixed(1)}</td>
-                <td class="num">${r.allSealsVerified ? '✓' : '✗'}</td>
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      `
-      : '';
-
-    this.inspectorBodyEl.innerHTML = `
       <section class="panel-section">
-        <div class="section-title"><span>JNV1.0 アーキテクチャ構成切替</span><span>7層推論</span></div>
-        <div class="stage-list">
-          ${JNV_PERSONA_LIST.map(
-            (p) => `
-            <button class="stage-card-btn ${this.currentPersona === p.id ? 'active' : ''}" data-persona="${p.id}" type="button">
-              <strong>${p.code} — ${p.nameJp}</strong>
-              <span>${p.subtitleJp} · ${p.descriptionJp}</span>
-            </button>
-          `
-          ).join('')}
+        <div class="section-head">
+          <span class="section-title">直前局 R${t.round} 読心解析</span>
+          <span class="section-meta">${t.activeExpertCount}専門家</span>
         </div>
-      </section>
-
-      <section class="panel-section">
-        <div class="section-title"><span>不正ゼロ証明（SHA-256事前コミット）</span><span>公平性検証</span></div>
-        <div class="seal-card">
-          <div><strong>次局 (R${seal?.round ?? 1}) 封印ハッシュ：</strong></div>
-          <div>${seal?.hashHex ?? '初期化中…'}</div>
-          ${
-            t
-              ? `
-            <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.1)">
-              <span class="badge-ok">${t.seal.verified ? '✓ 前局ハッシュ検証一致 (VERIFIED)' : '✗ 検証失敗'}</span><br/>
-              R${t.round} 開示: JNV=${MOVE_META[t.chosenNpcMove].jp} / Salt=${t.seal.salt}
-            </div>
-          `
-              : `<div style="margin-top:4px;opacity:0.75">※ JNV1.0はあなたが手を選ぶ前に次局の手を確定し、SHA-256で封印しています。</div>`
-          }
-        </div>
-      </section>
-
-      ${
-        t
-          ? `
-      <section class="panel-section">
-        <div class="section-title"><span>前局 R${t.round} 読心ポストモーテム</span><span>${t.activeExpertCount}専門家</span></div>
-        <p class="section-note" style="color:var(--washi-primary)">${t.insightJp}</p>
-        <div class="prob-bars">
-          ${([ROCK, SCISSORS, PAPER] as const)
+        <div class="jnv-verdict-chip">${t.insightJp}</div>
+        <div class="prob-bar-list">
+          ${([ROCK, SCISSORS, PAPER] as Move[])
             .map((m) => {
               const pct = Math.round(t.predictedPlayerDist[m] * 100);
               const isActual = t.actualPlayerMove === m;
               return `
               <div class="prob-row">
-                <span>予測:${MOVE_META[m].jp}${isActual ? '★' : ''}</span>
-                <div class="prob-track"><div class="prob-fill ${isActual ? 'secondary' : ''}" style="width:${pct}%"></div></div>
+                <span class="prob-lbl">${MOVE_META[m].jp}${isActual ? '★' : ''}</span>
+                <div class="prob-track"><div class="prob-fill ${isActual ? 'actual' : ''}" style="width:${pct}%"></div></div>
                 <span class="prob-val">${pct}%</span>
-              </div>
-            `;
+              </div>`;
             })
             .join('')}
         </div>
-        <div class="telemetry-grid">
-          <div class="metric-box"><div class="k">ナッシュ均衡混合 β</div><div class="v">${Math.round(t.nashBlendBeta * 100)}%</div></div>
-          <div class="metric-box"><div class="k">ボラティリティ指数</div><div class="v ${t.driftDetected ? 'warn' : ''}">${(t.volatilityIndex * 100).toFixed(0)}%${t.driftDetected ? ' (変化点)' : ''}</div></div>
-          <div class="metric-box"><div class="k">CUSUM変化信号</div><div class="v">${t.cusumSignal.toFixed(2)}</div></div>
-          <div class="metric-box"><div class="k">自己被搾取警戒</div><div class="v">${Math.round(t.selfExploitability * 100)}%</div></div>
+        <div class="metric-grid" style="margin-top:8px">
+          <div class="metric-box"><div class="k">ナッシュ混合 β</div><div class="v">${Math.round(t.nashBlendBeta * 100)}%</div></div>
+          <div class="metric-box"><div class="k">ボラティリティ</div><div class="v ${t.driftDetected ? 'warn' : ''}">${Math.round(t.volatilityIndex * 100)}%</div></div>
+          <div class="metric-box"><div class="k">予測エントロピー</div><div class="v">${predEntropy.toFixed(2)}</div></div>
+          <div class="metric-box"><div class="k">被搾取リスク</div><div class="v ${t.selfExploitability > 0.45 ? 'warn' : 'good'}">${Math.round(t.selfExploitability * 100)}%</div></div>
         </div>
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>優勢メタ専門家 Top 5 (Fixed-Share Hedge)</span></div>
+        <div class="section-head"><span class="section-title">上位専門家</span><span class="section-meta">Fixed-Share</span></div>
         <div class="expert-list">
           ${t.topExperts
             .slice(0, 5)
             .map(
               (ex) => `
             <div class="expert-row">
-              <div class="expert-row-top">
-                <span class="expert-name">${ex.labelJp}</span>
-                <span class="expert-w">重み ${(ex.weight * 100).toFixed(1)}%</span>
+              <div class="ex-top">
+                <span class="ex-name">${ex.labelJp}</span>
+                <span class="ex-meta">M${ex.metaLevel} · ${(ex.weight * 100).toFixed(1)}%</span>
               </div>
-              <div class="expert-meta">
-                推奨:${MOVE_META[ex.recommendedNpcMove].jp} · 割引点:${ex.discountedScore.toFixed(2)} · 勝率:${Math.round(ex.hitRate * 100)}% · ${ex.detail}
-              </div>
+              <div class="ex-bar"><div class="ex-bar-fill" style="width:${Math.min(100, ex.weight * 320)}%"></div></div>
             </div>
           `
             )
@@ -780,43 +949,71 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-title"><span>あなたの行動プロファイル (${t.profile.sampleCount}手)</span></div>
-        <p class="section-note" style="color:var(--washi-primary)">${t.profile.dominantHabitJp}</p>
-        <div class="telemetry-grid">
-          <div class="metric-box"><div class="k">ランダム性 (Entropy)</div><div class="v">${Math.round(t.profile.playerEntropy * 100)}%</div></div>
-          <div class="metric-box"><div class="k">平均思考テンポ</div><div class="v">${(t.profile.avgLatencyMs / 1000).toFixed(2)}s</div></div>
-          <div class="metric-box"><div class="k">勝利後・継続率</div><div class="v">${Math.round(t.profile.winStayRate * 100)}%</div></div>
-          <div class="metric-box"><div class="k">敗北後・変更率</div><div class="v">${Math.round(t.profile.loseShiftRate * 100)}%</div></div>
+        <div class="section-head"><span class="section-title">あなたの行動指標</span><span class="section-meta">${t.profile.dominantHabitJp}</span></div>
+        <div class="metric-grid">
+          <div class="metric-box"><div class="k">勝後継続</div><div class="v">${Math.round(t.profile.winStayRate * 100)}%</div></div>
+          <div class="metric-box"><div class="k">敗後転換</div><div class="v">${Math.round(t.profile.loseShiftRate * 100)}%</div></div>
+          <div class="metric-box"><div class="k">あいこ転換</div><div class="v">${Math.round(t.profile.drawChangeRate * 100)}%</div></div>
+          <div class="metric-box"><div class="k">思考時間</div><div class="v">${Math.round(t.profile.avgLatencyMs)}ms</div></div>
         </div>
       </section>
-      `
-          : `
+    `
+      : '';
+
+    const benchHtml = this.benchmarkCache
+      ? `
+      <table class="bench-table">
+        <thead><tr><th>対戦AI</th><th>決定勝率</th><th>純点/100</th><th>SHA</th></tr></thead>
+        <tbody>
+          ${this.benchmarkCache
+            .map(
+              (r) => `
+            <tr>
+              <td>${r.botNameJp.split('（')[0]}</td>
+              <td class="num ${r.decisiveWinRate >= 0.65 ? 'strong' : ''}">${(r.decisiveWinRate * 100).toFixed(1)}%</td>
+              <td class="num">${r.netEdgePer100 >= 0 ? '+' : ''}${r.netEdgePer100.toFixed(1)}</td>
+              <td class="num strong">${r.allSealsVerified ? '✓' : '✗'}</td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    `
+      : '';
+
+    this.inspectorBodyEl.innerHTML = `
       <section class="panel-section">
-        <div class="section-title"><span>JNV1.0 待機中</span></div>
-        <p class="section-note">
-          1手勝負するごとに、9種の基本予測器（多階マルコフ・結合マルコフ・回転不変シフト・Wang-Xu-Zhou心理モデル・最長一致スナイパー・連打反動・思考テンポ遅延・対NPCミラー）と3階層メタ読み（計36専門家）のリアルタイム解析がここに可視化されます。
-        </p>
+        <div class="section-head"><span class="section-title">推論コア人格</span><span class="section-meta">7層推論</span></div>
+        <div class="persona-grid">${personaHtml}</div>
       </section>
-      `
-      }
 
       <section class="panel-section">
-        <div class="section-title"><span>JNV1.0 数学的検証ベンチマーク</span><span>1,600局実測</span></div>
-        <p class="section-note">
-          8種類の合成対戦AI（偏重・循環・人間心理・模倣・後追い・複合周期・途中戦術切替・完全ランダム）に対して、不正ゼロのSHA-256事前封印モードで各200局をブラウザ内で即時実測します。
-        </p>
-        <button class="action-btn" id="btn-run-bench" type="button">
-          ${this.benchmarkCache ? 'ベンチマークを再実行 (1,600局)' : 'JNV1.0 性能ベンチマークを実行 (1,600局)'}
+        <div class="section-head"><span class="section-title">SHA-256 事前封印証明</span><span class="section-meta">不正ゼロ</span></div>
+        <div class="seal-box">
+          <div class="seal-row">R${seal?.round ?? 1} 封印ダイジェスト</div>
+          <div class="seal-hash">${seal?.hashHex ?? '生成中…'}</div>
+          ${
+            t?.seal
+              ? `<div class="seal-verified">✓ R${t.round} 開示一致 (${MOVE_META[t.chosenNpcMove].jp} / ${t.seal.salt.slice(0, 8)})</div>`
+              : ''
+          }
+        </div>
+      </section>
+
+      ${telemetryHtml}
+
+      <section class="panel-section">
+        <div class="section-head"><span class="section-title">数学ベンチマーク</span><span class="section-meta">1,600局</span></div>
+        <button class="pill-btn full-pill" id="btn-run-bench">
+          <span>${this.benchmarkCache ? '再実行 (8種×200局)' : 'ベンチマーク実行 (8種×200局)'}</span>
         </button>
         ${benchHtml}
       </section>
     `;
 
     this.inspectorBodyEl.querySelectorAll<HTMLButtonElement>('[data-persona]').forEach((b) => {
-      b.addEventListener('click', () => {
-        this.benchmarkCache = null;
-        this.handlers.onChangePersona(b.dataset.persona as JNVPersonaId);
-      });
+      b.addEventListener('click', () => this.handlers.onChangePersona(b.dataset.persona as JNVPersonaId));
     });
 
     this.inspectorBodyEl.querySelector('#btn-run-bench')!.addEventListener('click', () => {
