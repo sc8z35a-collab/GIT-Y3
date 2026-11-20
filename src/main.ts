@@ -195,6 +195,11 @@ class JankenKiwamiApp {
         this.sound.playWoodTap(enabled ? 820 : 520);
         this.ui.syncSettings(this.scene.getSettings());
       },
+      onToggleJSoundSympathetic: (enabled) => {
+        this.scene.setJSoundSympathetic(enabled);
+        this.sound.playWoodTap(enabled ? 920 : 560);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
       onAuditionSound: (instrument) => {
         this.sound.playAuditionSound(instrument);
       },

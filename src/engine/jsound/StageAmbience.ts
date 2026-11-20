@@ -34,7 +34,11 @@ export type SoundscapeActorKind =
   | 'distant_nokan'
   | 'distant_shakujo'
   | 'onsen_steam_hiss'
-  | 'distant_binzasara';
+  | 'distant_binzasara'
+  | 'nanbu_furin_breeze'
+  | 'orugoru_tinkle'
+  | 'kagurabue_echo'
+  | 'wagon_harmonic_swell';
 
 export interface StageSoundscapeSpec {
   minIntervalSec: number;
@@ -56,7 +60,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     actors: [
       {
         kind: 'shishi_odoshi',
-        weight: 0.24,
+        weight: 0.22,
         gain: 0.14,
         pos: { x: -3.4, y: 0.35, z: -2.5 },
         posJitter: { x: 0.4, y: 0.1, z: 0.3 },
@@ -64,7 +68,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_suikinkutsu',
-        weight: 0.2,
+        weight: 0.18,
         gain: 0.12,
         pos: { x: -2.4, y: 0.15, z: -3.1 },
         posJitter: { x: 0.3, y: 0.08, z: 0.3 },
@@ -72,15 +76,23 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'furin',
-        weight: 0.2,
+        weight: 0.16,
         gain: 0.085,
         pos: { x: 2.8, y: 2.35, z: -1.4 },
         posJitter: { x: 0.35, y: 0.22, z: 0.25 },
         labelJp: '軒先・江戸風鈴',
       },
       {
-        kind: 'bamboo_wind_rustle',
+        kind: 'nanbu_furin_breeze',
         weight: 0.14,
+        gain: 0.08,
+        pos: { x: -2.1, y: 2.65, z: -1.8 },
+        posJitter: { x: 0.4, y: 0.2, z: 0.3 },
+        labelJp: '庇・南部鉄器風鈴',
+      },
+      {
+        kind: 'bamboo_wind_rustle',
+        weight: 0.12,
         gain: 0.09,
         pos: { x: 1.4, y: 3.2, z: -2.2 },
         posJitter: { x: 1.6, y: 0.35, z: 1.2 },
@@ -88,7 +100,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'crickets_suzumushi',
-        weight: 0.12,
+        weight: 0.1,
         gain: 0.075,
         pos: { x: 3.6, y: 0.4, z: 1.8 },
         posJitter: { x: 0.7, y: 0.15, z: 0.8 },
@@ -96,7 +108,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_shamisen',
-        weight: 0.1,
+        weight: 0.08,
         gain: 0.055,
         pos: { x: -4.2, y: 1.1, z: -3.6 },
         posJitter: { x: 0.5, y: 0.2, z: 0.4 },
@@ -110,15 +122,23 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     actors: [
       {
         kind: 'pendulum_clock',
-        weight: 0.58,
+        weight: 0.5,
         gain: 0.095,
         pos: { x: 3.6, y: 1.55, z: -3.4 },
         posJitter: { x: 0.1, y: 0.05, z: 0.1 },
         labelJp: '大広間・振子時計',
       },
       {
+        kind: 'orugoru_tinkle',
+        weight: 0.14,
+        gain: 0.068,
+        pos: { x: -2.9, y: 1.35, z: -2.5 },
+        posJitter: { x: 0.3, y: 0.15, z: 0.3 },
+        labelJp: '貴賓卓・絡繰オルゴール',
+      },
+      {
         kind: 'distant_dora',
-        weight: 0.15,
+        weight: 0.13,
         gain: 0.065,
         pos: { x: -3.8, y: 1.2, z: -4.0 },
         posJitter: { x: 0.4, y: 0.2, z: 0.4 },
@@ -126,7 +146,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_binzasara',
-        weight: 0.14,
+        weight: 0.12,
         gain: 0.058,
         pos: { x: -2.6, y: 2.2, z: 1.6 },
         posJitter: { x: 0.6, y: 0.2, z: 0.5 },
@@ -134,7 +154,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'furin',
-        weight: 0.13,
+        weight: 0.11,
         gain: 0.048,
         pos: { x: -3.4, y: 2.8, z: -2.6 },
         posJitter: { x: 0.3, y: 0.2, z: 0.3 },
@@ -195,8 +215,16 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
         labelJp: '社叢・龍笛遠音',
       },
       {
+        kind: 'kagurabue_echo',
+        weight: 0.11,
+        gain: 0.056,
+        pos: { x: -3.2, y: 2.75, z: -3.9 },
+        posJitter: { x: 0.7, y: 0.25, z: 0.6 },
+        labelJp: '神域・神楽笛遠響',
+      },
+      {
         kind: 'distant_shinobue',
-        weight: 0.08,
+        weight: 0.07,
         gain: 0.05,
         pos: { x: -4.0, y: 2.1, z: -4.2 },
         posJitter: { x: 0.8, y: 0.3, z: 0.6 },
@@ -248,11 +276,19 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     actors: [
       {
         kind: 'hearth_pop',
-        weight: 0.44,
+        weight: 0.4,
         gain: 0.13,
         pos: { x: -2.8, y: 0.45, z: -2.1 },
         posJitter: { x: 0.4, y: 0.15, z: 0.3 },
         labelJp: '暖炉・備長炭爆ぜ',
+      },
+      {
+        kind: 'wagon_harmonic_swell',
+        weight: 0.14,
+        gain: 0.062,
+        pos: { x: 2.6, y: 1.45, z: -2.6 },
+        posJitter: { x: 0.4, y: 0.2, z: 0.3 },
+        labelJp: '書斎隅・和琴余韻',
       },
       {
         kind: 'chronometer_tick',

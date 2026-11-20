@@ -422,6 +422,11 @@ export class GameScene {
     this.sound.setAmbienceEnabled(enabled);
   }
 
+  public setJSoundSympathetic(enabled: boolean): void {
+    this.settings.jsoundSympathetic = enabled;
+    this.sound.setSympatheticResonance(enabled);
+  }
+
   public startPV(mode: PVModeId = 'grand_trailer', recordVideo = false): void {
     if (!this.pvDirector.isActive()) {
       this.prePvStage = this.settings.stage;
@@ -1489,12 +1494,18 @@ export class GameScene {
           jhandSynergyJp: jhandT.synergyPhaseJp,
           jsoundRt60Sec: jsoundT.stageRt60Sec,
           jsoundEarlyRays: jsoundT.earlyRayCount,
+          jsoundAmbisonicsOrder: jsoundT.ambisonicsOrder,
+          jsoundFdtdNodes: jsoundT.fdtdGridNodes,
           jsoundOversampling: jsoundT.oversamplingFactor,
           jsoundDspRateKhz: Math.round(jsoundT.internalDspRateHz / 1000),
           jsoundCacheHitPct: jsoundT.cacheHitRatePct,
           jsoundSpatialMode: jsoundT.spatialMode,
           jsoundVoices: jsoundT.activeVoices,
           jsoundPeakDb: jsoundT.peakDb,
+          jsoundLufsMomentary: jsoundT.lufsMomentary,
+          jsoundTruePeakDbTp: jsoundT.truePeakDbTp,
+          jsoundPhaseCorr: jsoundT.phaseCorrelation,
+          jsoundWorkletActive: jsoundT.workletActive,
           jsoundMaterialPair: jsoundT.materialPairJp,
           jsoundLastEventJp: jsoundT.lastAcousticEventJp,
           // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★

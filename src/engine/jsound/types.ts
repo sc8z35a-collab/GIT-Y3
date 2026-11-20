@@ -1,36 +1,47 @@
 /**
- * ★ JSound Engin 1.4 — 4D Audio / 4D Audio MAX × 384kHz 8×OS 31-Tap (-111 dB) Physical DSP Engine ★
+ * ★ JSound Engin 1.5 — 16ch 3OA Ambisonics × 2D Kirchhoff-Love FDTD × Quantum AudioWorklet × 768kHz (-134 dB) ★
  *
- * Upgraded v1.4 Flagship Acoustic Architecture (zero external audio files):
- *  - 5 Selectable Spatial Imaging Modes:
- *      · `4d_audio_max`: Full 4D Holographic Externalizer + Dual-Axis 360° Orbital Wavefront + 4D Overhead Height Air
+ * Upgraded v1.5 Research-Grade Flagship Acoustic Architecture (zero external audio files):
+ *  - 6 Selectable Spatial Imaging Modes:
+ *      · `4d_audio_x`  : ★ 4D Audio X (3OA) — 16ch 3rd-Order Ambisonics (ACN/SN3D Max-rE) + 8-Ch Hadamard
+ *                        Unitary Modulated FDN + 13-String Sympathetic Japanese Resonance + 4D Orbital Field!
+ *      · `4d_audio_max`: Full 4D Holographic Externalizer + Dual-Axis 360° Orbital Wavefront + Overhead Height
  *                        + Visceral Sub-Tactile Resonance + Relativistic 4D Curved Doppler Trajectories!
  *      · `4d_audio`    : Balanced 4D Spatio-Temporal Envelopment + Externalizer + Height Air + Tactile Depth
  *      · `binaural_3d` : Classic 3D HRTF + ITD/ILD
  *      · `studio_wide` : True Mid/Side Mastering Expansion
  *      · `focused`     : Tight Center Articulation
- *  - 3 High-Speed Ultra-Clarity Quality Tiers:
- *      · `ultra`: 384 kHz 8× Cascade 31-Tap Kaiser(9.2) FIR (-111.7 dB) + 24 modes + 6th-Order 380-Ray 4D IR + 7-Band Velvet
- *      · `pro`  : 192 kHz 4× Cascade 31-Tap Kaiser FIR + 18 modes + 5th-Order 230-Ray 4D IR + HRTF/Doppler
- *      · `lite` : 96 kHz 2× Kaiser FIR + 10 modes + 2nd-Order 36-Ray IR + fast stereo
- *  - 58 Physically Calibrated Acoustic Materials (+15 new Noh, Kyudo, Temple, & Artisan materials)
- *  - 36 Pure-Physical-Modeling Instruments & 20 Living 4D World Soundscape Actors (32 interactive in Studio Deck!)
- *  - Multi-Variant Round-Robin LRU Acoustic Buffer Cache for sub-millisecond zero-stutter playback
+ *  - 3 Ultra-Clarity Quality Tiers:
+ *      · `ultra`: 768kHz 16×OS / 384kHz 8×OS 63-Tap Kaiser(13.2) FIR (-134 dB) + 2D FDTD + 7th-Order 520-Ray 3OA IR + 9-Band Velvet
+ *      · `pro`  : 192kHz 4×OS 63-Tap Kaiser FIR + 18 modes + 5th-Order 230-Ray 3OA IR + HRTF/Doppler
+ *      · `lite` : 96kHz 2×OS 63-Tap Kaiser FIR + 10 modes + 2nd-Order 36-Ray 3OA IR + fast stereo
+ *  - 70 Physically Calibrated Acoustic Materials (+12 Japanese kiln, timber, lacquer, iron, quartz materials)
+ *  - 44 Pure-Physical-Modeling Instruments (40 interactive in Studio Deck!) & 24 Living 3OA/4D World Actors
+ *  - Real-Time AudioWorklet Master (8ch Unitary FDN + 13-String Sympathetic Bank + 4×OS True-Peak + ITU-R BS.1770-4 LUFS)
  */
 
 import { HandMaterialPreset, StageId } from '../../graphics/GraphicsConfig';
 
 export type JSoundQualityMode = 'ultra' | 'pro' | 'lite';
-export type JSoundSpatialMode = '4d_audio_max' | '4d_audio' | 'binaural_3d' | 'studio_wide' | 'focused';
+export type JSoundSpatialMode =
+  | '4d_audio_x'
+  | '4d_audio_max'
+  | '4d_audio'
+  | 'binaural_3d'
+  | 'studio_wide'
+  | 'focused';
 
 export type AuditionInstrumentId =
   | 'taiko'
   | 'shime_daiko'
+  | 'daibyoshi'
+  | 'tsuridaiko'
   | 'otsuzumi'
   | 'kotsuzumi'
   | 'kakko'
   | 'koto'
   | 'taisho_koto'
+  | 'wagon'
   | 'shamisen'
   | 'sanshin'
   | 'biwa'
@@ -40,6 +51,8 @@ export type AuditionInstrumentId =
   | 'shinobue'
   | 'ryuteki'
   | 'nokan'
+  | 'komabue'
+  | 'kagurabue'
   | 'hichiriki'
   | 'sho'
   | 'horagai'
@@ -53,6 +66,9 @@ export type AuditionInstrumentId =
   | 'hyoshigi'
   | 'binzasara'
   | 'furin'
+  | 'nanbu_furin'
+  | 'edo_kiriko_chime'
+  | 'orugoru'
   | 'sensu'
   | 'yumi_bow'
   | 'suikinkutsu';
@@ -68,6 +84,7 @@ export interface JSoundSettings {
   quality: JSoundQualityMode;
   spatialMode: JSoundSpatialMode;
   ambienceEnabled: boolean;
+  sympatheticResonance: boolean;
   masterVolume: number; // 0..1
 }
 
@@ -77,9 +94,12 @@ export interface JSoundTelemetry {
   quality: JSoundQualityMode;
   spatialMode: JSoundSpatialMode;
   ambienceEnabled: boolean;
+  sympatheticActive: boolean;
   stageId: StageId;
   stageRt60Sec: number;
   earlyRayCount: number;
+  ambisonicsOrder: number;
+  fdtdGridNodes: number;
   internalDspRateHz: number;
   oversamplingFactor: number;
   soundCatalogCount: number;
@@ -90,6 +110,12 @@ export interface JSoundTelemetry {
   sampleRate: number;
   peakDb: number;
   rmsDb: number;
+  lufsMomentary: number;
+  truePeakDbTp: number;
+  phaseCorrelation: number;
+  crestFactorDb: number;
+  workletActive: boolean;
+  fdnActive: boolean;
   materialPairJp: string;
   lastAcousticEventJp: string;
 }
@@ -227,10 +253,22 @@ export type AcousticMaterialId =
   | 'urushi_tray_lacquer'
   | 'katana_tsuba_iron'
   | 'tatami_straw_mat'
-  | 'hinoki_bath_tub';
+  | 'hinoki_bath_tub'
+  | 'bizen_stoneware'
+  | 'sendai_keyaki_chest'
+  | 'kurogaki_ebony'
+  | 'shakudo_alloy'
+  | 'nanbu_cast_iron'
+  | 'crystal_quartz'
+  | 'bamboo_forest_culm'
+  | 'shoji_kumiko_frame'
+  | 'tsugaru_lacquer_cup'
+  | 'edo_kiriko_glass'
+  | 'urushi_gold_maki'
+  | 'temple_stone_lantern';
 
 /**
- * 58 Physically Calibrated Multi-Mode Material Spectra (up to 20–24 modes in Ultra).
+ * 70 Physically Calibrated Multi-Mode Material Spectra (up to 20–24 modes in Ultra).
  * Derived from Euler-Bernoulli orthotropic wood bars, Kirchhoff bronze/glass/steel shells,
  * vitreous porcelain bells, volcanic obsidian, living skin, and traditional Japanese craft materials.
  */
@@ -978,6 +1016,153 @@ export const ACOUSTIC_MATERIALS: Record<AcousticMaterialId, ModalSpec> = {
     bodyHz: 112,
     stereoParity: 0.52,
     labelJp: '檜湯槽胴',
+  },
+  // ★ JSound Engin 1.5 — 12 New Artisan Kiln, Rare Timber, Metal & Crystal Physical Materials (59..70) ★
+  bizen_stoneware: {
+    // High-fired unglazed Bizen-yaki clay stoneware ring
+    fundamentalHz: 745,
+    ratios: [1.0, 1.88, 2.94, 4.22, 5.74, 7.48, 9.42, 11.6],
+    amps: [1.0, 0.78, 0.56, 0.39, 0.26, 0.17, 0.105, 0.062],
+    decays: [0.22, 0.165, 0.122, 0.088, 0.062, 0.044, 0.031, 0.022],
+    contactMs: 0.24,
+    surfaceGrain: 0.42,
+    bodyHz: 290,
+    stereoParity: 0.48,
+    labelJp: '備前焼炻器',
+  },
+  sendai_keyaki_chest: {
+    // Aged Japanese Zelkova (Keyaki) Tansu hardwood chest panel with iron fittings
+    fundamentalHz: 248,
+    ratios: [1.0, 1.66, 2.52, 3.58, 4.86, 6.32, 7.98, 9.82],
+    amps: [1.0, 0.74, 0.54, 0.37, 0.24, 0.155, 0.095, 0.056],
+    decays: [0.19, 0.145, 0.108, 0.078, 0.054, 0.038, 0.026, 0.018],
+    contactMs: 0.46,
+    surfaceGrain: 0.31,
+    bodyHz: 124,
+    stereoParity: 0.54,
+    labelJp: '仙台欅箪笥',
+  },
+  kurogaki_ebony: {
+    // Dense black-veined Japanese persimmon luxury timber
+    fundamentalHz: 512,
+    ratios: [1.0, 2.08, 3.44, 5.08, 6.96, 9.12, 11.5, 14.1],
+    amps: [1.0, 0.79, 0.58, 0.41, 0.27, 0.175, 0.11, 0.064],
+    decays: [0.16, 0.12, 0.088, 0.064, 0.045, 0.032, 0.022, 0.015],
+    contactMs: 0.28,
+    surfaceGrain: 0.24,
+    bodyHz: 210,
+    stereoParity: 0.46,
+    labelJp: '黒柿銘木',
+  },
+  shakudo_alloy: {
+    // Traditional Japanese copper-gold Shakudo metalworking alloy chime
+    fundamentalHz: 1260,
+    ratios: [1.0, 1.94, 3.04, 4.38, 5.95, 7.72, 9.75, 12.0],
+    amps: [1.0, 0.84, 0.66, 0.49, 0.35, 0.24, 0.155, 0.095],
+    decays: [0.74, 0.58, 0.44, 0.32, 0.23, 0.16, 0.11, 0.072],
+    contactMs: 0.12,
+    surfaceGrain: 0.15,
+    doubletSplitHz: 1.85,
+    stereoParity: 0.66,
+    labelJp: '赤銅金工',
+  },
+  nanbu_cast_iron: {
+    // Morioka Nanbu Tekki cast-iron Furin bell (exceptionally pure long crystalline sustain!)
+    fundamentalHz: 1780,
+    ratios: [1.0, 2.34, 3.92, 5.74, 7.82, 10.18, 12.8, 15.65],
+    amps: [1.0, 0.86, 0.68, 0.51, 0.36, 0.24, 0.15, 0.088],
+    decays: [1.92, 1.48, 1.08, 0.76, 0.52, 0.35, 0.23, 0.15],
+    contactMs: 0.09,
+    surfaceGrain: 0.12,
+    doubletSplitHz: 2.15,
+    stereoParity: 0.72,
+    labelJp: '南部鉄器',
+  },
+  crystal_quartz: {
+    // Yamanashi natural rock-crystal prism ring (high-Q glass-like harmonics)
+    fundamentalHz: 2240,
+    ratios: [1.0, 2.68, 4.82, 7.36, 10.25, 13.48, 17.0],
+    amps: [1.0, 0.82, 0.6, 0.42, 0.28, 0.175, 0.105],
+    decays: [1.65, 1.24, 0.88, 0.61, 0.41, 0.27, 0.17],
+    contactMs: 0.07,
+    surfaceGrain: 0.08,
+    doubletSplitHz: 1.4,
+    stereoParity: 0.74,
+    labelJp: '山梨水晶',
+  },
+  bamboo_forest_culm: {
+    // Hollow thick-walled Moso bamboo culm knock
+    fundamentalHz: 615,
+    ratios: [1.0, 1.54, 2.38, 3.42, 4.72, 6.24, 7.95],
+    amps: [1.0, 0.78, 0.58, 0.4, 0.26, 0.16, 0.095],
+    decays: [0.18, 0.135, 0.098, 0.07, 0.048, 0.032, 0.022],
+    contactMs: 0.28,
+    surfaceGrain: 0.25,
+    bodyHz: 308,
+    pitchGlideAmt: 0.015,
+    pitchGlideMs: 8,
+    stereoParity: 0.52,
+    labelJp: '孟宗竹節',
+  },
+  shoji_kumiko_frame: {
+    // Fine cedar Kumiko lattice sliding-screen tap
+    fundamentalHz: 465,
+    ratios: [1.0, 1.78, 2.82, 4.05, 5.52, 7.22],
+    amps: [0.95, 0.68, 0.46, 0.3, 0.18, 0.105],
+    decays: [0.095, 0.068, 0.048, 0.034, 0.024, 0.016],
+    contactMs: 0.36,
+    surfaceGrain: 0.34,
+    bodyHz: 195,
+    stereoParity: 0.44,
+    labelJp: '組子障子桟',
+  },
+  tsugaru_lacquer_cup: {
+    // Multi-layered Tsugaru-nuri lacquered wooden sake cup click
+    fundamentalHz: 840,
+    ratios: [1.0, 1.92, 3.12, 4.55, 6.22, 8.15, 10.3],
+    amps: [1.0, 0.76, 0.54, 0.36, 0.23, 0.14, 0.082],
+    decays: [0.15, 0.112, 0.082, 0.058, 0.04, 0.028, 0.019],
+    contactMs: 0.19,
+    surfaceGrain: 0.16,
+    bodyHz: 365,
+    stereoParity: 0.48,
+    labelJp: '津軽塗盃',
+  },
+  edo_kiriko_glass: {
+    // Faceted Edo Kiriko crystal cut-glass harmonic ping
+    fundamentalHz: 1960,
+    ratios: [1.0, 2.32, 4.18, 6.45, 9.05, 12.0, 15.2],
+    amps: [1.0, 0.85, 0.64, 0.45, 0.3, 0.19, 0.11],
+    decays: [1.42, 1.06, 0.76, 0.52, 0.35, 0.23, 0.145],
+    contactMs: 0.08,
+    surfaceGrain: 0.09,
+    doubletSplitHz: 1.95,
+    stereoParity: 0.7,
+    labelJp: '江戸切子',
+  },
+  urushi_gold_maki: {
+    // Gold-leaf Maki-e lacquered Hinoki presentation board
+    fundamentalHz: 428,
+    ratios: [1.0, 1.82, 2.86, 4.12, 5.62, 7.36, 9.28],
+    amps: [1.0, 0.74, 0.52, 0.36, 0.24, 0.15, 0.09],
+    decays: [0.21, 0.155, 0.112, 0.08, 0.056, 0.039, 0.026],
+    contactMs: 0.26,
+    surfaceGrain: 0.18,
+    bodyHz: 188,
+    stereoParity: 0.5,
+    labelJp: '蒔絵漆板',
+  },
+  temple_stone_lantern: {
+    // Moss-veined granite shrine Toro stone knock
+    fundamentalHz: 685,
+    ratios: [1.0, 1.96, 3.16, 4.58, 6.26, 8.18, 10.35],
+    amps: [1.0, 0.78, 0.58, 0.42, 0.28, 0.18, 0.11],
+    decays: [0.14, 0.105, 0.076, 0.054, 0.038, 0.026, 0.018],
+    contactMs: 0.18,
+    surfaceGrain: 0.46,
+    bodyHz: 265,
+    stereoParity: 0.45,
+    labelJp: '御影石灯籠',
   },
 };
 

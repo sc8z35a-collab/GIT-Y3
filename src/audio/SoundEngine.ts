@@ -1,7 +1,8 @@
 /**
- * ★ JSound Engin 1.4 — Public Audio Facade ★
- * Re-exports the proprietary 4D Audio / 4D Audio MAX, 384kHz 8×OS 31-Tap (-111 dB),
- * 36-instrument, 58-material, 380-ray 4D Spatial & Real-Time Acoustic Probe engine.
+ * ★ JSound Engin 1.5 — Public Audio Facade ★
+ * Re-exports the flagship 16ch 3OA Ambisonics (4D Audio X), 2D Kirchhoff-Love/von Kármán FDTD,
+ * Real-Time Quantum AudioWorklet (8ch Hadamard Unitary FDN + 13-String Sympathetic Bank + 4×OS True-Peak
+ * + ITU-R BS.1770-4 LUFS), 768kHz 16×OS 63-Tap (-134 dB), 44-instrument, 70-material & 520-Ray 3OA engine.
  */
 export { JSoundEngine, JSoundEngine as SoundEngine } from '../engine/jsound/JSoundEngine';
 export { AcousticProbeEngine } from '../engine/jsound/AcousticProbeEngine';

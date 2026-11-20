@@ -583,7 +583,7 @@ export async function captureCurrentAngle5KPhoto(params: {
     rgb16,
     {
       Title: 'JANKEN KIWAMI 3D — 5K KHDR 1.1 Cryptographically Proven Photograph',
-      Software: `JANKEN KIWAMI 3D v1.4 | KHDR 1.1 | ${fingerS1Enabled ? 'FINGER S1.0' : 'Classic'} | JSound 1.4 4D | JNV-PROOF 1.0`,
+      Software: `JANKEN KIWAMI 3D v1.5 | KHDR 1.1 | ${fingerS1Enabled ? 'FINGER S1.0' : 'Classic'} | JSound 1.5 3OA | JNV-PROOF 1.0`,
       Description: `Stage: ${stageLabel} | Resolution: ${fullW}x${fullH} (5K) | Color: 48-bit RGB (16-bit/ch Lossless) | Seal: ${signedProof.sealSha256.slice(0, 24)}`,
       'JNV-Proof-Seal': signedProof.sealSha256,
     },

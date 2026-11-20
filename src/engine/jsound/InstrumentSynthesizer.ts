@@ -22,6 +22,7 @@ import {
   synthesizeModalImpactStereo,
 } from './ModalSynthesizer';
 import { JSoundQualityMode } from './types';
+import { synthesizeWaveField2DStereo } from './WaveFieldSolver2D';
 
 /** Fast Chamberlin State-Variable Filter for formants & body resonances */
 class FormantSvf {
@@ -2110,6 +2111,381 @@ export function synthesizeCameraShutter(
   }
   return { left, right };
 }
+
+// =============================================================================
+// ★ JSound Engin 1.5 — 8 NEW PURE-PHYSICAL & 2D-FDTD INSTRUMENTS (37..44) ★
+// =============================================================================
+
+/**
+ * 37. Daibyoshi Festival Double-Headed Drum (大拍子太鼓 — 2D von Kármán FDTD Membrane):
+ * Rope-tensioned twin cowhide drum solved directly via our 2D nonlinear membrane PDE!
+ */
+export function synthesizeDaibyoshi(
+  sampleRate: number,
+  velocity = 1.0,
+  strikeOffset = 0.22,
+  seed = 40040
+): { left: Float32Array; right: Float32Array } {
+  const vel = Math.max(0.15, Math.min(1.5, velocity));
+  const fdtd = synthesizeWaveField2DStereo(
+    {
+      geometry: 'circular_membrane',
+      gridSize: 16,
+      fundamentalHz: 118,
+      stiffness: 0.035,
+      damping0: 3.4,
+      damping1: 0.24,
+      nonlinearity: 1.65,
+      strikeX: 0.5 + Math.max(-0.28, Math.min(0.28, strikeOffset)),
+      strikeY: 0.48,
+      velocity: vel,
+      contactMs: 1.9,
+      durationSec: 0.62,
+      seed,
+    },
+    sampleRate
+  );
+  const bachi = synthesizeModalImpactStereo('shime_tight_hide', sampleRate, {
+    velocity: vel * 0.72,
+    pitchScale: 0.78,
+    durationSec: 0.22,
+    quality: 'pro',
+    seed: seed + 7,
+  });
+  const n = fdtd.left.length;
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const bL = i < bachi.left.length ? bachi.left[i] : 0;
+    const bR = i < bachi.right.length ? bachi.right[i] : 0;
+    left[i] = Math.tanh((fdtd.left[i] * 1.15 + bL * 0.32) * 1.02);
+    right[i] = Math.tanh((fdtd.right[i] * 1.15 + bR * 0.32) * 1.02);
+  }
+  return { left, right };
+}
+
+/**
+ * 38. Gagaku Tsuridaiko Suspended Imperial Court Drum (釣太鼓 — 2D FDTD Double-Strike):
+ * Iconic Gagaku court rhythm: soft left grace tap ("zun") followed by resonant right center strike ("don")!
+ */
+export function synthesizeTsuridaiko(
+  sampleRate: number,
+  velocity = 1.0,
+  seed = 41041
+): { left: Float32Array; right: Float32Array } {
+  const vel = Math.max(0.15, Math.min(1.5, velocity));
+  const grace = synthesizeWaveField2DStereo(
+    {
+      geometry: 'circular_membrane',
+      gridSize: 16,
+      fundamentalHz: 84,
+      stiffness: 0.025,
+      damping0: 2.3,
+      damping1: 0.3,
+      nonlinearity: 0.85,
+      strikeX: 0.68,
+      strikeY: 0.56,
+      velocity: vel * 0.52,
+      contactMs: 2.6,
+      durationSec: 0.42,
+      seed,
+    },
+    sampleRate
+  );
+  const main = synthesizeWaveField2DStereo(
+    {
+      geometry: 'circular_membrane',
+      gridSize: 16,
+      fundamentalHz: 80,
+      stiffness: 0.025,
+      damping0: 1.95,
+      damping1: 0.28,
+      nonlinearity: 1.9,
+      strikeX: 0.5,
+      strikeY: 0.5,
+      velocity: vel * 1.18,
+      contactMs: 3.1,
+      durationSec: 0.85,
+      seed: seed + 19,
+    },
+    sampleRate
+  );
+  const gap = Math.floor(0.125 * sampleRate);
+  const n = gap + main.left.length;
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  for (let i = 0; i < grace.left.length; i++) {
+    left[i] += grace.left[i] * 0.72;
+    right[i] += grace.right[i] * 0.58;
+  }
+  for (let i = 0; i < main.left.length; i++) {
+    left[gap + i] += main.left[i] * 1.05;
+    right[gap + i] += main.right[i] * 1.12;
+  }
+  for (let i = 0; i < n; i++) {
+    left[i] = Math.tanh(left[i] * 0.94);
+    right[i] = Math.tanh(right[i] * 0.94);
+  }
+  return { left, right };
+}
+
+/**
+ * 39. Wagon Ancient 6-String Shinto Zither (和琴 — Koto-Suri Ceremonial Sweep):
+ * Rapid silk-string glissando across the traditional 6-string Japanese court tuning (D3-A3-G3-E4-B3-D4)!
+ */
+export function synthesizeWagon(
+  sampleRate: number,
+  velocity = 0.9,
+  seed = 42042
+): { left: Float32Array; right: Float32Array } {
+  const freqs = [146.83, 220.0, 196.0, 329.63, 246.94, 293.66];
+  const durSec = 1.65;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const rng = createSeededRng(seed);
+
+  for (let s = 0; s < freqs.length; s++) {
+    const startSample = Math.floor(s * 0.036 * sampleRate);
+    const f0 = freqs[s] * (1 + (rng() - 0.5) * 0.004);
+    const period = Math.max(8, Math.round(sampleRate / f0));
+    const line = new Float32Array(period);
+    for (let k = 0; k < period; k++) {
+      line[k] = (rng() * 2 - 1) * velocity * 0.55;
+    }
+    // Smooth plectrum lowpass excitation
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k = 1; k < period; k++) {
+        line[k] = line[k] * 0.58 + line[k - 1] * 0.42;
+      }
+    }
+
+    const pan = 0.25 + (s / (freqs.length - 1)) * 0.5;
+    const gL = Math.cos(pan * Math.PI * 0.5);
+    const gR = Math.sin(pan * Math.PI * 0.5);
+    let ptr = 0;
+    let prev = 0;
+    const body = new FormantSvf();
+    const damp = 0.9964 - s * 0.0002;
+
+    for (let i = startSample; i < n; i++) {
+      const cur = line[ptr];
+      const next = (cur * 0.52 + prev * 0.48) * damp;
+      prev = cur;
+      line[ptr] = next;
+      ptr = (ptr + 1) % period;
+
+      const bodyRes = body.process(cur, 340 + s * 45, 2.2, sampleRate);
+      const out = cur * 0.72 + bodyRes * 0.48;
+      left[i] += out * gL;
+      right[i] += out * gR;
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const fade = i > n - 1200 ? (n - i) / 1200 : 1;
+    left[i] = Math.tanh(left[i] * 0.86) * fade;
+    right[i] = Math.tanh(right[i] * 0.86) * fade;
+  }
+  return { left, right };
+}
+
+/**
+ * 40. Komabue Bright 6-Hole Gagaku Court Flute (高麗笛):
+ * Crisp narrow-bore smoked bamboo transverse flute with nimble pitch ornament (Merikari)!
+ */
+export function synthesizeKomabue(
+  sampleRate: number,
+  baseHz = 987.77,
+  durationSec = 1.15,
+  seed = 43043
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const n = Math.floor(sampleRate * durationSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const airSvf = new FormantSvf();
+  let ph = 0;
+  const twoPiSr = (2 * Math.PI) / sampleRate;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const u = t / durationSec;
+    const atk = Math.min(1, t / 0.045);
+    const rel = u > 0.82 ? Math.max(0, (1 - u) / 0.18) : 1;
+    const env = Math.sin(atk * Math.PI * 0.5) * rel;
+    // Expressive Gagaku upward grace scoop -> bright steady trill vibrato
+    const grace = t < 0.08 ? -0.055 * (1 - t / 0.08) : 0;
+    const vib = Math.sin(2 * Math.PI * 5.8 * t) * 0.011 * Math.min(1, t / 0.25);
+    const freq = baseHz * (1 + grace + vib);
+    ph += freq * twoPiSr;
+
+    const tone = Math.sin(ph) * 0.62 + Math.sin(2 * ph) * 0.28 + Math.sin(3 * ph) * 0.11;
+    const chiff = airSvf.process(rng() * 2 - 1, freq * 2.1, 3.8, sampleRate) * (0.28 + (t < 0.09 ? 0.45 : 0));
+    const sig = Math.tanh((tone + chiff * 0.42) * env * 0.72);
+    left[i] = sig * (0.94 + Math.sin(t * 2.3) * 0.06);
+    right[i] = sig * (0.94 - Math.sin(t * 2.3) * 0.06);
+  }
+  return { left, right };
+}
+
+/**
+ * 41. Kagurabue Sacred Shinto Court Flute (神楽笛):
+ * Deeper, warmer wide-bore sacred shrine bamboo flute with serene breathy wood resonance!
+ */
+export function synthesizeKagurabue(
+  sampleRate: number,
+  baseHz = 587.33,
+  durationSec = 1.45,
+  seed = 44044
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const n = Math.floor(sampleRate * durationSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const breathSvf = new FormantSvf();
+  const boreSvf = new FormantSvf();
+  let ph = 0;
+  const twoPiSr = (2 * Math.PI) / sampleRate;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const u = t / durationSec;
+    const env = Math.min(1, t / 0.11) * (u > 0.78 ? Math.max(0, (1 - u) / 0.22) : 1);
+    const slowLift = Math.min(1, t / 0.22) * 0.022 - 0.022;
+    const vib = Math.sin(2 * Math.PI * 4.4 * t) * 0.0085 * Math.min(1, t / 0.35);
+    const freq = baseHz * (1 + slowLift + vib);
+    ph += freq * twoPiSr;
+
+    const raw = Math.sin(ph) * 0.72 + Math.sin(2 * ph) * 0.19 + Math.sin(3 * ph) * 0.06;
+    const warmBore = boreSvf.process(raw, freq * 1.02, 1.8, sampleRate);
+    const breath = breathSvf.process(rng() * 2 - 1, freq * 2.6, 2.4, sampleRate) * 0.32;
+    const sig = Math.tanh((raw * 0.6 + warmBore * 0.45 + breath) * env * 0.76);
+    left[i] = sig * 0.96;
+    right[i] = sig * 1.04;
+  }
+  return { left, right };
+}
+
+/**
+ * 42. Karakuri Orugoru Precision Steel-Comb Music Box (絡繰オルゴール):
+ * Delicate pentatonic Japanese mechanical comb-tooth arpeggio with clockwork escapement micro-ticks!
+ */
+export function synthesizeOrugoru(
+  sampleRate: number,
+  seed = 45045
+): { left: Float32Array; right: Float32Array } {
+  // Japanese In-sen pentatonic motif (D5 - Eb5 - G5 - A5 - D6)
+  const notes = [587.33, 622.25, 783.99, 880.0, 1174.66];
+  const stepSec = 0.155;
+  const durSec = notes.length * stepSec + 1.15;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const twoPiSr = (2 * Math.PI) / sampleRate;
+  const rng = createSeededRng(seed);
+
+  for (let idx = 0; idx < notes.length; idx++) {
+    const start = Math.floor(idx * stepSec * sampleRate);
+    const f = notes[idx] * (1 + (rng() - 0.5) * 0.002);
+    const pan = 0.28 + (idx / (notes.length - 1)) * 0.44;
+    const gL = Math.cos(pan * Math.PI * 0.5);
+    const gR = Math.sin(pan * Math.PI * 0.5);
+
+    // Cantilevered steel tine modes (1.0, 6.267, 17.55 — exact Euler-Bernoulli clamped-free beam ratios!)
+    const tineRatios = [1.0, 6.267, 17.55];
+    const tineAmps = [0.68, 0.16, 0.045];
+    const tineDecays = [0.82, 0.16, 0.042];
+
+    for (let m = 0; m < tineRatios.length; m++) {
+      const fm = f * tineRatios[m];
+      if (fm >= sampleRate * 0.46) continue;
+      const w = fm * twoPiSr;
+      const d = Math.exp(-1 / (tineDecays[m] * sampleRate));
+      const cw = Math.cos(w) * d;
+      const sw = Math.sin(w) * d;
+      let re = tineAmps[m];
+      let im = 0;
+      const end = Math.min(n, start + Math.floor(tineDecays[m] * 5.2 * sampleRate));
+      for (let i = start; i < end; i++) {
+        const atk = i - start < 24 ? (i - start) / 24 : 1;
+        left[i] += im * atk * gL;
+        right[i] += im * atk * gR;
+        const nr = re * cw - im * sw;
+        im = re * sw + im * cw;
+        re = nr;
+      }
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    left[i] = Math.tanh(left[i] * 0.92);
+    right[i] = Math.tanh(right[i] * 0.92);
+  }
+  return { left, right };
+}
+
+/**
+ * 43. Edo Kiriko Faceted Crystal Cut-Glass Chime (江戸切子グラス):
+ * Pure high-Q vitreous crystal rim resonance with subtle rotating geometric beating doublet!
+ */
+export function synthesizeEdoKirikoChime(
+  sampleRate: number,
+  pitchScale = 1.0,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 46046
+): { left: Float32Array; right: Float32Array } {
+  return synthesizeModalImpactStereo('edo_kiriko_glass', sampleRate, {
+    velocity: 0.92,
+    pitchScale,
+    durationSec: 1.6,
+    quality,
+    seed,
+    stereoWidth: 0.92,
+  });
+}
+
+/**
+ * 44. Morioka Nanbu Tekki Cast-Iron Wind Bell (南部鉄器風鈴):
+ * Celebrated long crystalline iron shimmer with gentle double-clapper sway!
+ */
+export function synthesizeNanbuFurin(
+  sampleRate: number,
+  pitchScale = 1.0,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 47047
+): { left: Float32Array; right: Float32Array } {
+  const hit1 = synthesizeModalImpactStereo('nanbu_cast_iron', sampleRate, {
+    velocity: 0.96,
+    pitchScale,
+    durationSec: 2.1,
+    quality,
+    seed,
+    stereoWidth: 0.95,
+  });
+  const hit2 = synthesizeModalImpactStereo('nanbu_cast_iron', sampleRate, {
+    velocity: 0.54,
+    pitchScale: pitchScale * 1.003,
+    durationSec: 1.4,
+    quality,
+    seed: seed + 23,
+    stereoWidth: 0.95,
+  });
+  const offset = Math.floor(0.28 * sampleRate);
+  const n = Math.max(hit1.left.length, offset + hit2.left.length);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  for (let i = 0; i < hit1.left.length; i++) {
+    left[i] += hit1.left[i] * 0.86;
+    right[i] += hit1.right[i] * 0.86;
+  }
+  for (let i = 0; i < hit2.left.length; i++) {
+    left[offset + i] += hit2.left[i] * 0.56;
+    right[offset + i] += hit2.right[i] * 0.56;
+  }
+  return { left, right };
+}
+
 
 
 

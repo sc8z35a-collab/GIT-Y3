@@ -41,18 +41,34 @@ export interface Spatial4DModeConfig {
   mode: JSoundSpatialMode;
   labelJp: string;
   shortJp: string;
-  dimensionTag: '4D MAX' | '4D' | '3D' | 'WIDE' | 'FOCUS';
+  dimensionTag: '4D X·3OA' | '4D MAX' | '4D' | '3D' | 'WIDE' | 'FOCUS';
   sideWidth: number;
   externalizerWet: number;
   orbitalWet: number;
   orbitalRateHz: number;
   heightAirWet: number;
   tactileSubWet: number;
+  fdnWet: number;
   dopplerDepth: number;
   reverbEnvelopmentBoost: number;
 }
 
 export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> = {
+  '4d_audio_x': {
+    mode: '4d_audio_x',
+    labelJp: '4D Audio X (3OA)',
+    shortJp: '4D X·3OA',
+    dimensionTag: '4D X·3OA',
+    sideWidth: 1.62,
+    externalizerWet: 0.28,
+    orbitalWet: 0.25,
+    orbitalRateHz: 0.21,
+    heightAirWet: 0.3,
+    tactileSubWet: 0.31,
+    fdnWet: 0.16,
+    dopplerDepth: 1.32,
+    reverbEnvelopmentBoost: 1.32,
+  },
   '4d_audio_max': {
     mode: '4d_audio_max',
     labelJp: '4D Audio MAX',
@@ -64,6 +80,7 @@ export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> 
     orbitalRateHz: 0.19,
     heightAirWet: 0.26,
     tactileSubWet: 0.28,
+    fdnWet: 0.12,
     dopplerDepth: 1.25,
     reverbEnvelopmentBoost: 1.26,
   },
@@ -78,6 +95,7 @@ export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> 
     orbitalRateHz: 0.12,
     heightAirWet: 0.17,
     tactileSubWet: 0.16,
+    fdnWet: 0.09,
     dopplerDepth: 1.05,
     reverbEnvelopmentBoost: 1.14,
   },
@@ -92,6 +110,7 @@ export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> 
     orbitalRateHz: 0.08,
     heightAirWet: 0.04,
     tactileSubWet: 0.0,
+    fdnWet: 0.04,
     dopplerDepth: 1.0,
     reverbEnvelopmentBoost: 1.0,
   },
@@ -106,6 +125,7 @@ export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> 
     orbitalRateHz: 0.08,
     heightAirWet: 0.08,
     tactileSubWet: 0.04,
+    fdnWet: 0.06,
     dopplerDepth: 0.9,
     reverbEnvelopmentBoost: 1.06,
   },
@@ -120,6 +140,7 @@ export const SPATIAL_4D_CONFIGS: Record<JSoundSpatialMode, Spatial4DModeConfig> 
     orbitalRateHz: 0.08,
     heightAirWet: 0.0,
     tactileSubWet: 0.0,
+    fdnWet: 0.0,
     dopplerDepth: 0.8,
     reverbEnvelopmentBoost: 0.86,
   },

@@ -98,6 +98,7 @@ export interface GameUIHandlers {
   onChangeJSoundQuality: (quality: JSoundModeSetting) => void;
   onChangeJSoundSpatialMode: (spatial: JSoundSpatialMode) => void;
   onToggleJSoundAmbience: (enabled: boolean) => void;
+  onToggleJSoundSympathetic: (enabled: boolean) => void;
   onAuditionSound: (instrument: AuditionInstrumentId) => void;
   onToggleBioPulse: (enabled: boolean) => void;
   onToggleAeroVortex: (enabled: boolean) => void;
@@ -109,11 +110,14 @@ export interface GameUIHandlers {
 const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> = [
   { id: 'taiko', label: '大太鼓' },
   { id: 'shime_daiko', label: '締太鼓' },
+  { id: 'daibyoshi', label: '大拍子' },
+  { id: 'tsuridaiko', label: '釣太鼓' },
   { id: 'otsuzumi', label: '大鼓' },
   { id: 'kotsuzumi', label: '小鼓' },
   { id: 'kakko', label: '鞨鼓' },
   { id: 'koto', label: '十三絃箏' },
   { id: 'taisho_koto', label: '大正琴' },
+  { id: 'wagon', label: '和琴六絃' },
   { id: 'shamisen', label: '三味線' },
   { id: 'sanshin', label: '三線' },
   { id: 'biwa', label: '薩摩琵琶' },
@@ -123,6 +127,8 @@ const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> =
   { id: 'shinobue', label: '篠笛' },
   { id: 'ryuteki', label: '龍笛' },
   { id: 'nokan', label: '能管' },
+  { id: 'komabue', label: '高麗笛' },
+  { id: 'kagurabue', label: '神楽笛' },
   { id: 'hichiriki', label: '篳篥' },
   { id: 'sho', label: '雅楽笙' },
   { id: 'horagai', label: '法螺貝' },
@@ -136,6 +142,9 @@ const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> =
   { id: 'hyoshigi', label: '拍子木' },
   { id: 'binzasara', label: '編木' },
   { id: 'furin', label: '江戸風鈴' },
+  { id: 'nanbu_furin', label: '南部風鈴' },
+  { id: 'edo_kiriko_chime', label: '江戸切子' },
+  { id: 'orugoru', label: 'オルゴール' },
   { id: 'sensu', label: '舞扇' },
   { id: 'yumi_bow', label: '弓道和弓' },
   { id: 'suikinkutsu', label: '水琴窟' },
@@ -419,14 +428,14 @@ export class GameUI {
           <button class="icon-medallion desktop-only" id="btn-camera" data-tip="カメラ切替 (C)" aria-label="カメラ視点切替">
             ${NAV_ICONS.camera}
           </button>
-          <button class="icon-medallion" id="btn-graphics" data-tip="5K撮影・4D音響1.4・NEXT技術 (G)" aria-label="スタジオ設定">
+          <button class="icon-medallion" id="btn-graphics" data-tip="5K撮影・JSound 1.5 (3OA/FDTD)・革新技術 (G)" aria-label="スタジオ設定">
             ${NAV_ICONS.graphics}
           </button>
           <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 / Psycho-Net 解析 (J)" aria-label="JNV1.0解析">
             ${NAV_ICONS.inspector}
             <span class="medallion-seal-dot"></span>
           </button>
-          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.4 4D ON/OFF" aria-label="音響切替">
+          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.5 3OA/4D ON/OFF" aria-label="音響切替">
             ${NAV_ICONS.soundOn}
           </button>
           <button class="icon-medallion" id="btn-fullscreen" data-tip="全画面表示 (F)" aria-label="全画面切替">
@@ -512,12 +521,12 @@ export class GameUI {
         </div>
       </footer>
 
-      <!-- Left Slide-Out Drawer: 5K KHDR 1.1 · JSound 1.4 4D · KIWAMI-NEXT · FINGER S1.0 · JHand 1.1 -->
+      <!-- Left Slide-Out Drawer: 5K KHDR 1.1 · JSound 1.5 (3OA/FDTD/Worklet) · KIWAMI-NEXT · FINGER S1.0 -->
       <aside class="drawer left" id="drawer-graphics" aria-label="スタジオ設定">
         <div class="drawer-header">
           <div class="drawer-title">
-            <h2>映像 · 4D音響 · 革新技術</h2>
-            <span class="drawer-badge">v1.4 極</span>
+            <h2>映像 · 3OA音響 · 革新技術</h2>
+            <span class="drawer-badge">v1.5 極</span>
           </div>
           <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
@@ -1159,6 +1168,7 @@ export class GameUI {
   }
 
   private formatSpatialTag(mode: JSoundSpatialMode): string {
+    if (mode === '4d_audio_x') return '4D X·3OA';
     if (mode === '4d_audio_max') return '4D MAX';
     if (mode === '4d_audio') return '4D音場';
     if (mode === 'binaural_3d') return '立体3D';
@@ -1224,12 +1234,14 @@ export class GameUI {
 
     const jsoundEl = this.graphicsBodyEl.querySelector('#live-jsound-stats');
     if (jsoundEl) {
-      const peakStr = m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`;
+      const lufsStr = m.jsoundLufsMomentary <= -68 ? '待機' : `${m.jsoundLufsMomentary} LUFS`;
+      const tpStr = m.jsoundTruePeakDbTp <= -68 ? '—' : `${m.jsoundTruePeakDbTp}dBTP`;
+      const wkTag = m.jsoundWorkletActive ? 'Worklet' : 'DSP';
       jsoundEl.innerHTML = `
-        <div class="metric-box"><div class="k">空間 / 内部DSP</div><div class="v gold">${spTag} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)</div></div>
-        <div class="metric-box"><div class="k">4D音線 / RT60</div><div class="v">${m.jsoundEarlyRays}Ray · ${m.jsoundRt60Sec.toFixed(2)}s</div></div>
-        <div class="metric-box"><div class="k">音響プローブ D/R</div><div class="v">${m.probeDrDb >= 0 ? '+' : ''}${m.probeDrDb.toFixed(1)}dB (近接+${m.probeProximityDb.toFixed(1)}dB)</div></div>
-        <div class="metric-box"><div class="k">発音 (${m.jsoundVoices}ch · ${peakStr})</div><div class="v">${m.jsoundLastEventJp}</div></div>
+        <div class="metric-box"><div class="k">3OA空間 / 内部DSP</div><div class="v gold">${spTag} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)</div></div>
+        <div class="metric-box"><div class="k">3OA音線 / 2D-FDTD</div><div class="v">${m.jsoundEarlyRays}Ray · ${m.jsoundFdtdNodes}節点 · ${m.jsoundRt60Sec.toFixed(2)}s</div></div>
+        <div class="metric-box"><div class="k">ITU-R計測 (${wkTag})</div><div class="v">${lufsStr} · ${tpStr} · ρ${m.jsoundPhaseCorr.toFixed(2)}</div></div>
+        <div class="metric-box"><div class="k">発音 (${m.jsoundVoices}ch · D/R ${m.probeDrDb >= 0 ? '+' : ''}${m.probeDrDb.toFixed(1)}dB)</div><div class="v">${m.jsoundLastEventJp}</div></div>
       `;
     }
 
@@ -1371,17 +1383,21 @@ export class GameUI {
 
       <section class="panel-section">
         <div class="section-head">
-          <span class="section-title">JSound Engin 1.4 · 4D音響</span>
-          <span class="section-meta">${this.formatSpatialTag(s.jsoundSpatialMode)} · ${s.jsoundQuality === 'ultra' ? '384kHz·380Ray' : s.jsoundQuality === 'pro' ? '192kHz·230Ray' : '96kHz·高速'}</span>
+          <span class="section-title">JSound Engin 1.5 · 3OA/4D</span>
+          <span class="section-meta">${this.formatSpatialTag(s.jsoundSpatialMode)} · ${s.jsoundQuality === 'ultra' ? '768kHz·520Ray' : s.jsoundQuality === 'pro' ? '192kHz·230Ray' : '96kHz·高速'}</span>
         </div>
-        <div class="pill-grid cols-2">
+        <div class="pill-grid cols-3">
+          <button class="pill-btn ${s.jsoundSpatialMode === '4d_audio_x' ? 'active' : ''}" data-spatial="4d_audio_x">
+            <span>★ 4D X(3OA)</span>
+            <span class="sub">16ch 3OA+FDN</span>
+          </button>
           <button class="pill-btn ${s.jsoundSpatialMode === '4d_audio_max' ? 'active' : ''}" data-spatial="4d_audio_max">
-            <span>★ 4D Audio MAX</span>
-            <span class="sub">360°球面+頭上+重低音</span>
+            <span>4D MAX</span>
+            <span class="sub">球面+頭上+重低</span>
           </button>
           <button class="pill-btn ${s.jsoundSpatialMode === '4d_audio' ? 'active' : ''}" data-spatial="4d_audio">
             <span>4D Audio</span>
-            <span class="sub">4D音場+頭上気流</span>
+            <span class="sub">4D気流+音場</span>
           </button>
         </div>
         <div class="pill-grid cols-3" style="margin-top:5px">
@@ -1398,22 +1414,29 @@ export class GameUI {
         </div>
         <div class="pill-grid cols-3" style="margin-top:5px">
           <button class="pill-btn ${s.jsoundQuality === 'ultra' ? 'active' : ''}" data-jsound="ultra">
-            <span>1.4 Ultra</span>
-            <span class="sub">384kHz·380Ray</span>
+            <span>1.5 Ultra</span>
+            <span class="sub">768kHz·520Ray</span>
           </button>
           <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
-            <span>1.4 Pro</span>
+            <span>1.5 Pro</span>
             <span class="sub">192kHz·230Ray</span>
           </button>
           <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
-            <span>1.4 Lite</span>
+            <span>1.5 Lite</span>
             <span class="sub">96kHz·高速</span>
           </button>
         </div>
-        <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
-          <span>${s.jsoundAmbience ? '✓ 4D空間環境音 ON（20種・竹林風/鈴虫/錫杖/能管/水琴窟他）' : '4D空間環境音 OFF'}</span>
-        </button>
-        <div class="swatch-row-label">32和楽器 4D物理試聴デッキ（384kHz 31-Tap -111dB · 58素材 · 380音線）</div>
+        <div class="pill-grid cols-2" style="margin-top:5px">
+          <button class="pill-btn ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
+            <span>${s.jsoundAmbience ? '✓ 24種 3OA環境音 ON' : '3OA環境音 OFF'}</span>
+            <span class="sub">南部風鈴/神楽笛/水琴窟</span>
+          </button>
+          <button class="pill-btn ${s.jsoundSympathetic ? 'active' : ''}" id="btn-jsound-sympathetic">
+            <span>${s.jsoundSympathetic ? '✓ 13弦共鳴・8ch FDN' : '共鳴弦・FDN OFF'}</span>
+            <span class="sub">AudioWorklet物理共鳴</span>
+          </button>
+        </div>
+        <div class="swatch-row-label">40和楽器 3OA/2D-FDTD 試聴デッキ（768kHz 63-Tap -134dB · 70素材 · 520音線）</div>
         <div class="audition-grid cols-4">
           ${AUDITION_INSTRUMENTS.map(
             (inst) => `
@@ -1422,9 +1445,9 @@ export class GameUI {
           ).join('')}
         </div>
         <div class="metric-grid" id="live-jsound-stats">
-          <div class="metric-box"><div class="k">空間 / 内部DSP</div><div class="v gold">${m ? `${this.formatSpatialTag(m.jsoundSpatialMode)} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)` : '4D MAX · 384kHz(8×)'}</div></div>
-          <div class="metric-box"><div class="k">4D音線 / RT60</div><div class="v">${m ? `${m.jsoundEarlyRays}Ray · ${m.jsoundRt60Sec.toFixed(2)}s` : '376Ray · 0.46s'}</div></div>
-          <div class="metric-box"><div class="k">音響プローブ D/R</div><div class="v">${m ? `${m.probeDrDb >= 0 ? '+' : ''}${m.probeDrDb.toFixed(1)}dB (近接+${m.probeProximityDb.toFixed(1)}dB)` : '—'}</div></div>
+          <div class="metric-box"><div class="k">3OA空間 / 内部DSP</div><div class="v gold">${m ? `${this.formatSpatialTag(m.jsoundSpatialMode)} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)` : '4D X·3OA · 768kHz(16×)'}</div></div>
+          <div class="metric-box"><div class="k">3OA音線 / 2D-FDTD</div><div class="v">${m ? `${m.jsoundEarlyRays}Ray · ${m.jsoundFdtdNodes}節点 · ${m.jsoundRt60Sec.toFixed(2)}s` : '524Ray · 256節点 · 0.46s'}</div></div>
+          <div class="metric-box"><div class="k">ITU-R計測 (Worklet)</div><div class="v">${m && m.jsoundLufsMomentary > -68 ? `${m.jsoundLufsMomentary} LUFS · ρ${m.jsoundPhaseCorr.toFixed(2)}` : '待機 · 4×OS TruePeak'}</div></div>
           <div class="metric-box"><div class="k">発音 (${m ? m.jsoundVoices : 0}ch)</div><div class="v">${m ? m.jsoundLastEventJp : '—'}</div></div>
         </div>
       </section>
@@ -1787,6 +1810,9 @@ export class GameUI {
     });
     this.graphicsBodyEl.querySelector('#btn-jsound-ambience')!.addEventListener('click', () => {
       this.handlers.onToggleJSoundAmbience(!this.currentSettings.jsoundAmbience);
+    });
+    this.graphicsBodyEl.querySelector('#btn-jsound-sympathetic')!.addEventListener('click', () => {
+      this.handlers.onToggleJSoundSympathetic(!this.currentSettings.jsoundSympathetic);
     });
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-audition]').forEach((b) => {
       b.addEventListener('click', () => {

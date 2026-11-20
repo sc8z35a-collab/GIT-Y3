@@ -177,6 +177,7 @@ export interface GraphicsSettings {
   jsoundQuality: JSoundModeSetting;
   jsoundSpatialMode: JSoundSpatialMode;
   jsoundAmbience: boolean;
+  jsoundSympathetic: boolean;
   cameraStyle: CameraStyleId;
   compactUi: boolean;
   /** Project KIWAMI-NEXT breakthrough engine toggles */
@@ -197,8 +198,9 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   npcHandMaterial: 'karakuri_bronze',
   jhandMode: 'biomech_ultra',
   jsoundQuality: 'ultra',
-  jsoundSpatialMode: '4d_audio_max',
+  jsoundSpatialMode: '4d_audio_x',
   jsoundAmbience: true,
+  jsoundSympathetic: true,
   cameraStyle: 'cinematic',
   compactUi: false,
   bioPulseEnabled: true,
@@ -228,12 +230,18 @@ export interface RenderMetrics {
   jhandSynergyJp: string;
   jsoundRt60Sec: number;
   jsoundEarlyRays: number;
+  jsoundAmbisonicsOrder: number;
+  jsoundFdtdNodes: number;
   jsoundOversampling: number;
   jsoundDspRateKhz: number;
   jsoundSpatialMode: JSoundSpatialMode;
   jsoundCacheHitPct: number;
   jsoundVoices: number;
   jsoundPeakDb: number;
+  jsoundLufsMomentary: number;
+  jsoundTruePeakDbTp: number;
+  jsoundPhaseCorr: number;
+  jsoundWorkletActive: boolean;
   jsoundMaterialPair: string;
   jsoundLastEventJp: string;
   // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★
