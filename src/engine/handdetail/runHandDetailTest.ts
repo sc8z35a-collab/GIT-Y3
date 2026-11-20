@@ -7,7 +7,13 @@
 import * as THREE from 'three';
 import { JHandKinesisEngine } from '../jhand/BiomechanicsSolver';
 import { PAPER, ROCK, SCISSORS } from '../jnv1/types';
-import { createFingerS1SculptedPalmGeo } from '../../graphics/FingerS1Engine';
+import {
+  createFingerS1CuticleArchGeo,
+  createFingerS1NailPlateGeo,
+  createFingerS1PhalanxGeo,
+  createFingerS1SculptedPalmGeo,
+} from '../../graphics/FingerS1Engine';
+import { CameraDirector } from '../../scene/CameraDirector';
 import {
   SculptedPalmSubcutaneousField,
   evaluateDermaTensorState,
@@ -15,6 +21,7 @@ import {
 } from './DermaTensorEngine';
 import {
   NailPressureRefillSolver,
+  createFingerDorsalVellusField,
   createVellusHairInstancedField,
   evaluateSpectralDermalBRDF,
 } from './ChromaDermOptics';
@@ -193,12 +200,12 @@ assert(
   `0.12s press=${(afterPress * 100).toFixed(1)}%, 0.12s releaseDrop=${(dropOnRelease * 100).toFixed(1)}%, 1.8s recovery=${(afterFullRefill * 100).toFixed(2)}%`
 );
 
-// 2D. 3D Backlit Dorsal Vellus Micro-Hair Instanced Field
+// 2D. 3D Curved Backlit Dorsal Vellus Micro-Hair Instanced Field (520 Palm + 34 Finger Proximal!)
 const vellus = createVellusHairInstancedField(
   palmGeo,
   1,
   new THREE.Vector3(0.45, 0.78, 0.42).normalize(),
-  340
+  520
 );
 const m4 = new THREE.Matrix4();
 const pTmp = new THREE.Vector3();
@@ -215,12 +222,88 @@ for (let k = 0; k < vellus.mesh.count; k++) {
   if (pTmp.y <= 0.008) allDorsal = false;
 }
 assert(
-  vellus.mesh.count >= 300 && allHairFinite && allDorsal,
-  '3D Backlit Vellus Hair InstancedMesh spawns 340 finite dorsal fibers with zero volar leakage',
-  `count=${vellus.mesh.count}, drawCalls=1, minY=${(minHairY * 1000).toFixed(2)}mm`
+  vellus.mesh.count >= 500 &&
+    vellus.mesh.geometry.attributes.position.count === 5 &&
+    allHairFinite &&
+    allDorsal,
+  '3D Curved Backlit Dorsal Palm Vellus Field spawns 520 arched 5-vert fibers with zero volar leakage',
+  `count=${vellus.mesh.count}, vertsPerHair=5, drawCalls=1, minY=${(minHairY * 1000).toFixed(2)}mm`
 );
+
+const proxPhalGeo = createFingerS1PhalanxGeo(0.105, 0.025, 0.022, false);
+const fingerVellus = createFingerDorsalVellusField(proxPhalGeo, vellus.material, 34);
+let allFingerHairDorsal = true;
+for (let k = 0; k < fingerVellus.count; k++) {
+  fingerVellus.getMatrixAt(k, m4);
+  pTmp.setFromMatrixPosition(m4);
+  if (!Number.isFinite(pTmp.y) || pTmp.y <= 0.005) allFingerHairDorsal = false;
+}
+assert(
+  fingerVellus.count === 34 && allFingerHairDorsal,
+  'Proximal finger dorsal vellus hair cluster plants 34 curved dorsal fibers cleanly',
+  `count=${fingerVellus.count}, dorsalOnly=${allFingerHairDorsal}`
+);
+fingerVellus.geometry.dispose();
 vellus.mesh.geometry.dispose();
 vellus.material.dispose();
+
+// 2E. True Solid 3D Beveled Fingernail Slab + 3D Eponychium Cuticle Arch
+const nailGeo = createFingerS1NailPlateGeo(0.028, 0.036);
+const cuticleGeo = createFingerS1CuticleArchGeo(0.028, 0.036);
+nailGeo.computeBoundingBox();
+const nailBox = nailGeo.boundingBox!;
+const nailVerts = nailGeo.attributes.position.count;
+const cuticleVerts = cuticleGeo.attributes.position.count;
+assert(
+  nailVerts === 27 * 23 * 2 && nailBox.max.y - nailBox.min.y > 0.003 && cuticleVerts > 250,
+  'Solid 3D beveled keratin nail slab (top+bottom+free-edge wall) & 3D eponychium cuticle arch verified',
+  `nailVerts=${nailVerts}, nailHeight=${((nailBox.max.y - nailBox.min.y) * 1000).toFixed(2)}mm, cuticleVerts=${cuticleVerts}`
+);
+
+// =============================================================================
+// 3. INFINITE-ZOOM OPTICS 1.0 AUDIT (0.2× .. 5000× C∞ Dolly + Telephoto + Pan)
+// =============================================================================
+console.log('\n3. INFINITE-ZOOM OPTICS 1.0 (0.2× Panorama -> 5000× Cellular Microscope)');
+
+const camDir = new CameraDirector(16 / 9);
+for (let i = 0; i < 60; i++) camDir.update(1 / 60);
+
+// Zoom IN to 5000× ultra-microscope!
+camDir.setTargetMagnification(5000);
+for (let i = 0; i < 180; i++) camDir.update(1 / 60);
+const ultraTel = camDir.getZoomTelemetry();
+const visibleHeightMm =
+  2 * ultraTel.workingDistanceM * Math.tan(THREE.MathUtils.degToRad(ultraTel.fovDeg * 0.5)) * 1000;
+assert(
+  ultraTel.magnification >= 4800 &&
+    ultraTel.workingDistanceM >= 0.0139 &&
+    camDir.camera.near <= 0.002 &&
+    ultraTel.fovDeg < 2.0 &&
+    visibleHeightMm < 0.5 &&
+    Number.isFinite(camDir.camera.position.x),
+  '5000× cellular microscope zoom resolves sub-0.5mm field-of-view without clipping geometry',
+  `mag=${ultraTel.magnification}×, fovHeight=${visibleHeightMm.toFixed(3)}mm, workDist=${(ultraTel.workingDistanceM * 1000).toFixed(2)}mm, near=${(camDir.camera.near * 1000).toFixed(2)}mm, fov=${ultraTel.fovDeg}°`
+);
+
+// Zoom OUT to 0.25× wide architectural panorama!
+camDir.setTargetMagnification(0.25);
+for (let i = 0; i < 180; i++) camDir.update(1 / 60);
+const wideTel = camDir.getZoomTelemetry();
+assert(
+  wideTel.magnification <= 0.27 && wideTel.workingDistanceM > 6.5,
+  'Wide architectural zoom-out reaches 0.25× panoramic room framing cleanly',
+  `mag=${wideTel.magnification}×, workDist=${wideTel.workingDistanceM.toFixed(2)}m`
+);
+
+// Reset smoothly back to 1.0×
+camDir.resetInspectionView();
+for (let i = 0; i < 180; i++) camDir.update(1 / 60);
+const resetTel = camDir.getZoomTelemetry();
+assert(
+  Math.abs(resetTel.magnification - 1.0) < 0.02 && !resetTel.isInspecting,
+  'Reset restores 1.0× default framing cleanly',
+  `mag=${resetTel.magnification}×`
+);
 
 console.log(`\n=== SUMMARY: ${passed} PASSED, ${failed} FAILED ===\n`);
 if (failed > 0) {

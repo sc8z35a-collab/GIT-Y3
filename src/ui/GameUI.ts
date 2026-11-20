@@ -42,6 +42,7 @@ import {
   JHandModeSetting,
   JSoundModeSetting,
   JSoundSpatialMode,
+  MicroscopeFocusPreset,
   PVModeId,
   RESOLUTION_LIST,
   RenderMetrics,
@@ -79,6 +80,9 @@ export interface GameUIHandlers {
   onChangeMatchFormat: (fmt: MatchFormat) => void;
   onChangeCameraStyle: (style: CameraStyleId) => void;
   onCycleCameraStyle: () => void;
+  onZoomSteps: (steps: number) => void;
+  onFocusMicroscope: (preset: MicroscopeFocusPreset) => void;
+  onResetZoom: () => void;
   onStartPV: (mode: PVModeId, recordVideo: boolean) => void;
   onStopPV: () => void;
   onCaptureSnapshot: () => void;
@@ -279,6 +283,10 @@ export class GameUI {
 
   private sealPillEl!: HTMLElement;
   private handButtons: HTMLButtonElement[] = [];
+
+  private zoomHudBarEl!: HTMLElement;
+  private zoomHudReadoutEl!: HTMLElement;
+  private zoomHudResetBtn!: HTMLButtonElement;
 
   private graphicsDrawerEl!: HTMLElement;
   private inspectorDrawerEl!: HTMLElement;
@@ -523,6 +531,14 @@ export class GameUI {
         </div>
       </footer>
 
+      <!-- Compact Infinite-Zoom Microscope HUD Bar (0.2× .. 5000×, Zero Neon!) -->
+      <div class="zoom-hud-bar" id="zoom-hud-bar" title="ホイール・ピンチ・＋/−で0.2×〜5000×無制限ズーム／右ドラッグ・Shiftドラッグでパン">
+        <button class="zoom-hud-btn" id="btn-zoom-out" aria-label="ズームアウト">−</button>
+        <span class="zoom-hud-readout" id="zoom-hud-readout">1.0×</span>
+        <button class="zoom-hud-btn" id="btn-zoom-in" aria-label="ズームイン">＋</button>
+        <button class="zoom-hud-btn zoom-hud-reset" id="btn-zoom-reset" style="display:none" title="視点・ズームをリセット (0 / ダブルクリック)">戻す</button>
+      </div>
+
       <!-- Left Slide-Out Drawer: 5K KHDR 1.1 · JSound 1.5 (3OA/FDTD/Worklet) · KIWAMI-NEXT · FINGER S1.0 -->
       <aside class="drawer left" id="drawer-graphics" aria-label="スタジオ設定">
         <div class="drawer-header">
@@ -584,6 +600,13 @@ export class GameUI {
     this.blitzBarEl = this.root.querySelector('#blitz-bar')!;
     this.blitzFillEl = this.root.querySelector('#blitz-fill')!;
     this.sealPillEl = this.root.querySelector('#seal-chip')!;
+
+    this.zoomHudBarEl = this.root.querySelector('#zoom-hud-bar')!;
+    this.zoomHudReadoutEl = this.root.querySelector('#zoom-hud-readout')!;
+    this.zoomHudResetBtn = this.root.querySelector('#btn-zoom-reset')!;
+    this.root.querySelector('#btn-zoom-in')!.addEventListener('click', () => this.handlers.onZoomSteps(2.2));
+    this.root.querySelector('#btn-zoom-out')!.addEventListener('click', () => this.handlers.onZoomSteps(-2.2));
+    this.zoomHudResetBtn.addEventListener('click', () => this.handlers.onResetZoom());
 
     this.graphicsDrawerEl = this.root.querySelector('#drawer-graphics')!;
     this.inspectorDrawerEl = this.root.querySelector('#drawer-inspector')!;
@@ -914,6 +937,12 @@ export class GameUI {
         this.inspectorOpen = !this.inspectorOpen;
         if (this.inspectorOpen) this.graphicsOpen = false;
         this.syncDrawers();
+      } else if (k === '+' || k === '=' || k === ';') {
+        this.handlers.onZoomSteps(2.2);
+      } else if (k === '-' || k === '_') {
+        this.handlers.onZoomSteps(-2.2);
+      } else if (k === '0') {
+        this.handlers.onResetZoom();
       }
     });
   }
@@ -1194,6 +1223,18 @@ export class GameUI {
     const sfShort = SHADOW_FLAME_SPECS[m.shadowFlameMode].shortLabel;
     const camShort = CAMERA_STYLE_SPECS[m.cameraStyle].shortJp;
     const spTag = this.formatSpatialTag(m.jsoundSpatialMode);
+
+    // Live Infinite-Zoom Microscope HUD Readout (0.2× .. 5000×)
+    const mag = m.cameraMagnification || 1;
+    const magStr =
+      mag >= 100
+        ? `${Math.round(mag)}× 超顕微`
+        : mag >= 10
+        ? `${mag.toFixed(1)}× マクロ`
+        : `${mag.toFixed(1)}×`;
+    this.zoomHudReadoutEl.textContent = magStr;
+    this.zoomHudBarEl.classList.toggle('inspecting', m.cameraIsInspecting);
+    this.zoomHudResetBtn.style.display = m.cameraIsInspecting ? 'inline-flex' : 'none';
 
     if (this.showHudTelemetry) {
       this.microTelemetryEl.style.display = 'inline-flex';
@@ -1517,14 +1558,41 @@ export class GameUI {
           </button>
         </div>
         <div class="finger-s1-caption">
-          ① DERMA-TENSOR 1.0（4指EDC伸筋腱・嗅ぎタバコ窩・皮下静脈弓の3D頂点実変形＋Mikkelsen 5K逆位相皺）<br/>
-          ② CHROMA-DERM &amp; 爪光学（3波長RGB拡散＋皮脂/角質2層GGX＋340本3D逆光産毛＋爪異方性＆毛細血管再充血）
+          ① DERMA-TENSOR 1.0（4指EDC伸筋腱・嗅ぎタバコ窩・皮下静脈弓の3D頂点実変形＋4層35μm顕微法線＆逆位相皺）<br/>
+          ② CHROMA-DERM &amp; 爪光学（3波長RGB拡散＋皮脂/角質2層GGX＋680本カーブ3D産毛＋立体3D爪＆甘皮・毛細血管再充血）
         </div>
         <div class="metric-grid" id="live-handdetail-stats">
           <div class="metric-box"><div class="k">皮下腱3D隆起</div><div class="v gold">${m ? `${m.dermaTendonLiftMm.toFixed(2)} mm` : '3.80 mm'}</div></div>
           <div class="metric-box"><div class="k">背側皺 / 掌側皺</div><div class="v">${m ? `${m.dermaWrinklePct}% / ${m.dermaVolarCreasePct}%` : '78% / 44%'}</div></div>
-          <div class="metric-box"><div class="k">爪床白化 / 3D産毛</div><div class="v">${m ? `${m.nailBlanchPct}% · ${m.vellusHairCount}本` : '4% · 340本'}</div></div>
+          <div class="metric-box"><div class="k">爪床白化 / 3D産毛</div><div class="v">${m ? `${m.nailBlanchPct}% · ${m.vellusHairCount}本` : '4% · 680本'}</div></div>
           <div class="metric-box"><div class="k">皮膚張力相</div><div class="v">${m ? m.dermaStatusJp : '静止平衡'}</div></div>
+        </div>
+        <div class="swatch-row-label" style="margin-top:6px">無制限顕微ズーム（0.2×〜5000× · 35μm細胞解像 · 右ドラッグ/2本指パン対応）</div>
+        <div class="pill-grid cols-3">
+          <button class="pill-btn" data-micro-focus="player_nail">
+            <span>爪・甘皮</span>
+            <span class="sub">42× 3D厚爪</span>
+          </button>
+          <button class="pill-btn" data-micro-focus="player_tendon">
+            <span>皮下腱・産毛</span>
+            <span class="sub">18× 680本</span>
+          </button>
+          <button class="pill-btn" data-micro-focus="player_fingerprint">
+            <span>指紋・汗孔</span>
+            <span class="sub">75× 掌側</span>
+          </button>
+          <button class="pill-btn" data-micro-focus="npc_joint">
+            <span>真鍮関節</span>
+            <span class="sub">26× 切削目</span>
+          </button>
+          <button class="pill-btn" data-micro-focus="ultra_cell">
+            <span>超顕微皮膚</span>
+            <span class="sub">320× 35μm</span>
+          </button>
+          <button class="pill-btn" data-micro-focus="reset">
+            <span>↺ 視点戻す</span>
+            <span class="sub">1.0× 標準</span>
+          </button>
         </div>
         <button class="pill-btn full-pill ${s.cameraStyle === 'macro_artisan' ? 'active' : ''}" id="btn-s1-macro" style="margin-top:6px">
           <span>◎ 匠マクロカメラで皮下腱・産毛・爪光学を極近接鑑賞</span>
@@ -1779,6 +1847,16 @@ export class GameUI {
     });
     this.graphicsBodyEl.querySelector('#btn-toggle-chroma')!.addEventListener('click', () => {
       this.handlers.onToggleChromaDerm(!this.currentSettings.chromaDermEnabled);
+    });
+    this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-micro-focus]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const preset = b.dataset.microFocus as MicroscopeFocusPreset;
+        this.handlers.onFocusMicroscope(preset);
+        if (preset !== 'reset') {
+          this.graphicsOpen = false;
+          this.syncDrawers();
+        }
+      });
     });
     this.graphicsBodyEl.querySelector('#btn-s1-macro')!.addEventListener('click', () => {
       this.handlers.onChangeCameraStyle('macro_artisan');

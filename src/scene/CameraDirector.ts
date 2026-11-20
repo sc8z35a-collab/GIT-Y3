@@ -52,6 +52,19 @@ interface ActiveSplineShot {
   rollEnd: number;
 }
 
+export interface CameraZoomTelemetry {
+  /** Effective optical magnification (1.0 = normal, 100 = 100× macro, up to 5000×+) */
+  magnification: number;
+  /** Physical distance from lens to focus point in meters */
+  workingDistanceM: number;
+  /** Effective focal distance in millimeters */
+  effectiveDistanceMm: number;
+  /** Live vertical field-of-view in degrees */
+  fovDeg: number;
+  /** True when user is zoomed into macro/microscope range or panned manually */
+  isInspecting: boolean;
+}
+
 export class CameraDirector {
   public readonly camera: THREE.PerspectiveCamera;
 
@@ -74,7 +87,12 @@ export class CameraDirector {
   private readonly rollSpring = new AnalyticSpring(0);
   private readonly orbitAzSpring = new AnalyticSpring(0);
   private readonly orbitElSpring = new AnalyticSpring(0);
-  private readonly zoomSpring = new AnalyticSpring(1.0);
+  // Logarithmic Infinite-Zoom Spring: zoomFactor = exp(zoomExp) ∈ [0.0002 (5000×) .. 5.0 (0.2×)]
+  private readonly zoomExpSpring = new AnalyticSpring(0.0);
+  // Precision 3D Microscope Pan Springs (world-space focus target offset!)
+  private readonly panSpringX = new AnalyticSpring(0);
+  private readonly panSpringY = new AnalyticSpring(0);
+  private readonly panSpringZ = new AnalyticSpring(0);
   private readonly recoilSpringX = new AnalyticSpring(0);
   private readonly recoilSpringY = new AnalyticSpring(0);
   private readonly recoilSpringZ = new AnalyticSpring(0);
@@ -92,20 +110,33 @@ export class CameraDirector {
   private targetRoll = 0;
   private dampRate = 6.2;
 
-  // Interactive pointer parallax, drag orbit & pinch/wheel zoom
+  // Interactive pointer parallax, unbounded 360° orbit, 3D pan & infinite logarithmic zoom
   private pointerX = 0;
   private pointerY = 0;
   private orbitAzimuth = 0;
   private orbitElevation = 0;
   private targetOrbitAzimuth = 0;
   private targetOrbitElevation = 0;
-  private zoomScale = 1.0;
-  private targetZoomScale = 1.0;
+  private zoomExp = 0;
+  private targetZoomExp = 0;
+  private readonly panOffset = new THREE.Vector3();
+  private readonly targetPanOffset = new THREE.Vector3();
+
   private isDragging = false;
+  private isPanning = false;
+  private hasUserPanned = false;
   private lastDragX = 0;
   private lastDragY = 0;
   private activePointers = new Map<number, { x: number; y: number }>();
   private lastPinchDist = 0;
+  private lastPinchMidX = 0;
+  private lastPinchMidY = 0;
+
+  // Live optical telemetry cache
+  private liveMagnification = 1.0;
+  private liveWorkingDistM = 2.4;
+  private liveEffectiveDistMm = 2400;
+  private liveFovDeg = 38;
 
   // Bullet-Time 180° Arc Orbit overlay
   private bulletOrbitRemaining = 0;
@@ -120,6 +151,9 @@ export class CameraDirector {
   private readonly tmpSplineLook = new THREE.Vector3();
   private readonly tmpOffset = new THREE.Vector3();
   private readonly tmpCamPos = new THREE.Vector3();
+  private readonly tmpFinalLook = new THREE.Vector3();
+  private readonly tmpCamRight = new THREE.Vector3();
+  private readonly tmpCamUp = new THREE.Vector3();
 
   // Impact micro-shake
   private microShake = 0;
@@ -128,8 +162,12 @@ export class CameraDirector {
   private mood: CameraMood = 'idle';
   private heroSweepAngle = 0;
 
+  // Optical limits: up to 5000× ultra-microscope magnification & 0.20× panoramic room pullout!
+  private static readonly MIN_ZOOM_EXP = Math.log(1 / 5000); // ~ -8.517 -> 5000×!
+  private static readonly MAX_ZOOM_EXP = Math.log(5.0);      // ~ +1.609 -> 0.2× wide!
+
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(38, aspect, 0.08, 48);
+    this.camera = new THREE.PerspectiveCamera(38, aspect, 0.02, 80);
     this.resize(aspect);
     this.triggerStageReveal();
   }
@@ -143,23 +181,124 @@ export class CameraDirector {
     if (style !== 'free_orbit') {
       this.targetOrbitAzimuth = 0;
       this.targetOrbitElevation = 0;
-      this.targetZoomScale = 1.0;
+      this.targetZoomExp = 0;
+      this.targetPanOffset.set(0, 0, 0);
+      this.hasUserPanned = false;
     }
     this.setMood(this.mood);
   }
 
+  /** Zoom smoothly in (+steps) or out (-steps) by logarithmic perceptual optical increments (22% per step)! */
+  public zoomBySteps(steps: number): void {
+    const nextExp = this.targetZoomExp - steps * 0.22;
+    this.targetZoomExp = THREE.MathUtils.clamp(
+      nextExp,
+      CameraDirector.MIN_ZOOM_EXP,
+      CameraDirector.MAX_ZOOM_EXP
+    );
+  }
+
+  /** Set exact target magnification (e.g. 1.0 = normal, 35 = 35× macro, 250 = 250× microscope)! */
+  public setTargetMagnification(mag: number): void {
+    const safeMag = Math.max(0.2, Math.min(5000, mag));
+    this.targetZoomExp = THREE.MathUtils.clamp(
+      Math.log(1 / safeMag),
+      CameraDirector.MIN_ZOOM_EXP,
+      CameraDirector.MAX_ZOOM_EXP
+    );
+  }
+
+  /** Smoothly aim the optical microscope directly at any 3D world point (fingernail, tendon, palm, joint)! */
+  public focusWorldPoint(
+    worldTarget: THREE.Vector3,
+    magnification: number,
+    orbitAzimuthRad?: number,
+    orbitElevationRad?: number
+  ): void {
+    this.stopSplineShot();
+    this.hasUserPanned = false;
+    this.targetPanOffset.copy(worldTarget).sub(this.targetLook);
+    this.setTargetMagnification(magnification);
+    if (typeof orbitAzimuthRad === 'number') this.targetOrbitAzimuth = orbitAzimuthRad;
+    if (typeof orbitElevationRad === 'number') this.targetOrbitElevation = orbitElevationRad;
+  }
+
+  /** Continuously track a moving 3D landmark (e.g. opening fingernail or breathing hand) until user pans manually */
+  public updateTrackedFocusPoint(worldTarget: THREE.Vector3): void {
+    if (!this.hasUserPanned) {
+      this.targetPanOffset.copy(worldTarget).sub(this.targetLook);
+    }
+  }
+
+  public isTrackingFocus(): boolean {
+    return !this.hasUserPanned;
+  }
+
+  /** Reset zoom, 3D pan, and orbit angle back to default framing smoothly */
+  public resetInspectionView(): void {
+    this.targetOrbitAzimuth = 0;
+    this.targetOrbitElevation = 0;
+    this.targetZoomExp = 0;
+    this.targetPanOffset.set(0, 0, 0);
+    this.hasUserPanned = false;
+  }
+
+  public getZoomTelemetry(): CameraZoomTelemetry {
+    return {
+      magnification: this.liveMagnification,
+      workingDistanceM: this.liveWorkingDistM,
+      effectiveDistanceMm: this.liveEffectiveDistMm,
+      fovDeg: this.liveFovDeg,
+      isInspecting:
+        this.liveMagnification > 1.28 ||
+        this.liveMagnification < 0.82 ||
+        this.targetPanOffset.lengthSq() > 0.0004 ||
+        Math.abs(this.targetOrbitAzimuth) > 0.05,
+    };
+  }
+
+  private applyScreenPan(dxPx: number, dyPx: number): void {
+    // 1:1 screen-pixel-matched 3D panning across ALL magnifications (1× to 5000×!)
+    this.hasUserPanned = true;
+    const zoomFactor = Math.exp(this.zoomExp);
+    const baseDist = Math.max(0.4, this.currentPos.distanceTo(this.currentLook));
+    const effectiveDist = baseDist * zoomFactor;
+    const panScale = effectiveDist * 0.00118;
+
+    this.camera.updateMatrixWorld();
+    this.tmpCamRight.setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+    this.tmpCamUp.setFromMatrixColumn(this.camera.matrixWorld, 1).normalize();
+
+    this.targetPanOffset.addScaledVector(this.tmpCamRight, -dxPx * panScale);
+    this.targetPanOffset.addScaledVector(this.tmpCamUp, dyPx * panScale);
+    // Keep focus inside the room boundaries cleanly
+    this.targetPanOffset.x = THREE.MathUtils.clamp(this.targetPanOffset.x, -2.6, 2.6);
+    this.targetPanOffset.y = THREE.MathUtils.clamp(this.targetPanOffset.y, -0.35, 1.85);
+    this.targetPanOffset.z = THREE.MathUtils.clamp(this.targetPanOffset.z, -2.4, 2.4);
+  }
+
   public bindCanvasEvents(canvas: HTMLCanvasElement): () => void {
+    const onContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
     const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
       this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.activePointers.size === 1) {
-        this.isDragging = true;
+        const wantsPan =
+          e.pointerType === 'mouse' && (e.button === 2 || e.button === 1 || (e.button === 0 && e.shiftKey));
+        if (e.pointerType === 'mouse' && e.button !== 0 && !wantsPan) return;
+        this.isPanning = wantsPan;
+        this.isDragging = !wantsPan;
         this.lastDragX = e.clientX;
         this.lastDragY = e.clientY;
       } else if (this.activePointers.size === 2) {
         this.isDragging = false;
+        this.isPanning = false;
         const pts = [...this.activePointers.values()];
         this.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        this.lastPinchMidX = (pts[0].x + pts[1].x) * 0.5;
+        this.lastPinchMidY = (pts[0].y + pts[1].y) * 0.5;
       }
     };
 
@@ -172,14 +311,34 @@ export class CameraDirector {
         this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       }
 
+      // 2-Finger Touch Pinch-to-Infinite-Zoom + Simultaneous 2-Finger Microscope Pan!
       if (this.activePointers.size === 2) {
         const pts = [...this.activePointers.values()];
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        if (this.lastPinchDist > 4) {
-          const ratio = this.lastPinchDist / Math.max(4, dist);
-          this.targetZoomScale = THREE.MathUtils.clamp(this.targetZoomScale * ratio, 0.56, 1.55);
+        const midX = (pts[0].x + pts[1].x) * 0.5;
+        const midY = (pts[0].y + pts[1].y) * 0.5;
+
+        if (this.lastPinchDist > 4 && dist > 4) {
+          const logRatio = Math.log(this.lastPinchDist / dist);
+          this.targetZoomExp = THREE.MathUtils.clamp(
+            this.targetZoomExp + logRatio * 1.15,
+            CameraDirector.MIN_ZOOM_EXP,
+            CameraDirector.MAX_ZOOM_EXP
+          );
+          this.applyScreenPan(midX - this.lastPinchMidX, midY - this.lastPinchMidY);
         }
         this.lastPinchDist = dist;
+        this.lastPinchMidX = midX;
+        this.lastPinchMidY = midY;
+        return;
+      }
+
+      if (this.isPanning) {
+        const dx = e.clientX - this.lastDragX;
+        const dy = e.clientY - this.lastDragY;
+        this.lastDragX = e.clientX;
+        this.lastDragY = e.clientY;
+        this.applyScreenPan(dx, dy);
         return;
       }
 
@@ -188,16 +347,15 @@ export class CameraDirector {
         const dy = e.clientY - this.lastDragY;
         this.lastDragX = e.clientX;
         this.lastDragY = e.clientY;
-        const maxAz = this.style === 'free_orbit' ? Math.PI : 0.92;
-        this.targetOrbitAzimuth = THREE.MathUtils.clamp(
-          this.targetOrbitAzimuth - dx * 0.0046,
-          -maxAz,
-          maxAz
-        );
+        // Scale angular rotation sensitivity smoothly at extreme magnification for microscope-grade precision!
+        const zoomFactor = Math.exp(this.zoomExp);
+        const precisionScale = THREE.MathUtils.clamp(Math.pow(zoomFactor, 0.35), 0.14, 1.0);
+        // Full 360° unbounded azimuth rotation in ALL modes!
+        this.targetOrbitAzimuth -= dx * 0.0048 * precisionScale;
         this.targetOrbitElevation = THREE.MathUtils.clamp(
-          this.targetOrbitElevation + dy * 0.0034,
-          -0.28,
-          0.52
+          this.targetOrbitElevation + dy * 0.0038 * precisionScale,
+          -0.95,
+          1.15
         );
       }
     };
@@ -209,29 +367,35 @@ export class CameraDirector {
       }
       if (this.activePointers.size === 0) {
         this.isDragging = false;
+        this.isPanning = false;
       }
     };
 
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) return;
-      const delta = Math.sign(e.deltaY) * 0.055;
-      this.targetZoomScale = THREE.MathUtils.clamp(this.targetZoomScale + delta, 0.58, 1.5);
+      e.preventDefault();
+      // Logarithmic perceptual zoom: supports mouse wheel AND trackpad pinch (ctrlKey) seamlessly!
+      const rawStep = e.ctrlKey ? e.deltaY * 0.014 : Math.sign(e.deltaY) * Math.min(0.28, Math.max(0.09, Math.abs(e.deltaY) * 0.0018));
+      this.targetZoomExp = THREE.MathUtils.clamp(
+        this.targetZoomExp + rawStep,
+        CameraDirector.MIN_ZOOM_EXP,
+        CameraDirector.MAX_ZOOM_EXP
+      );
     };
 
     const onDblClick = () => {
-      this.targetOrbitAzimuth = 0;
-      this.targetOrbitElevation = 0;
-      this.targetZoomScale = 1.0;
+      this.resetInspectionView();
     };
 
+    canvas.addEventListener('contextmenu', onContextMenu);
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-    canvas.addEventListener('wheel', onWheel, { passive: true });
+    canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('dblclick', onDblClick);
 
     return () => {
+      canvas.removeEventListener('contextmenu', onContextMenu);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
@@ -252,7 +416,10 @@ export class CameraDirector {
     this.rollSpring.snap(this.currentRoll);
     this.orbitAzSpring.snap(this.orbitAzimuth);
     this.orbitElSpring.snap(this.orbitElevation);
-    this.zoomSpring.snap(this.zoomScale);
+    this.zoomExpSpring.snap(this.zoomExp);
+    this.panSpringX.snap(this.panOffset.x);
+    this.panSpringY.snap(this.panOffset.y);
+    this.panSpringZ.snap(this.panOffset.z);
   }
 
   /**
@@ -266,10 +433,12 @@ export class CameraDirector {
     this.currentRoll = -0.024;
     this.orbitAzimuth = 0;
     this.orbitElevation = 0;
-    this.zoomScale = 1.0;
+    this.zoomExp = 0;
+    this.panOffset.set(0, 0, 0);
     this.targetOrbitAzimuth = 0;
     this.targetOrbitElevation = 0;
-    this.targetZoomScale = 1.0;
+    this.targetZoomExp = 0;
+    this.targetPanOffset.set(0, 0, 0);
     this.syncSpringsToCurrent();
     this.setMood('idle');
     this.dampRate = 3.6;
@@ -309,6 +478,7 @@ export class CameraDirector {
    */
   public triggerBulletTimeOrbit(durationSec = 0.72, dir: 1 | -1 = 1, spanRad = 1.38): void {
     if (this.style === 'free_orbit' || this.style === 'broadcast') return;
+    if (this.liveMagnification > 3.0) return; // Don't spin wildly during close microscope inspection!
     this.bulletOrbitDuration = Math.max(0.25, durationSec);
     this.bulletOrbitRemaining = this.bulletOrbitDuration;
     this.bulletOrbitDir = dir;
@@ -319,12 +489,10 @@ export class CameraDirector {
   public setMood(mood: CameraMood, forceOverrideFree = false): void {
     this.mood = mood;
     if (this.style === 'free_orbit' && !forceOverrideFree) {
-      // Preserve user's custom orbit angle in Free Orbit inspection mode!
       return;
     }
     this.heroSweepAngle = 0;
 
-    // Style-adaptive baseline offsets
     const isDuel = this.style === 'duel_rail';
     const isMacro = this.style === 'macro_artisan';
     const isBroad = this.style === 'broadcast';
@@ -336,9 +504,9 @@ export class CameraDirector {
         this.targetLook.set(0, 0.28, 0.02);
         this.targetFovOffset = -2.0;
       } else if (isMacro) {
-        this.targetPos.set(-0.22, 0.88, 1.54 * pS);
-        this.targetLook.set(-0.14, 0.29, 0.14);
-        this.targetFovOffset = -7.5;
+        this.targetPos.set(-0.22, 0.72, 1.18 * pS);
+        this.targetLook.set(-0.18, 0.29, 0.16);
+        this.targetFovOffset = -9.5;
       } else if (isBroad) {
         this.targetPos.set(0, 1.78, 2.52 * pS);
         this.targetLook.set(0, 0.18, -0.06);
@@ -388,10 +556,10 @@ export class CameraDirector {
         this.targetFovOffset = -1.5;
         this.targetRoll = 0;
       } else if (isMacro) {
-        this.targetPos.set(0, 0.86, 1.46 * pS);
+        this.targetPos.set(0, 0.72, 1.12 * pS);
         this.targetLook.set(0, 0.31, 0.08);
-        this.targetFovOffset = -8.2;
-        this.targetRoll = 0.028;
+        this.targetFovOffset = -9.5;
+        this.targetRoll = 0.024;
       } else {
         this.targetPos.set(0, isDuel ? 0.78 : 1.06, (isDuel ? 1.72 : 1.82) * pS);
         this.targetLook.set(0, 0.29, 0.04);
@@ -400,42 +568,36 @@ export class CameraDirector {
       }
       this.dampRate = 13.5;
     } else if (mood === 'low_clash') {
-      // Dramatic low Samurai tabletop angle looking slightly up through the colliding hands!
       this.targetPos.set(0.18, 0.62, 1.68 * pS);
       this.targetLook.set(0, 0.34, 0.04);
       this.targetFovOffset = -6.8;
       this.targetRoll = -0.032;
       this.dampRate = 14.0;
     } else if (mood === 'ots_player') {
-      // Over-the-shoulder right behind the Player's sculpted craft hand staring down JNV1.0!
       this.targetPos.set(-1.26, 0.94, 1.54 * pS);
       this.targetLook.set(0.28, 0.3, -0.04);
       this.targetFovOffset = -4.2;
       this.targetRoll = -0.02;
       this.dampRate = 6.8;
     } else if (mood === 'ots_npc') {
-      // Dramatic counter over-the-shoulder behind JNV1.0!
       this.targetPos.set(1.26, 0.96, 1.48 * pS);
       this.targetLook.set(-0.28, 0.3, 0.06);
       this.targetFovOffset = -4.2;
       this.targetRoll = 0.022;
       this.dampRate = 6.8;
     } else if (mood === 'macro_hand') {
-      // Intimate 85mm craft macro inspecting joints, dorsal tendons, and lacquer grain
-      this.targetPos.set(-0.28, 0.78, 1.26 * pS);
+      this.targetPos.set(-0.28, 0.68, 1.04 * pS);
       this.targetLook.set(-0.22, 0.29, 0.14);
-      this.targetFovOffset = -9.5;
+      this.targetFovOffset = -10.5;
       this.targetRoll = -0.015;
       this.dampRate = 4.6;
     } else if (mood === 'spirit_charge') {
-      // Coiled low-tension push-in while Spirit Overdrive (極一撃) is armed!
       this.targetPos.set(-0.52, 0.98, 1.84 * pS);
       this.targetLook.set(-0.08, 0.31, 0.08);
       this.targetFovOffset = -4.6;
       this.targetRoll = -0.026;
       this.dampRate = 5.8;
     } else if (mood === 'feint_peek') {
-      // Quick tactical lean-in inspecting JNV1.0's hand for a subtle tell!
       this.targetPos.set(0.32, 1.06, 1.76 * pS);
       this.targetLook.set(0.32, 0.3, 0.04);
       this.targetFovOffset = -5.5;
@@ -468,20 +630,17 @@ export class CameraDirector {
     }
   }
 
-  /**
-   * Directional spring-damped physical shockwave kick aligned with clash momentum!
-   */
   public triggerImpactImpulse(strength = 0.034, dirX = 0, dirY = -0.6): void {
-    this.recoilSpringX.impulse(dirX * strength * 16.0);
-    this.recoilSpringY.impulse(dirY * strength * 14.0);
-    this.recoilSpringZ.impulse(-strength * 11.0);
-    this.microShake = Math.max(this.microShake, strength * 0.55);
+    const macroDamp = Math.min(1.0, Math.exp(this.zoomExp));
+    this.recoilSpringX.impulse(dirX * strength * 16.0 * macroDamp);
+    this.recoilSpringY.impulse(dirY * strength * 14.0 * macroDamp);
+    this.recoilSpringZ.impulse(-strength * 11.0 * macroDamp);
+    this.microShake = Math.max(this.microShake, strength * 0.55 * macroDamp);
   }
 
   public resize(aspect: number): void {
     this.aspect = Math.max(0.4, aspect);
     this.camera.aspect = this.aspect;
-    // Responsive framing: portrait smartphones pull back & open FOV so BOTH hands & kimono sleeves frame cleanly!
     if (this.aspect < 0.72) {
       this.baseFov = 52;
       this.portraitScale = 1.44;
@@ -510,7 +669,6 @@ export class CameraDirector {
     if (this.splineShot) {
       this.splineShot.elapsed += safeDt;
       const rawU = Math.min(1.0, this.splineShot.elapsed / this.splineShot.durationSec);
-      // Quintic smoothstep easing for silky museum crane motion
       const u = rawU * rawU * rawU * (rawU * (rawU * 6 - 15) + 10);
 
       this.splineShot.posCurve.getPoint(u, this.tmpSplinePos);
@@ -521,6 +679,8 @@ export class CameraDirector {
       this.currentFov = THREE.MathUtils.lerp(this.splineShot.fovStart, this.splineShot.fovEnd, u);
       this.currentRoll = THREE.MathUtils.lerp(this.splineShot.rollStart, this.splineShot.rollEnd, u);
 
+      this.camera.near = 0.04;
+      this.camera.far = 64;
       this.camera.fov = this.currentFov;
       this.camera.updateProjectionMatrix();
       this.camera.position.copy(this.currentPos);
@@ -537,11 +697,10 @@ export class CameraDirector {
       return;
     }
 
-    // 2. Camera Director 2.1 — Exact Closed-Form C² AnalyticSpring Steadicam Tracking!
+    // 2. Camera Director 2.2 — Exact Closed-Form C² AnalyticSpring Steadicam + INFINITE-ZOOM OPTICS!
     this.dampRate = THREE.MathUtils.lerp(this.dampRate, 6.2, 1 - Math.exp(-1.8 * safeDt));
     const omega = Math.max(3.4, this.dampRate * 1.18);
     const kCam = omega * omega;
-    // Slightly under-critical zeta=0.96 gives buttery Steadicam momentum with zero wobble!
     const dCam = 2.0 * omega * 0.96;
 
     this.currentPos.set(
@@ -555,69 +714,100 @@ export class CameraDirector {
       this.lookSpringZ.step(this.targetLook.z, kCam * 1.12, dCam * 1.06, safeDt)
     );
 
-    const kOrb = 58.0;
-    const dOrb = 2.0 * Math.sqrt(kOrb) * 0.98;
+    const kOrb = 68.0;
+    const dOrb = 2.0 * Math.sqrt(kOrb) * 0.99;
     this.orbitAzimuth = this.orbitAzSpring.step(this.targetOrbitAzimuth, kOrb, dOrb, safeDt);
     this.orbitElevation = this.orbitElSpring.step(this.targetOrbitElevation, kOrb, dOrb, safeDt);
-    this.zoomScale = this.zoomSpring.step(this.targetZoomScale, kOrb, dOrb, safeDt);
+    this.zoomExp = this.zoomExpSpring.step(this.targetZoomExp, kOrb * 1.15, dOrb * 1.08, safeDt);
+    this.panOffset.set(
+      this.panSpringX.step(this.targetPanOffset.x, kOrb, dOrb, safeDt),
+      this.panSpringY.step(this.targetPanOffset.y, kOrb, dOrb, safeDt),
+      this.panSpringZ.step(this.targetPanOffset.z, kOrb, dOrb, safeDt)
+    );
 
-    const desiredFov = THREE.MathUtils.clamp(this.baseFov + this.targetFovOffset, 24, 64);
-    const nextFov = this.fovSpring.step(desiredFov, kCam * 0.9, dCam * 0.96, safeDt);
-    if (Math.abs(nextFov - this.camera.fov) > 0.005) {
-      this.currentFov = nextFov;
-      this.camera.fov = this.currentFov;
-      this.camera.updateProjectionMatrix();
-    }
-
+    const desiredBaseFov = THREE.MathUtils.clamp(this.baseFov + this.targetFovOffset, 22, 64);
+    this.currentFov = this.fovSpring.step(desiredBaseFov, kCam * 0.9, dCam * 0.96, safeDt);
     this.currentRoll = this.rollSpring.step(this.targetRoll, kCam * 0.85, dCam * 0.95, safeDt);
 
     const damp = 1 - Math.exp(-this.dampRate * safeDt);
-    // Subtle heroic continuous arc on match victory/defeat
     if (this.mood === 'match_victory' || this.mood === 'match_defeat') {
       this.heroSweepAngle += safeDt * 0.26;
     } else {
       this.heroSweepAngle = THREE.MathUtils.lerp(this.heroSweepAngle, 0, damp);
     }
 
-    // Bullet-Time 180° Arc Orbit envelope!
     if (this.bulletOrbitRemaining > 0) {
       this.bulletOrbitRemaining = Math.max(0, this.bulletOrbitRemaining - safeDt);
       const u = 1 - this.bulletOrbitRemaining / Math.max(0.01, this.bulletOrbitDuration);
-      const arcBell = Math.sin(u * Math.PI);
-      this.bulletOrbitAngle = arcBell * this.bulletOrbitSpanRad * this.bulletOrbitDir;
+      this.bulletOrbitAngle = Math.sin(u * Math.PI) * this.bulletOrbitSpanRad * this.bulletOrbitDir;
     } else {
       this.bulletOrbitAngle = THREE.MathUtils.lerp(this.bulletOrbitAngle, 0, damp);
     }
 
-    // Step directional impact springs (closed-form framerate-invariant!)
     const recX = this.recoilSpringX.step(0, 240, 22, safeDt);
     const recY = this.recoilSpringY.step(0, 240, 22, safeDt);
     const recZ = this.recoilSpringZ.step(0, 240, 22, safeDt);
 
-    // Organic prime-lens breathing + pointer parallax + orbit + bullet-time arc (zero per-frame alloc!)
+    // ★ INFINITE-ZOOM OPTICS 1.0: C∞ Hyperbolic Physical-Dolly + Optical-Telephoto Handoff! ★
+    //   radius = sqrt(effectiveDist² + minWorkDist²)  (never clips into hand geometry!)
+    //   tan(fov/2) = tan(baseFov/2) * (effectiveDist / radius)  (seamless 0.2× .. 5000× magnification!)
     this.tmpOffset.copy(this.currentPos).sub(this.currentLook);
-    const offLen = Math.max(0.01, this.tmpOffset.length());
-    const radius = Math.max(0.85, offLen * this.zoomScale);
+    const offLen = Math.max(0.05, this.tmpOffset.length());
+    const zoomFactor = Math.exp(this.zoomExp);
+    const effectiveDist = offLen * zoomFactor;
+    const minWorkDist = 0.014; // 1.4cm safe physical working clearance from surface!
+    const radius = Math.sqrt(effectiveDist * effectiveDist + minWorkDist * minWorkDist);
+    const opticalScale = Math.min(1.0, effectiveDist / Math.max(1e-6, radius));
+
+    const baseHalfTan = Math.tan(THREE.MathUtils.degToRad(this.currentFov) * 0.5);
+    const finalFovDeg = THREE.MathUtils.clamp(
+      THREE.MathUtils.radToDeg(2.0 * Math.atan(baseHalfTan * opticalScale)),
+      0.08,
+      78
+    );
+
+    // Dynamic Adaptive Near/Far Clipping Planes (zero near-clip at 1.4cm, zero Z-fighting at 18m!)
+    const targetNear = THREE.MathUtils.clamp(radius * 0.06, 0.0004, 0.08);
+    const targetFar = THREE.MathUtils.clamp(Math.max(48, radius * 24), 48, 260);
+    if (
+      Math.abs(finalFovDeg - this.camera.fov) > 0.0005 ||
+      Math.abs(targetNear - this.camera.near) / Math.max(1e-5, this.camera.near) > 0.03 ||
+      Math.abs(targetFar - this.camera.far) > 2.0
+    ) {
+      this.camera.fov = finalFovDeg;
+      this.camera.near = targetNear;
+      this.camera.far = targetFar;
+      this.camera.updateProjectionMatrix();
+    }
+
+    this.liveMagnification = Number((1.0 / Math.max(1e-5, zoomFactor)).toFixed(2));
+    this.liveWorkingDistM = radius;
+    this.liveEffectiveDistMm = Number((effectiveDist * 1000).toFixed(2));
+    this.liveFovDeg = Number(finalFovDeg.toFixed(2));
+
     const basePhi = Math.atan2(this.tmpOffset.x, this.tmpOffset.z);
     const baseTheta = Math.acos(THREE.MathUtils.clamp(this.tmpOffset.y / offLen, -0.99, 0.99));
 
-    const breathX = Math.sin(this.elapsed * 0.68) * 0.014;
-    const breathY = Math.cos(this.elapsed * 0.52) * 0.009;
-    const heroArc = Math.sin(this.heroSweepAngle) * 0.18;
-    const parallaxScale = this.style === 'broadcast' ? 0.025 : 0.064;
+    // Vibration-isolated optical table damping: breathing & parallax fade smoothly at macro magnification!
+    const swayMask = THREE.MathUtils.clamp(zoomFactor * 1.35, 0.0, 1.0);
+    const breathX = Math.sin(this.elapsed * 0.68) * 0.014 * swayMask;
+    const breathY = Math.cos(this.elapsed * 0.52) * 0.009 * swayMask;
+    const heroArc = Math.sin(this.heroSweepAngle) * 0.18 * swayMask;
+    const parallaxScale = (this.style === 'broadcast' ? 0.025 : 0.064) * swayMask;
 
     const finalPhi =
       basePhi + this.orbitAzimuth + this.pointerX * parallaxScale + breathX + heroArc + this.bulletOrbitAngle;
     const finalTheta = THREE.MathUtils.clamp(
-      baseTheta - this.orbitElevation - this.pointerY * 0.036 + breathY,
-      0.34,
-      1.38
+      baseTheta - this.orbitElevation - this.pointerY * 0.036 * swayMask + breathY,
+      0.06,
+      1.54
     );
 
+    this.tmpFinalLook.copy(this.currentLook).add(this.panOffset);
     this.tmpCamPos.set(
-      this.currentLook.x + radius * Math.sin(finalTheta) * Math.sin(finalPhi) + recX,
-      this.currentLook.y + radius * Math.cos(finalTheta) + recY,
-      this.currentLook.z + radius * Math.sin(finalTheta) * Math.cos(finalPhi) + recZ
+      this.tmpFinalLook.x + radius * Math.sin(finalTheta) * Math.sin(finalPhi) + recX,
+      this.tmpFinalLook.y + radius * Math.cos(finalTheta) + recY,
+      this.tmpFinalLook.z + radius * Math.sin(finalTheta) * Math.cos(finalPhi) + recZ
     );
 
     if (this.microShake > 0.0003) {
@@ -629,10 +819,10 @@ export class CameraDirector {
     }
 
     this.camera.position.copy(this.tmpCamPos);
-    this.camera.lookAt(this.currentLook);
+    this.camera.lookAt(this.tmpFinalLook);
 
     if (Math.abs(this.currentRoll) > 0.0002) {
-      this.camera.rotateZ(this.currentRoll);
+      this.camera.rotateZ(this.currentRoll * swayMask);
     }
   }
 }

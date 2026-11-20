@@ -100,6 +100,17 @@ class JankenKiwamiApp {
         this.scene.setCameraStyle(next);
         this.ui.syncSettings(this.scene.getSettings());
       },
+      onZoomSteps: (steps) => {
+        this.scene.zoomCameraSteps(steps);
+      },
+      onFocusMicroscope: (preset) => {
+        this.sound.playWoodTap(preset === 'reset' ? 620 : 900);
+        this.scene.focusMicroscopePreset(preset);
+      },
+      onResetZoom: () => {
+        this.sound.playWoodTap(640);
+        this.scene.resetCameraZoom();
+      },
       onStartPV: (mode: PVModeId, recordVideo: boolean) => {
         this.stopBlitzTimer();
         this.scene.startPV(mode, recordVideo);

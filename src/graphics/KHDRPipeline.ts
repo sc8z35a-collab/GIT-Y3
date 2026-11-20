@@ -139,15 +139,18 @@ float computeShadowFlameSSCS(vec2 uv, float rawDepth) {
   if (rawDepth >= 0.9995) return 1.0;
 
   vec3 viewPos = reconstructViewPos(uv, rawDepth);
-  float distFade = 1.0 - smoothstep(4.2, 7.8, -viewPos.z);
+  float viewDist = max(0.002, -viewPos.z);
+  float distFade = 1.0 - smoothstep(4.2, 7.8, viewDist);
   if (distFade <= 0.01) return 1.0;
 
   float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
 
-  float rayLength = 0.24;
+  // Adaptive macro-to-architectural ray scaling: carves sub-millimeter micro-shadows even at 5000x zoom!
+  float rayLength = clamp(viewDist * 0.14, 0.0012, 0.24);
   const int STEPS = 10;
   float stepLen = rayLength / float(STEPS);
-  float thickness = 0.055;
+  float thickness = clamp(viewDist * 0.032, 0.00035, 0.055);
+  float minDelta = clamp(viewDist * 0.0028, 0.00008, 0.0045);
 
   float occ = 0.0;
   vec3 rayDir = normalize(uSunViewDir);
@@ -165,7 +168,7 @@ float computeShadowFlameSSCS(vec2 uv, float rawDepth) {
     float rayZ = sampleView.z;
 
     float delta = sampleSceneZ - rayZ;
-    if (delta > 0.0045 && delta < thickness) {
+    if (delta > minDelta && delta < thickness) {
       float falloff = 1.0 - (float(i) / float(STEPS));
       float smoothThick = 1.0 - smoothstep(thickness * 0.45, thickness, delta);
       occ = max(occ, falloff * smoothThick);
@@ -275,9 +278,9 @@ void main() {
     float gain = clamp(adaptedLum / lum, 0.60, 1.38);
     vec3 khdr = exposed * gain;
 
-    // 2. Depth-Aware Micro-Specular Surface Clarity (extra tactile crispness on foreground hands!)
+    // 2. Depth-Aware Micro-Specular Surface Clarity (extra Leica APO-Macro crispness when zoomed close!)
     float linearZ = rawDepth < 0.9995 ? linearizeDepth(rawDepth) : 20.0;
-    float fgClarityBoost = mix(0.28, 0.46, 1.0 - smoothstep(1.8, 4.6, linearZ));
+    float fgClarityBoost = mix(0.28, 0.56, 1.0 - smoothstep(0.55, 4.6, linearZ));
     vec2 px = 1.0 / uResolution;
     vec3 nAvg = 0.25 * (
       texture2D(tColor, vUv + vec2(px.x, 0.0)).rgb +

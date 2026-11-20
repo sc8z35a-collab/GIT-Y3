@@ -19,10 +19,10 @@
   3. **J-PSYCHO-NET 1.0**：SHA-256 事前封印を100%守りつつ、シャノン情報量 $H(X)$・KLダイバージェンス・可変長マルコフ連鎖(VLMC)・ナッシュ後悔最小化(Hedge)で心理を可視化
   4. **SPECTRAL-RAY ACOUSTIC PROBE 1.0**：ライブ3Dカメラ位置と建築寸法から毎秒30回・12幾何音線を解析し、D/R比・コンデンサ近接効果・フレネル遮蔽LPFをJSound 1.5へ連続連成
   5. **JNV-PROOF STEGO-SEAL 1.0**：5K 48-bit PNG の全ピクセル SHA-256 指紋と試合ハッシュ・カメラ座標・生体状態を専用 `jNVp` PNGチャンクへ不可分封印＋スタジオ内蔵 **1-bit改ざん検知リーダー**
-- **極写実ハンド造形＆2大・手の細部技術革新「FINGER S1.0 × DERMA-TENSOR 1.0 × CHROMA-DERM & KERATIN OPTICS 1.0」** ([FINGER S1.0設計書](docs/FINGER_S1_0.md) / [手の細部2革新設計書](docs/HAND_DETAIL_INNOVATIONS.md))
-  - **細部技術革新① `DERMA-TENSOR 1.0`**：4本の総指伸筋腱（EDC）・2本の斜走腱間結合・母指嗅ぎタバコ窩（EPL）・背側静脈弓の **リアルタイム3D頂点実変形**（チョキ時は示指・中指の2腱のみ選択隆起）＋ Langer線 逆位相皮膚張力（背側皺平坦化×掌側屈曲皺深化）＆ **Mikkelsen `dFdx`/`dFdy` 5K無限解像 Rete Cutis 微細法線**
-  - **細部技術革新② `CHROMA-DERM & KERATIN OPTICS 1.0`**：3波長スペクトル皮膚拡散（赤650nm 3.4mm ＞ 緑550nm 0.9mm ＞ 青450nm 0.3mm）＋ 皮脂脂質($\alpha_1$)/角質($\alpha_2$)2層GGX BRDF ＋ **340本 単一ドローコール 3D逆光背側産毛（Kajiya-Kayリム）** ＋ 異方性ブラッシュドケラチン爪光学＆油圧式毛細血管再充血（圧迫白化 $\tau=0.08\text{s}$／再充血 $\tau=0.38\text{s}$）
-  - 32×24 非対称解剖彫刻指節・3層動的関節皺・二重曲率爪半月・手続き型指紋/毛穴/掌紋/静脈 PBR・`living_skin` 極写実肌
+- **極写実ハンド造形＆手の細部革新 × 無制限顕微ズーム「FINGER S1.0 × DERMA-TENSOR 1.0 × CHROMA-DERM & KERATIN OPTICS 1.0 × INFINITE-ZOOM OPTICS」** ([FINGER S1.0設計書](docs/FINGER_S1_0.md) / [手の細部・無制限ズーム設計書](docs/HAND_DETAIL_INNOVATIONS.md))
+  - **細部技術革新① `DERMA-TENSOR 1.0`**：4本の総指伸筋腱（EDC）・2本の斜走腱間結合・母指嗅ぎタバコ窩（EPL）・背側静脈弓の **リアルタイム3D頂点実変形**（52×40彫刻手掌・チョキ時は示指/中指2腱のみ選択隆起）＋ Langer線 逆位相皮膚張力 ＆ **4オクターブ・スケール不変 Mikkelsen 35μm 顕微法線（`1.4mm → 0.42mm → 0.13mm → 0.035mm`）**
+  - **細部技術革新② `CHROMA-DERM & KERATIN OPTICS 1.0`**：3波長スペクトル皮膚拡散（赤650nm ＞ 緑550nm ＞ 青450nm）＋ 皮脂($\alpha_1$)/角質($\alpha_2$)2層GGX ＋ **680本カーブ3D逆光産毛（手背520本＋指基節160本）** ＋ **立体厚み3D爪スラブ＆3D甘皮アーチ**・異方性ケラチン爪光学＆油圧式毛細血管再充血（$\tau=0.08\text{s}/0.38\text{s}$）
+  - **無制限顕微ズーム（`0.2×〜5000×`）**：双曲線ドリー＋超望遠C∞連続遷移（画面縦視野 `0.345mm` までめり込みゼロ）・動的Near/Far＆SF-SSCS適応・3Dパン＆360°回転・6種ワンタップ顕微フォーカス・1024×1024汗孔付指紋＆512×512爪床毛細血管PBR
 - **独自生体関節エンジン「JHand Kinesis 1.1」× 36掌形＆C²滑らか制御** ([詳細設計書](docs/JHAND_KINESIS_1_1.md))
   - 38-DOF 解剖リグ・36掌形・6×サブステップ＋厳密解析解バネ `AnalyticSpring`・Camera Director 2.1・PVシネマ録画・スマホ全画面UI
 - **独自NPCコア「JNV1.0」& 独自影「Shadow Flame 1.0 Flash / Pro」** ([詳細設計書](docs/JNV1_ARCHITECTURE.md))

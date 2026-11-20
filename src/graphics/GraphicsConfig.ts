@@ -212,6 +212,14 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   acousticProbeEnabled: true,
 };
 
+export type MicroscopeFocusPreset =
+  | 'player_nail'
+  | 'player_tendon'
+  | 'player_fingerprint'
+  | 'npc_joint'
+  | 'ultra_cell'
+  | 'reset';
+
 export interface RenderMetrics {
   fps: number;
   frameTimeMs: number;
@@ -225,6 +233,10 @@ export interface RenderMetrics {
   shadowFlameMode: ShadowFlameMode;
   fingerS1Active: boolean;
   cameraStyle: CameraStyleId;
+  cameraMagnification: number;
+  cameraEffectiveDistMm: number;
+  cameraFovDeg: number;
+  cameraIsInspecting: boolean;
   jhandDof: number;
   jhandPoseCount: number;
   jhandPalmCupDeg: number;

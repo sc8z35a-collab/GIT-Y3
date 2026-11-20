@@ -114,6 +114,8 @@ export class GameScene {
   private readonly tmpVelLeft = new THREE.Vector3();
   private readonly tmpVelRight = new THREE.Vector3();
   private readonly tmpCamForward = new THREE.Vector3();
+  private readonly tmpFocusTarget = new THREE.Vector3();
+  private activeMicroscopeFocus: import('../graphics/GraphicsConfig').MicroscopeFocusPreset | null = null;
 
   private settings: GraphicsSettings = { ...DEFAULT_GRAPHICS_SETTINGS };
   private currentShadowMapSize = 2048;
@@ -347,6 +349,95 @@ export class GameScene {
     this.cameraDirector.setStyle(style);
   }
 
+  public zoomCameraSteps(steps: number): void {
+    this.cameraDirector.zoomBySteps(steps);
+  }
+
+  public resetCameraZoom(): void {
+    this.activeMicroscopeFocus = null;
+    if (!this.isAnimatingRound && !this.pvDirector.isActive()) {
+      this.playerHand.targetExtraRoll = 0;
+      this.playerHand.targetExtraPitch = 0;
+    }
+    this.cameraDirector.resetInspectionView();
+  }
+
+  private resolveMicroscopeLandmark(
+    preset: import('../graphics/GraphicsConfig').MicroscopeFocusPreset,
+    out: THREE.Vector3
+  ): boolean {
+    if (preset === 'player_nail') {
+      this.playerHand.getIndexNailWorldPosition(out);
+      return true;
+    }
+    if (preset === 'player_tendon' || preset === 'ultra_cell') {
+      this.playerHand.getDorsalTendonWorldPosition(out);
+      return true;
+    }
+    if (preset === 'player_fingerprint') {
+      this.playerHand.getIndexPulpWorldPosition(out);
+      return true;
+    }
+    if (preset === 'npc_joint') {
+      this.npcHand.getDorsalTendonWorldPosition(out);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * One-tap Optical Microscope Inspection Presets (18× .. 320×) with live 3D anatomical landmark tracking!
+   */
+  public focusMicroscopePreset(preset: import('../graphics/GraphicsConfig').MicroscopeFocusPreset): void {
+    if (preset === 'reset') {
+      this.resetCameraZoom();
+      return;
+    }
+    const canPose = !this.isAnimatingRound && !this.pvDirector.isActive();
+    this.activeMicroscopeFocus = preset;
+    if (preset === 'player_nail') {
+      if (canPose) {
+        this.playerHand.setTargetPose(PAPER, false, true);
+        this.playerHand.targetExtraRoll = 0;
+        this.playerHand.targetExtraPitch = 0;
+      }
+      this.resolveMicroscopeLandmark(preset, this.tmpFocusTarget);
+      this.cameraDirector.focusWorldPoint(this.tmpFocusTarget, 42, -0.35, 0.36);
+    } else if (preset === 'player_tendon') {
+      if (canPose) {
+        this.playerHand.setTargetPose(PAPER, false, true);
+        this.playerHand.targetExtraRoll = 0;
+        this.playerHand.targetExtraPitch = 0;
+      }
+      this.resolveMicroscopeLandmark(preset, this.tmpFocusTarget);
+      this.cameraDirector.focusWorldPoint(this.tmpFocusTarget, 18, -0.22, 0.28);
+    } else if (preset === 'player_fingerprint') {
+      if (canPose) {
+        this.playerHand.setTargetPose(PAPER, false, true);
+        // Gently supinate palm upward into the stage sunlight so volar fingerprint whorls & sweat pores gleam!
+        this.playerHand.targetExtraRoll = -Math.PI * 0.72;
+        this.playerHand.targetExtraPitch = -0.14;
+      }
+      this.resolveMicroscopeLandmark(preset, this.tmpFocusTarget);
+      this.cameraDirector.focusWorldPoint(this.tmpFocusTarget, 75, -0.28, 0.32);
+    } else if (preset === 'npc_joint') {
+      if (canPose) {
+        this.playerHand.targetExtraRoll = 0;
+        this.playerHand.targetExtraPitch = 0;
+      }
+      this.resolveMicroscopeLandmark(preset, this.tmpFocusTarget);
+      this.cameraDirector.focusWorldPoint(this.tmpFocusTarget, 26, 0.32, 0.34);
+    } else if (preset === 'ultra_cell') {
+      if (canPose) {
+        this.playerHand.setTargetPose(PAPER, false, true);
+        this.playerHand.targetExtraRoll = 0;
+        this.playerHand.targetExtraPitch = 0;
+      }
+      this.resolveMicroscopeLandmark(preset, this.tmpFocusTarget);
+      this.cameraDirector.focusWorldPoint(this.tmpFocusTarget, 320, -0.12, 0.46);
+    }
+  }
+
   public setCompactUi(compact: boolean): void {
     this.settings.compactUi = compact;
   }
@@ -440,6 +531,7 @@ export class GameScene {
   }
 
   public startPV(mode: PVModeId = 'grand_trailer', recordVideo = false): void {
+    this.activeMicroscopeFocus = null;
     if (!this.pvDirector.isActive()) {
       this.prePvStage = this.settings.stage;
       this.prePvPlayerMat = this.settings.playerHandMaterial;
@@ -644,6 +736,7 @@ export class GameScene {
   }
 
   public resetHandsToReady(): void {
+    this.activeMicroscopeFocus = null;
     this.clearTimeline();
     this.isAnimatingRound = false;
     this.hitStopRemaining = 0;
@@ -1295,7 +1388,12 @@ export class GameScene {
             cue.action();
           }
         }
-      } else if (!this.isAnimatingRound && !this.pvDirector.isActive() && !this.overdriveArmed) {
+      } else if (
+        !this.isAnimatingRound &&
+        !this.pvDirector.isActive() &&
+        !this.overdriveArmed &&
+        !this.cameraDirector.getZoomTelemetry().isInspecting
+      ) {
         // 10 Lifelike Idle Personality Micro-Gestures across our 36-Pose library!
         this.idleGestureTimer -= rawDt;
         if (this.idleGestureTimer <= 0) {
@@ -1437,6 +1535,15 @@ export class GameScene {
         this.settings.stage,
         this.settings.aeroVortexEnabled ? this.aeroVortex : undefined
       );
+
+      // Live Microscope Anatomical Landmark Tracking (locks cleanly onto opening nail/tendon/pulp until manual pan!)
+      if (this.activeMicroscopeFocus && !this.isAnimatingRound && !this.pvDirector.isActive()) {
+        if (!this.cameraDirector.isTrackingFocus()) {
+          this.activeMicroscopeFocus = null;
+        } else if (this.resolveMicroscopeLandmark(this.activeMicroscopeFocus, this.tmpFocusTarget)) {
+          this.cameraDirector.updateTrackedFocusPoint(this.tmpFocusTarget);
+        }
+      }
       this.cameraDirector.update(silkyDt);
 
       // Sync 3D/4D HRTF AudioListener pose in JSound Engin 1.4 with live Cinema Camera!
@@ -1481,6 +1588,7 @@ export class GameScene {
         const dim = this.khdr.getDimensions();
         const jhandT = this.playerHand.getKinesisTelemetry();
         const handDetailT = this.playerHand.getHandDetailTelemetry();
+        const zoomT = this.cameraDirector.getZoomTelemetry();
         const jsoundT = this.sound.getTelemetry();
         const aeroT = this.aeroVortex.getTelemetry();
         const probeT = this.acousticProbe.getSnapshot();
@@ -1498,6 +1606,10 @@ export class GameScene {
           shadowFlameMode: this.settings.shadowFlame,
           fingerS1Active: this.settings.fingerS1Enabled,
           cameraStyle: this.settings.cameraStyle,
+          cameraMagnification: zoomT.magnification,
+          cameraEffectiveDistMm: zoomT.effectiveDistanceMm,
+          cameraFovDeg: zoomT.fovDeg,
+          cameraIsInspecting: zoomT.isInspecting,
           jhandDof: jhandT.activeDof,
           jhandPoseCount: this.playerHand.kinesis.getPoseCount(),
           jhandPalmCupDeg: jhandT.palmCupDeg,
