@@ -171,6 +171,8 @@ export interface GraphicsSettings {
   shadowFlame: ShadowFlameMode;
   stage: StageId;
   fingerS1Enabled: boolean;
+  dermaTensorEnabled: boolean;
+  chromaDermEnabled: boolean;
   playerHandMaterial: HandMaterialPreset;
   npcHandMaterial: HandMaterialPreset;
   jhandMode: JHandModeSetting;
@@ -194,6 +196,8 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   shadowFlame: 'pro',
   stage: 'zashiki',
   fingerS1Enabled: true,
+  dermaTensorEnabled: true,
+  chromaDermEnabled: true,
   playerHandMaterial: 'living_skin',
   npcHandMaterial: 'karakuri_bronze',
   jhandMode: 'biomech_ultra',
@@ -228,6 +232,13 @@ export interface RenderMetrics {
   jhandIcrGlideMm: number;
   jhandFdiPct: number;
   jhandSynergyJp: string;
+  // ★ DERMA-TENSOR 1.0 + CHROMA-DERM & KERATIN OPTICS 1.0 Live Hand Micro-Detail Telemetry ★
+  dermaTendonLiftMm: number;
+  dermaWrinklePct: number;
+  dermaVolarCreasePct: number;
+  dermaStatusJp: string;
+  nailBlanchPct: number;
+  vellusHairCount: number;
   jsoundRt60Sec: number;
   jsoundEarlyRays: number;
   jsoundAmbisonicsOrder: number;

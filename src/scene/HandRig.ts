@@ -29,6 +29,18 @@ import {
   JHandTelemetry,
 } from '../engine/jhand/types';
 import {
+  DermaTensorState,
+  SculptedPalmSubcutaneousField,
+  evaluateDermaTensorState,
+} from '../engine/handdetail/DermaTensorEngine';
+import {
+  KeratinNailUniforms,
+  NailPressureRefillSolver,
+  VellusHairUniforms,
+  createVellusHairInstancedField,
+  enhanceNailWithKeratinOptics,
+} from '../engine/handdetail/ChromaDermOptics';
+import {
   AnalyticSpring,
   FingerS1ShaderUniforms,
   createFingerS1ForearmWristGeo,
@@ -44,6 +56,15 @@ import { HandMaterialPreset } from '../graphics/GraphicsConfig';
 import { TextureAtlasLoader } from '../graphics/TextureAtlasLoader';
 
 export type { HandPoseKey } from '../engine/jhand/types';
+
+export interface HandDetailTelemetry {
+  dermaTendonLiftMm: number;
+  dermaWrinklePct: number;
+  dermaVolarCreasePct: number;
+  dermaStatusJp: string;
+  nailBlanchPct: number;
+  vellusHairCount: number;
+}
 
 interface FingerJoints {
   mcp: THREE.Group;
@@ -131,14 +152,40 @@ export class SculptedHandRig {
   private readonly textures: TextureAtlasLoader;
   private currentPreset: HandMaterialPreset;
   private fingerS1Enabled: boolean;
+  private dermaTensorEnabled = true;
+  private chromaDermEnabled = true;
 
-  // FINGER S1.0 shared optical dermal-SSS uniforms
+  // FINGER S1.0 + DERMA-TENSOR 1.0 + CHROMA-DERM 1.0 shared optical dermal uniforms
   private readonly s1Uniforms: FingerS1ShaderUniforms = {
     uS1Enabled: { value: 1.0 },
     uS1SkinMode: { value: 1.0 },
     uS1Effort: { value: 0.2 },
     uS1SunDir: { value: new THREE.Vector3(0.45, 0.78, 0.42).normalize() },
+    uS1DermaEnabled: { value: 1.0 },
+    uS1ChromaEnabled: { value: 1.0 },
+    uS1DorsalStrain: { value: 0.25 },
+    uS1VolarCompress: { value: 0.42 },
+    uS1Sweat: { value: 0.14 },
+    uS1VascularPulse: { value: 0.35 },
   };
+
+  // CHROMA-DERM & KERATIN OPTICS 1.0 nail-bed anisotropic optics & capillary refill uniforms
+  private readonly nailUniforms: KeratinNailUniforms = {
+    uKeratinEnabled: { value: 1.0 },
+    uNailSkinMode: { value: 1.0 },
+    uNailPressure: { value: 0.0 },
+    uNailPulse: { value: 0.35 },
+    uNailSunDir: { value: new THREE.Vector3(0.45, 0.78, 0.42).normalize() },
+  };
+  private readonly nailRefillSolver = new NailPressureRefillSolver();
+  private palmSubcutaneousField?: SculptedPalmSubcutaneousField;
+  private vellusHairMesh?: THREE.InstancedMesh;
+  private vellusUniforms?: VellusHairUniforms;
+  private vellusMaterial?: THREE.ShaderMaterial;
+  private lastDermaState?: DermaTensorState;
+  private lastPulseWave = 0.35;
+  private lastSweatSheen = 0.14;
+  private lastFrameDt = 1 / 60;
 
   // Articulated 5-Metacarpal Palm Sub-Pivots
   private readonly cmc2Pivot = new THREE.Group();
@@ -258,7 +305,7 @@ export class SculptedHandRig {
     this.forearmPivot.add(this.sleeveAnchor);
 
     this.root.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
+      if (obj instanceof THREE.Mesh && obj !== this.vellusHairMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
       }
@@ -580,10 +627,11 @@ export class SculptedHandRig {
       });
     }
 
-    // Inject FINGER S1.0 Optical Dermal SSS + Knuckle Blanching + Peach-Fuzz Sheen cleanly!
+    // Inject FINGER S1.0 + DERMA-TENSOR 1.0 + CHROMA-DERM 1.0 Optical Dermal & Keratin Shaders cleanly!
     enhanceMaterialWithFingerS1Shader(this.primaryMat, preset, this.s1Uniforms);
     enhanceMaterialWithFingerS1Shader(this.fingerMat, preset, this.s1Uniforms);
     enhanceMaterialWithFingerS1Shader(this.s1JointCapsuleMat, preset, this.s1Uniforms);
+    enhanceNailWithKeratinOptics(this.nailMat, preset, this.nailUniforms);
   }
 
   private applyMaterialsToMeshes(): void {
@@ -601,7 +649,20 @@ export class SculptedHandRig {
   private syncVisibilityForMode(): void {
     const s1 = this.fingerS1Enabled;
     const isOrganicLiving = s1 && this.currentPreset === 'living_skin';
+    const dermaActive = s1 && this.dermaTensorEnabled;
+    const chromaActive = s1 && this.chromaDermEnabled;
+
     this.s1Uniforms.uS1Enabled.value = s1 ? 1.0 : 0.0;
+    this.s1Uniforms.uS1DermaEnabled.value = dermaActive ? 1.0 : 0.0;
+    this.s1Uniforms.uS1ChromaEnabled.value = chromaActive ? 1.0 : 0.0;
+    this.nailUniforms.uKeratinEnabled.value = chromaActive ? 1.0 : 0.0;
+
+    if (this.vellusHairMesh) {
+      this.vellusHairMesh.visible = isOrganicLiving && chromaActive;
+    }
+    if (this.palmSubcutaneousField && this.lastDermaState) {
+      this.palmSubcutaneousField.applyState(this.lastDermaState, dermaActive);
+    }
 
     for (const obj of this.s1OnlyMeshes) obj.visible = s1;
     for (const obj of this.classicOnlyMeshes) obj.visible = !s1;
@@ -620,8 +681,41 @@ export class SculptedHandRig {
     return this.fingerS1Enabled;
   }
 
+  public setDermaTensorEnabled(enabled: boolean): void {
+    if (this.dermaTensorEnabled === enabled) return;
+    this.dermaTensorEnabled = enabled;
+    this.syncVisibilityForMode();
+  }
+
+  public setChromaDermEnabled(enabled: boolean): void {
+    if (this.chromaDermEnabled === enabled) return;
+    this.chromaDermEnabled = enabled;
+    this.syncVisibilityForMode();
+  }
+
   public setSunDirection(dir: THREE.Vector3): void {
     this.s1Uniforms.uS1SunDir.value.copy(dir).normalize();
+    this.nailUniforms.uNailSunDir.value.copy(dir).normalize();
+    if (this.vellusUniforms) {
+      this.vellusUniforms.uSunDir.value.copy(dir).normalize();
+    }
+  }
+
+  public getHandDetailTelemetry(): HandDetailTelemetry {
+    const activeDerma = this.fingerS1Enabled && this.dermaTensorEnabled;
+    const activeChroma = this.fingerS1Enabled && this.chromaDermEnabled;
+    const d = this.lastDermaState;
+    return {
+      dermaTendonLiftMm: activeDerma && d ? d.peakTendonLiftMm : 0,
+      dermaWrinklePct: activeDerma && d ? Math.round(d.dorsalWrinkleDepth * 100) : 0,
+      dermaVolarCreasePct: activeDerma && d ? Math.round(d.volarCreaseDepth * 100) : 0,
+      dermaStatusJp: activeDerma && d ? d.statusJp : '停止中',
+      nailBlanchPct: activeChroma ? Math.round(this.nailRefillSolver.pressureBlanch * 100) : 0,
+      vellusHairCount:
+        activeChroma && this.currentPreset === 'living_skin' && this.vellusHairMesh
+          ? this.vellusHairMesh.count
+          : 0,
+    };
   }
 
   public setMaterialPreset(preset: HandMaterialPreset): void {
@@ -776,6 +870,21 @@ export class SculptedHandRig {
     s1PalmCore.position.set(0.014 * s, 0.001, 0.108);
     this.midcarpalPivot.add(s1PalmCore);
     this.s1OnlyMeshes.push(s1PalmCore);
+
+    // ★ DERMA-TENSOR 1.0: Real-Time Subcutaneous Dorsal Tendon & Venous-Arch 3D Vertex Field! ★
+    this.palmSubcutaneousField = new SculptedPalmSubcutaneousField(s1PalmCore.geometry, s);
+
+    // ★ CHROMA-DERM 1.0: 340-Fiber 3D Backlit Dorsal Vellus Micro-Hair Instanced Field (1 draw call!) ★
+    const vellus = createVellusHairInstancedField(
+      s1PalmCore.geometry,
+      s,
+      this.s1Uniforms.uS1SunDir.value,
+      340
+    );
+    this.vellusHairMesh = vellus.mesh;
+    this.vellusUniforms = vellus.uniforms;
+    this.vellusMaterial = vellus.material;
+    s1PalmCore.add(vellus.mesh);
 
     // 1B. Classic Palm Core (toggled when FINGER S1.0 is OFF)
     const palmCore = this.regPrimary(new THREE.SphereGeometry(0.124, 32, 24));
@@ -1287,6 +1396,42 @@ export class SculptedHandRig {
     // Feed live neuromuscular effort into FINGER S1.0 GLSL shader for real-time knuckle tension blanching!
     this.s1Uniforms.uS1Effort.value = solved.muscleEffort;
 
+    // ★ DERMA-TENSOR 1.0: Real-Time Subcutaneous Dorsal Tendon & Venous-Arch 3D Vertex Deformation
+    //   + Langer-Line Counter-Phase Dorsal/Volar Epidermal Strain Tensor! ★
+    const fKeys: FingerName[] = ['index', 'middle', 'ring', 'pinky'];
+    let clenchSum = 0;
+    let pulpSum = solved.thumb.pulpCompression;
+    for (let i = 0; i < fKeys.length; i++) {
+      const f = solved.fingers[fKeys[i]];
+      clenchSum += Math.max(0, f.mcpFlex) / 1.55 + Math.max(0, f.pipFlex) / 1.65;
+      pulpSum += f.pulpCompression;
+    }
+    const rawClench = Math.max(0, Math.min(1, clenchSum / 7.2));
+    const meanPulp = Math.max(0, Math.min(1, pulpSum / 5));
+
+    const derma = evaluateDermaTensorState(solved, this.lastPulseWave, rawClench);
+    this.lastDermaState = derma;
+    this.palmSubcutaneousField?.applyState(derma, this.fingerS1Enabled && this.dermaTensorEnabled);
+
+    this.s1Uniforms.uS1DorsalStrain.value = derma.dorsalFlexStrain;
+    this.s1Uniforms.uS1VolarCompress.value = derma.volarCreaseDepth;
+    this.s1Uniforms.uS1Sweat.value = this.lastSweatSheen;
+    this.s1Uniforms.uS1VascularPulse.value = this.lastPulseWave;
+
+    if (this.currentPreset === 'living_skin') {
+      const rShift = this.fingerS1Enabled && this.dermaTensorEnabled ? derma.skinRoughnessShift * 0.45 : 0;
+      this.primaryMat.roughness = 0.94 + rShift;
+      this.fingerMat.roughness = 0.92 + rShift;
+    }
+
+    // ★ CHROMA-DERM & KERATIN OPTICS 1.0: Asymmetric Hydraulic Nail-Bed Capillary Refill (τ=0.08s/0.38s)! ★
+    const nailPressure = this.nailRefillSolver.step(
+      Math.max(meanPulp, rawClench * 0.72),
+      this.lastFrameDt
+    );
+    this.nailUniforms.uNailPressure.value = nailPressure;
+    this.nailUniforms.uNailPulse.value = this.lastPulseWave;
+
     // 1. Forearm DRUJ Pronation + Visible Ulnar Styloid Head + Volar FCR/PL Flexor Tendons
     const wristThoughtRoll = Math.sin(this.idlePhase * 0.85) * 0.026 * this.idleDrummingWeight;
     this.forearmPivot.rotation.set(
@@ -1440,6 +1585,7 @@ export class SculptedHandRig {
 
   public update(dt: number): void {
     const safeDt = Math.min(dt, 0.05);
+    this.lastFrameDt = safeDt;
     this.idlePhase += safeDt * 1.85;
     this.recoilPulse = Math.max(0, this.recoilPulse - safeDt * 4.4);
 
@@ -1527,6 +1673,9 @@ export class SculptedHandRig {
     },
     enabled: boolean
   ): void {
+    this.lastPulseWave = enabled ? sample.pulseWave : 0.35;
+    this.lastSweatSheen = enabled ? sample.sweatSheen : 0.14;
+
     // 1. Subtle 8–12 Hz physiological neuromuscular micro-tremor on fingertips & radiocarpal wrist
     if (enabled && this.currentPreset === 'living_skin') {
       this.radiocarpalPivot.rotation.x += sample.tremorPitchRad;
@@ -1574,5 +1723,7 @@ export class SculptedHandRig {
     this.nailMat?.dispose();
     this.sleeveMat?.dispose();
     this.trimMat?.dispose();
+    this.vellusHairMesh?.geometry.dispose();
+    this.vellusMaterial?.dispose();
   }
 }

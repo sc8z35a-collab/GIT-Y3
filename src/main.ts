@@ -164,6 +164,16 @@ class JankenKiwamiApp {
         this.scene.setFingerS1Enabled(enabled);
         this.ui.syncSettings(this.scene.getSettings());
       },
+      onToggleDermaTensor: (enabled) => {
+        this.sound.playWoodTap(enabled ? 920 : 600);
+        this.scene.setDermaTensorEnabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onToggleChromaDerm: (enabled) => {
+        this.sound.playWoodTap(enabled ? 960 : 640);
+        this.scene.setChromaDermEnabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
       onPreviewPose: (pose) => {
         this.scene.previewPoseShowcase(pose);
       },

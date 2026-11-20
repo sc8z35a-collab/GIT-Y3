@@ -91,6 +91,8 @@ export interface GameUIHandlers {
   onChangeKHDRSplitX: (normX: number) => void;
   onChangeShadowFlame: (mode: ShadowFlameMode) => void;
   onToggleFingerS1: (enabled: boolean) => void;
+  onToggleDermaTensor: (enabled: boolean) => void;
+  onToggleChromaDerm: (enabled: boolean) => void;
   onPreviewPose: (pose: HandPoseKey) => void;
   onChangeStage: (stage: StageId) => void;
   onChangeHandMaterials: (playerMat: HandMaterialPreset, npcMat: HandMaterialPreset) => void;
@@ -1232,6 +1234,16 @@ export class GameUI {
       `;
     }
 
+    const handDetailEl = this.graphicsBodyEl.querySelector('#live-handdetail-stats');
+    if (handDetailEl) {
+      handDetailEl.innerHTML = `
+        <div class="metric-box"><div class="k">皮下腱3D隆起</div><div class="v gold">${m.dermaTendonLiftMm.toFixed(2)} mm</div></div>
+        <div class="metric-box"><div class="k">背側皺 / 掌側皺</div><div class="v">${m.dermaWrinklePct}% / ${m.dermaVolarCreasePct}%</div></div>
+        <div class="metric-box"><div class="k">爪床白化 / 3D産毛</div><div class="v">${m.nailBlanchPct}% · ${m.vellusHairCount}本</div></div>
+        <div class="metric-box"><div class="k">皮膚張力相</div><div class="v">${m.dermaStatusJp}</div></div>
+      `;
+    }
+
     const jsoundEl = this.graphicsBodyEl.querySelector('#live-jsound-stats');
     if (jsoundEl) {
       const lufsStr = m.jsoundLufsMomentary <= -68 ? '待機' : `${m.jsoundLufsMomentary} LUFS`;
@@ -1483,7 +1495,7 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">FINGER S1.0 極写実ハンド</span><span class="section-meta">${s.fingerS1Enabled ? 'ON · 彫刻関節+SSS' : 'OFF · 従来造形'}</span></div>
+        <div class="section-head"><span class="section-title">FINGER S1.0 極写実ハンド</span><span class="section-meta">${s.fingerS1Enabled ? 'ON · 細部2革新' : 'OFF · 従来造形'}</span></div>
         <div class="pill-grid cols-2">
           <button class="pill-btn ${s.fingerS1Enabled ? 'active' : ''}" data-fingers1="on">
             <span>FINGER S1.0 ON</span>
@@ -1494,11 +1506,28 @@ export class GameUI {
             <span class="sub">クラシック互換</span>
           </button>
         </div>
-        <div class="finger-s1-caption">
-          32×24 非対称解剖指節 · 3層動的関節皺 · 二重曲率爪半月 · J-BioPulse脈波&amp;毛細血管白化連動 · GLSL皮下散乱SSS
+        <div class="pill-grid cols-2" style="margin-top:5px">
+          <button class="pill-btn ${s.fingerS1Enabled && s.dermaTensorEnabled ? 'active' : ''}" id="btn-toggle-derma">
+            <span>${s.dermaTensorEnabled ? '✓ Derma-Tensor 1.0' : 'Derma-Tensor OFF'}</span>
+            <span class="sub">皮下腱3D+5K動的皺</span>
+          </button>
+          <button class="pill-btn ${s.fingerS1Enabled && s.chromaDermEnabled ? 'active' : ''}" id="btn-toggle-chroma">
+            <span>${s.chromaDermEnabled ? '✓ Chroma-Derm+爪光学' : 'Chroma-Derm OFF'}</span>
+            <span class="sub">3波長SSS+3D産毛+爪白化</span>
+          </button>
         </div>
-        <button class="pill-btn full-pill ${s.cameraStyle === 'macro_artisan' ? 'active' : ''}" id="btn-s1-macro">
-          <span>◎ 匠マクロカメラで指先・関節を極近接鑑賞</span>
+        <div class="finger-s1-caption">
+          ① DERMA-TENSOR 1.0（4指EDC伸筋腱・嗅ぎタバコ窩・皮下静脈弓の3D頂点実変形＋Mikkelsen 5K逆位相皺）<br/>
+          ② CHROMA-DERM &amp; 爪光学（3波長RGB拡散＋皮脂/角質2層GGX＋340本3D逆光産毛＋爪異方性＆毛細血管再充血）
+        </div>
+        <div class="metric-grid" id="live-handdetail-stats">
+          <div class="metric-box"><div class="k">皮下腱3D隆起</div><div class="v gold">${m ? `${m.dermaTendonLiftMm.toFixed(2)} mm` : '3.80 mm'}</div></div>
+          <div class="metric-box"><div class="k">背側皺 / 掌側皺</div><div class="v">${m ? `${m.dermaWrinklePct}% / ${m.dermaVolarCreasePct}%` : '78% / 44%'}</div></div>
+          <div class="metric-box"><div class="k">爪床白化 / 3D産毛</div><div class="v">${m ? `${m.nailBlanchPct}% · ${m.vellusHairCount}本` : '4% · 340本'}</div></div>
+          <div class="metric-box"><div class="k">皮膚張力相</div><div class="v">${m ? m.dermaStatusJp : '静止平衡'}</div></div>
+        </div>
+        <button class="pill-btn full-pill ${s.cameraStyle === 'macro_artisan' ? 'active' : ''}" id="btn-s1-macro" style="margin-top:6px">
+          <span>◎ 匠マクロカメラで皮下腱・産毛・爪光学を極近接鑑賞</span>
         </button>
       </section>
 
@@ -1744,6 +1773,12 @@ export class GameUI {
     // Bind listeners
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-fingers1]').forEach((b) => {
       b.addEventListener('click', () => this.handlers.onToggleFingerS1(b.dataset.fingers1 === 'on'));
+    });
+    this.graphicsBodyEl.querySelector('#btn-toggle-derma')!.addEventListener('click', () => {
+      this.handlers.onToggleDermaTensor(!this.currentSettings.dermaTensorEnabled);
+    });
+    this.graphicsBodyEl.querySelector('#btn-toggle-chroma')!.addEventListener('click', () => {
+      this.handlers.onToggleChromaDerm(!this.currentSettings.chromaDermEnabled);
     });
     this.graphicsBodyEl.querySelector('#btn-s1-macro')!.addEventListener('click', () => {
       this.handlers.onChangeCameraStyle('macro_artisan');

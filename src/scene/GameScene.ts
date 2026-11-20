@@ -360,6 +360,18 @@ export class GameScene {
     this.npcHand.addMotionImpulse(0, 0.35, 0, -0.5, -0.7);
   }
 
+  public setDermaTensorEnabled(enabled: boolean): void {
+    this.settings.dermaTensorEnabled = enabled;
+    this.playerHand.setDermaTensorEnabled(enabled);
+    this.npcHand.setDermaTensorEnabled(enabled);
+  }
+
+  public setChromaDermEnabled(enabled: boolean): void {
+    this.settings.chromaDermEnabled = enabled;
+    this.playerHand.setChromaDermEnabled(enabled);
+    this.npcHand.setChromaDermEnabled(enabled);
+  }
+
   /** Interactive 36-Pose Showcase Preview (triggered from Studio Drawer Pose Gallery!) */
   public previewPoseShowcase(poseKey: HandPoseKey): void {
     if (this.isAnimatingRound || this.pvDirector.isActive()) return;
@@ -1468,6 +1480,7 @@ export class GameScene {
         const p99Ms = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.02))] || avgMs;
         const dim = this.khdr.getDimensions();
         const jhandT = this.playerHand.getKinesisTelemetry();
+        const handDetailT = this.playerHand.getHandDetailTelemetry();
         const jsoundT = this.sound.getTelemetry();
         const aeroT = this.aeroVortex.getTelemetry();
         const probeT = this.acousticProbe.getSnapshot();
@@ -1492,6 +1505,12 @@ export class GameScene {
           jhandIcrGlideMm: jhandT.icrGlideMm,
           jhandFdiPct: jhandT.fdiBulgePct,
           jhandSynergyJp: jhandT.synergyPhaseJp,
+          dermaTendonLiftMm: handDetailT.dermaTendonLiftMm,
+          dermaWrinklePct: handDetailT.dermaWrinklePct,
+          dermaVolarCreasePct: handDetailT.dermaVolarCreasePct,
+          dermaStatusJp: handDetailT.dermaStatusJp,
+          nailBlanchPct: handDetailT.nailBlanchPct,
+          vellusHairCount: handDetailT.vellusHairCount,
           jsoundRt60Sec: jsoundT.stageRt60Sec,
           jsoundEarlyRays: jsoundT.earlyRayCount,
           jsoundAmbisonicsOrder: jsoundT.ambisonicsOrder,

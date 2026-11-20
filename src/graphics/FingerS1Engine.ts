@@ -980,18 +980,25 @@ export function createFingerS1SculptedPalmGeo(mirrorSign: number): THREE.BufferG
 
 export interface FingerS1ShaderUniforms {
   uS1Enabled: { value: number };
-  uS1SkinMode: { value: number }; // 1.0 living_skin, 0.32 porcelain/hinoki, 0.10 metallic
+  uS1SkinMode: { value: number }; // 1.0 living_skin, 0.28 porcelain/hinoki, 0.08 metallic
   uS1Effort: { value: number }; // 0..1 live clench effort -> knuckle tension blanching!
   uS1SunDir: { value: THREE.Vector3 };
+  // ★ DERMA-TENSOR 1.0 & CHROMA-DERM 1.0 Hand Fine-Detail Uniforms ★
+  uS1DermaEnabled: { value: number }; // 1.0 ON, 0.0 OFF
+  uS1ChromaEnabled: { value: number }; // 1.0 ON, 0.0 OFF
+  uS1DorsalStrain: { value: number }; // 0 = Paper extended (deep dorsal folds), 1 = Rock clenched (taut glossy collagen)
+  uS1VolarCompress: { value: number }; // 0.24..1.0 volar palmar flexion crease depth (counter-phase!)
+  uS1Sweat: { value: number }; // 0..1 J-BioPulse sebum/perspiration micro-sheen
+  uS1VascularPulse: { value: number }; // 0..1 live arterial systolic PPG pulse wave
 }
 
 /**
- * Patch a `MeshPhysicalMaterial` cleanly with FINGER S1.0's optical dermal scattering shader:
- *  - Linear-HDR calibrated warm hemoglobin wrap-diffuse scattering strictly across the shadow terminator!
- *  - Backlit crimson-amber fingertip & webbing translucency (zero neon — strictly physical optical SSS!)
- *  - Subtle directional crevice micro-AO so fingers & knuckles sculpt deep photographic 3D volume!
- *  - Real-time knuckle tension blanching driven by `JHandSolvedFrame.muscleEffort`
- *  - Whisper-subtle velvety vellus peach-fuzz grazing micro-sheen at oblique rim angles
+ * Patch a `MeshPhysicalMaterial` cleanly with FINGER S1.0 + DERMA-TENSOR 1.0 + CHROMA-DERM 1.0:
+ *  - DERMA-TENSOR 1.0: Mikkelsen `dFdx`/`dFdy` screen-space derivative procedural Rete Cutis micro-cells
+ *    and counter-phase Langer-line dorsal/volar dynamic wrinkles at infinite 5K macro sharpness!
+ *  - CHROMA-DERM 1.0: 3-Band Wavelength-Dependent Spectral Skin Diffusion (R 650nm > G 550nm > B 450nm)
+ *    + Dual-Lobe Sebum Lipid (α₁) & Stratum Corneum Keratin (α₂) GGX Microfacet Specular BRDF!
+ *  - Backlit crimson-amber fingertip & webbing translucency + knuckle tension blanching (strictly zero neon!)
  *
  * Strictly patches ONLY `#include <common>`, `#include <worldpos_vertex>`, and `#include <dithering_fragment>`
  * so Three.js's global `Shadow Flame 1.0` shadowmap chunk remains 100% untouched!
@@ -1009,12 +1016,18 @@ export function enhanceMaterialWithFingerS1Shader(
       : 0.08;
   uniforms.uS1SkinMode.value = skinMode;
 
-  mat.customProgramCacheKey = () => `finger_s1_optical_v2_${preset}`;
+  mat.customProgramCacheKey = () => `finger_s1_optical_v3_derma_chroma_${preset}`;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uS1Enabled = uniforms.uS1Enabled;
     shader.uniforms.uS1SkinMode = uniforms.uS1SkinMode;
     shader.uniforms.uS1Effort = uniforms.uS1Effort;
     shader.uniforms.uS1SunDir = uniforms.uS1SunDir;
+    shader.uniforms.uS1DermaEnabled = uniforms.uS1DermaEnabled;
+    shader.uniforms.uS1ChromaEnabled = uniforms.uS1ChromaEnabled;
+    shader.uniforms.uS1DorsalStrain = uniforms.uS1DorsalStrain;
+    shader.uniforms.uS1VolarCompress = uniforms.uS1VolarCompress;
+    shader.uniforms.uS1Sweat = uniforms.uS1Sweat;
+    shader.uniforms.uS1VascularPulse = uniforms.uS1VascularPulse;
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -1023,6 +1036,8 @@ export function enhanceMaterialWithFingerS1Shader(
         #include <common>
         varying vec3 vS1WorldPos;
         varying vec3 vS1WorldNormal;
+        varying vec3 vS1LocalPos;
+        varying vec2 vS1Uv;
         `
       )
       .replace(
@@ -1036,6 +1051,8 @@ export function enhanceMaterialWithFingerS1Shader(
         s1Wp = modelMatrix * s1Wp;
         vS1WorldPos = s1Wp.xyz;
         vS1WorldNormal = normalize( mat3( modelMatrix ) * objectNormal );
+        vS1LocalPos = transformed;
+        vS1Uv = uv;
         `
       );
 
@@ -1048,8 +1065,57 @@ export function enhanceMaterialWithFingerS1Shader(
         uniform float uS1SkinMode;
         uniform float uS1Effort;
         uniform vec3 uS1SunDir;
+        uniform float uS1DermaEnabled;
+        uniform float uS1ChromaEnabled;
+        uniform float uS1DorsalStrain;
+        uniform float uS1VolarCompress;
+        uniform float uS1Sweat;
+        uniform float uS1VascularPulse;
         varying vec3 vS1WorldPos;
         varying vec3 vS1WorldNormal;
+        varying vec3 vS1LocalPos;
+        varying vec2 vS1Uv;
+
+        float s1Hash21( vec2 p ) {
+          p = fract( p * vec2( 123.34, 456.21 ) );
+          p += dot( p, p + 45.32 );
+          return fract( p.x * p.y );
+        }
+
+        float s1Noise2( vec2 p ) {
+          vec2 i = floor( p );
+          vec2 f = fract( p );
+          vec2 u = f * f * ( 3.0 - 2.0 * f );
+          float a = s1Hash21( i );
+          float b = s1Hash21( i + vec2( 1.0, 0.0 ) );
+          float c = s1Hash21( i + vec2( 0.0, 1.0 ) );
+          float d = s1Hash21( i + vec2( 1.0, 1.0 ) );
+          return mix( mix( a, b, u.x ), mix( c, d, u.x ), u.y );
+        }
+
+        // Organic domain-warped 5K macro Rete Cutis dermal micro-cells + counter-phase Langer folds (ZERO grid!)
+        float s1EvalReteCutisHeight( vec2 pM, float dorsalMask, float dorsalStrain, float volarCompress ) {
+          vec2 warp = vec2(
+            s1Noise2( pM * 68.0 + vec2( 1.7, 9.2 ) ) - 0.5,
+            s1Noise2( pM * 68.0 + vec2( 8.3, 2.8 ) ) - 0.5
+          ) * 0.0045;
+          vec2 pw = pM + warp;
+
+          // Biological Rete Cutis polygonal skin-hill cells (~1.4mm) + fine micro-pores (~0.6mm)
+          float n1 = s1Noise2( pw * 420.0 );
+          float n2 = s1Noise2( pw * 920.0 + vec2( 13.1, 7.4 ) );
+          float cellular = 1.0 - abs( n1 * 2.0 - 1.0 );
+
+          // Counter-phase Langer-line dynamic skin folds:
+          //   Dorsal skin folds deepen on extension (strain=0) & pull sleekly flat on clench (strain=1)!
+          //   Volar palmar creases fold deepest on clench (volarCompress=1)!
+          float dorsalDepth = mix( 1.0, 0.16, clamp( dorsalStrain, 0.0, 1.0 ) );
+          float foldWarp = s1Noise2( pM * 95.0 ) * 2.4;
+          float dorsalFolds = ( 0.5 + 0.5 * cos( pw.y * 1650.0 + foldWarp ) ) * dorsalDepth * dorsalMask;
+          float volarFolds = ( 0.5 + 0.5 * cos( ( pw.y * 1250.0 + pw.x * 380.0 ) + foldWarp * 1.2 ) ) * volarCompress * ( 1.0 - dorsalMask );
+
+          return cellular * 0.42 + n2 * 0.22 + ( dorsalFolds * 0.22 + volarFolds * 0.24 );
+        }
         `
       )
       .replace(
@@ -1060,36 +1126,96 @@ export function enhanceMaterialWithFingerS1Shader(
           vec3 s1V = normalize( cameraPosition - vS1WorldPos );
           vec3 s1L = normalize( uS1SunDir );
 
-          float s1NdotL = dot( s1N, s1L );
-          float s1NdotV = clamp( dot( s1N, s1V ), 0.0, 1.0 );
+          // 0. ★ DERMA-TENSOR 1.0: Mikkelsen Screen-Space Derivative Organic Micro-Relief (pixel-footprint AA!) ★
+          vec3 s1MicroN = s1N;
+          float s1MicroCavity = 1.0;
+          if ( uS1DermaEnabled > 0.5 && uS1SkinMode > 0.45 ) {
+            vec2 microCoordM = vec2( vS1LocalPos.x + vS1LocalPos.y * 0.18, vS1LocalPos.z );
+            float dorsalSide = smoothstep( -0.28, 0.32, s1N.y );
+            float microH = s1EvalReteCutisHeight( microCoordM, dorsalSide, uS1DorsalStrain, uS1VolarCompress );
+
+            vec3 dPosX = dFdx( vS1WorldPos );
+            vec3 dPosY = dFdy( vS1WorldPos );
+            float pxWorldSize = max( length( dPosX ), length( dPosY ) );
+            float macroFocus = 1.0 - smoothstep( 0.00045, 0.0022, pxWorldSize );
+
+            vec3 r1 = cross( dPosY, s1N );
+            vec3 r2 = cross( s1N, dPosX );
+            float det = dot( dPosX, r1 );
+            if ( abs( det ) > 1e-8 && macroFocus > 0.01 ) {
+              float dHx = dFdx( microH );
+              float dHy = dFdy( microH );
+              vec3 surfGrad = sign( det ) * ( dHx * r1 + dHy * r2 );
+              vec3 gradWorld = clamp( surfGrad / max( abs( det ), 1e-7 ), vec3( -120.0 ), vec3( 120.0 ) );
+              float bumpStrength = 0.0016 * macroFocus * uS1SkinMode * mix( 1.0, 0.72, uS1DorsalStrain * dorsalSide );
+              s1MicroN = normalize( s1N - gradWorld * bumpStrength );
+            }
+            float grooveAo = mix( 0.96, 1.02, clamp( microH, 0.0, 1.0 ) );
+            s1MicroCavity = mix( 1.0, grooveAo, macroFocus * smoothstep( 0.45, 1.0, uS1SkinMode ) );
+          }
+
+          float s1NdotLGeo = dot( s1N, s1L );
+          float s1NdotL = dot( s1MicroN, s1L );
+          float s1NdotV = clamp( dot( s1MicroN, s1V ), 0.0, 1.0 );
           float s1Fresnel = pow( 1.0 - s1NdotV, 3.6 );
 
-          // 1. Directional Dermal Cavity Micro-AO (deepens underside & inter-digit volume cleanly!)
+          // 1. Directional Dermal Cavity Micro-AO + Rete Cutis Micro-Furrow Occlusion
           float s1CavityAO = mix( 1.0, mix( 0.80, 1.0, clamp( s1N.y * 0.55 + 0.62, 0.0, 1.0 ) ), smoothstep( 0.4, 1.0, uS1SkinMode ) );
-          gl_FragColor.rgb *= s1CavityAO;
+          gl_FragColor.rgb *= s1CavityAO * s1MicroCavity;
 
-          // 2. Linear-HDR Pre-Integrated Dermal Hemoglobin Wrap-Scattering across light terminator!
-          //    Warm crimson-terracotta scatter warms shadow transition without washing out highlights!
-          float s1Wrap = clamp( ( s1NdotL + 0.48 ) / 1.48, 0.0, 1.0 );
-          float s1Terminator = smoothstep( -0.40, 0.16, s1NdotL ) * ( 1.0 - smoothstep( 0.02, 0.52, s1NdotL ) );
-          vec3 s1HemoScatter = vec3( 0.58, 0.11, 0.04 ) * s1Terminator * 0.046 * uS1SkinMode;
+          // 2. ★ CHROMA-DERM 1.0: 3-Band Wavelength-Dependent Spectral Skin Diffusion (R 650nm > G 550nm > B 450nm!) ★
+          float s1Wrap = clamp( ( s1NdotLGeo + 0.48 ) / 1.48, 0.0, 1.0 );
+          vec3 s1HemoScatter;
+          if ( uS1ChromaEnabled > 0.5 ) {
+            // Red scatters 3.4mm across smooth geometric contour; Blue stays 0.3mm sharp on micro-pores!
+            float wR = clamp( ( s1NdotLGeo + 0.62 ) / 1.62, 0.0, 1.0 );
+            float wG = clamp( ( mix( s1NdotLGeo, s1NdotL, 0.55 ) + 0.24 ) / 1.24, 0.0, 1.0 );
+            float wB = clamp( ( s1NdotL + 0.06 ) / 1.06, 0.0, 1.0 );
+            float baseDiff = max( 0.0, s1NdotL );
+            vec3 chromaExcess = max( vec3( 0.0 ), vec3( wR - baseDiff, wG - baseDiff, wB - baseDiff ) );
+            float pulseWarmth = 1.0 + uS1VascularPulse * 0.24;
+            s1HemoScatter = chromaExcess * vec3( 0.145, 0.048, 0.018 ) * pulseWarmth * uS1SkinMode;
+          } else {
+            float s1Terminator = smoothstep( -0.40, 0.16, s1NdotL ) * ( 1.0 - smoothstep( 0.02, 0.52, s1NdotL ) );
+            s1HemoScatter = vec3( 0.58, 0.11, 0.04 ) * s1Terminator * 0.046 * uS1SkinMode;
+          }
+
+          // 2B. ★ CHROMA-DERM 1.0: Dual-Lobe Sebum Lipid (α₁) + Stratum Corneum Keratin (α₂) GGX Microfacet BRDF ★
+          vec3 s1DualSpec = vec3( 0.0 );
+          if ( uS1ChromaEnabled > 0.5 && uS1SkinMode > 0.45 ) {
+            vec3 s1H = normalize( s1L + s1V );
+            float s1NdotH = max( 0.0, dot( s1MicroN, s1H ) );
+            float s1Schlick = 0.028 + 0.972 * pow( 1.0 - s1NdotV, 5.0 );
+            float alphaSebum = max( 0.11, 0.175 - uS1Sweat * 0.045 - uS1DorsalStrain * 0.025 );
+            float alphaKeratin = max( 0.28, 0.48 - uS1DorsalStrain * 0.09 );
+            float a1 = alphaSebum * alphaSebum;
+            float a2 = alphaKeratin * alphaKeratin;
+            float d1Den = s1NdotH * s1NdotH * ( a1 - 1.0 ) + 1.0;
+            float d2Den = s1NdotH * s1NdotH * ( a2 - 1.0 ) + 1.0;
+            float d1 = a1 / max( 1e-4, 3.14159265 * d1Den * d1Den );
+            float d2 = a2 / max( 1e-4, 3.14159265 * d2Den * d2Den );
+            float visAtten = clamp( ( s1NdotL + 0.22 ) / 1.22, 0.0, 1.0 );
+            float specVal = ( d1 * ( 0.22 + uS1Sweat * 0.20 ) * 0.095 + d2 * 0.76 * 0.115 ) * s1Schlick * visAtten;
+            // Warm neutral-ivory dielectric lipid glint (zero neon!)
+            s1DualSpec = vec3( 1.0, 0.95, 0.90 ) * min( specVal, 0.22 ) * uS1SkinMode;
+          }
 
           // 3. Physically Grounded Backlit Dermal Translucency (warm amber-blood glow ONLY when backlit)
           vec3 s1BackH = normalize( s1L + s1N * 0.36 );
           float s1BackGlow = pow( clamp( dot( s1V, -s1BackH ), 0.0, 1.0 ), 3.8 );
           vec3 s1Translucency = vec3( 0.72, 0.16, 0.06 ) * s1BackGlow * ( 0.022 + 0.055 * s1Fresnel ) * uS1SkinMode;
 
-          // 4. Real-Time Knuckle Tension Blanching (uS1Effort 0..1):
+          // 4. Real-Time Knuckle Tension Blanching (uS1Effort 0..1 + uS1DorsalStrain):
           //    Under high clench effort, stretched upward-facing dorsal skin subtly blanches warmer ivory!
           float s1DorsalUp = clamp( s1N.y * 0.7 + 0.3, 0.0, 1.0 );
-          float s1BlanchAmt = uS1Effort * s1DorsalUp * 0.10 * smoothstep( 0.5, 1.0, uS1SkinMode );
-          vec3 s1BlanchTint = vec3( 1.04, 0.96, 0.90 );
+          float s1BlanchAmt = max( uS1Effort, uS1DorsalStrain * 0.75 ) * s1DorsalUp * 0.11 * smoothstep( 0.5, 1.0, uS1SkinMode );
+          vec3 s1BlanchTint = vec3( 1.045, 0.965, 0.905 );
 
           // 5. Whisper-Subtle Vellus Peach-Fuzz Grazing Micro-Sheen (zero neon!)
           vec3 s1PeachFuzz = vec3( 0.78, 0.58, 0.46 ) * s1Fresnel * ( 0.012 + 0.020 * s1Wrap ) * uS1SkinMode;
 
           gl_FragColor.rgb = mix( gl_FragColor.rgb, gl_FragColor.rgb * s1BlanchTint, s1BlanchAmt );
-          gl_FragColor.rgb += s1HemoScatter + s1Translucency + s1PeachFuzz;
+          gl_FragColor.rgb += s1HemoScatter + s1DualSpec + s1Translucency + s1PeachFuzz;
         }
         #include <dithering_fragment>
         `
