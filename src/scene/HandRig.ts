@@ -1493,6 +1493,79 @@ export class SculptedHandRig {
     return out;
   }
 
+  /** Instantaneous linear velocity vector of palm motion spring (m/s) for AERO-KINETIC VORTEX 1.0 */
+  public getPalmVelocity(out: THREE.Vector3): THREE.Vector3 {
+    out.set(this.offX.velocity, this.offY.velocity, this.offZ.velocity);
+    return out;
+  }
+
+  /** Normalized mechanical grip clench load [0..1] driving J-BIOPULSE 1.0 capillary blanching */
+  public getClenchLoad(): number {
+    const fNames: FingerName[] = ['index', 'middle', 'ring', 'pinky'];
+    let sum = 0;
+    for (let i = 0; i < fNames.length; i++) {
+      const f = this.fingers[fNames[i]];
+      sum += Math.max(0, f.mcp.rotation.x) / 1.55 + Math.max(0, f.pip.rotation.x) / 1.65;
+    }
+    return Math.max(0, Math.min(1, sum / 7.2));
+  }
+
+  /**
+   * ★ J-BIOPULSE 1.0 Real-Time Living Physiology Optical & Neuromuscular Micro-Tremor Coupling ★
+   * Modulates arterial hemoglobin perfusion warmth, knuckle capillary blanching under Rock clench,
+   * subtle dermal micro-perspiration sheen, and authentic 8–12 Hz physiological tremor!
+   */
+  public applyBioPulse(
+    sample: {
+      pulseWave: number;
+      hemoglobinPerfusion: number;
+      capillaryBlanching: number;
+      sweatSheen: number;
+      tremorPitchRad: number;
+      tremorYawRad: number;
+      tremorFingerRad: number;
+    },
+    enabled: boolean
+  ): void {
+    // 1. Subtle 8–12 Hz physiological neuromuscular micro-tremor on fingertips & radiocarpal wrist
+    if (enabled && this.currentPreset === 'living_skin') {
+      this.radiocarpalPivot.rotation.x += sample.tremorPitchRad;
+      this.radiocarpalPivot.rotation.y += sample.tremorYawRad;
+      this.fingers.index.dip.rotation.x += sample.tremorFingerRad;
+      this.fingers.middle.dip.rotation.x += sample.tremorFingerRad * 0.9;
+    }
+
+    // 2. Real-time optical PPG hemoglobin perfusion & mechanical capillary blanching (living_skin only; zero neon!)
+    if (this.currentPreset === 'living_skin') {
+      if (enabled) {
+        // Arterial hemoglobin subsurface warmth breathes subtly with systolic + dicrotic wave
+        const flush = (sample.hemoglobinPerfusion - 0.65) * 0.048;
+        const rFlush = Math.max(0.012, 0.042 + flush);
+        const gFlush = Math.max(0.004, 0.011 + flush * 0.25);
+        const bFlush = Math.max(0.003, 0.008 + flush * 0.16);
+        this.fingerMat.emissive.setRGB(rFlush, gFlush, bFlush);
+        this.primaryMat.emissive.setRGB(rFlush * 0.72, gFlush * 0.72, bFlush * 0.72);
+
+        // Knuckle capillary blanching: taut clenched knuckles pale subtly toward warm ivory, refill rosy on open!
+        const bl = sample.capillaryBlanching;
+        this.s1JointCapsuleMat.color.setRGB(
+          0.955 + bl * 0.04,
+          0.92 + bl * 0.055,
+          0.90 + bl * 0.062
+        );
+        // Subtle sympathetic micro-perspiration specular sheen
+        this.primaryMat.clearcoat = 0.055 + sample.sweatSheen * 0.085;
+        this.fingerMat.clearcoat = 0.065 + sample.sweatSheen * 0.095;
+      } else {
+        this.fingerMat.emissive.setRGB(0.036, 0.01, 0.007);
+        this.primaryMat.emissive.setRGB(0.028, 0.008, 0.006);
+        this.s1JointCapsuleMat.color.setRGB(0.96, 0.925, 0.905);
+        this.primaryMat.clearcoat = 0.06;
+        this.fingerMat.clearcoat = 0.07;
+      }
+    }
+  }
+
   public dispose(): void {
     this.primaryMat?.dispose();
     this.fingerMat?.dispose();

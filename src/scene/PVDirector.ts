@@ -300,10 +300,10 @@ export class PVDirector {
         rollEnd: -0.016,
       });
       this.bridge.playPvAudioCue(2, 'shrine');
-      this.setCard('KHDR × SHADOW FLAME 1.0 PRO', '陰翳と光彩、物理の再定義。', '16-bit浮動小数HDR × PCSS可変半影', 3, totalActs);
+      this.setCard('KHDR 1.1 × SHADOW FLAME 1.0 PRO', '陰翳と光彩、物理の再定義。', '16-bit浮動小数スペクトルHDR × PCSS可変半影', 3, totalActs);
     });
 
-    // ACT 4 (13.2s): JSound Engin 1.3 384kHz 8×OS Spatial Acoustics in Grand Salon
+    // ACT 4 (13.2s): JSound Engin 1.4 4D Audio MAX 384kHz 8×OS Spatial Acoustics in Grand Salon
     this.addCue(13.2, () => {
       this.khdrSweepActive = false;
       this.bridge.setKhdrSplitCompare(false, 0.5);
@@ -333,7 +333,7 @@ export class PVDirector {
         rollEnd: 0.024,
       });
       this.bridge.playPvAudioCue(3, 'salon');
-      this.setCard('JSOUND ENGIN 1.3', '384kHz 8×OS・26和楽器・230音線立体音響', '23-Tap Kaiser FIR × 43物理素材リアルタイム合成', 4, totalActs);
+      this.setCard('JSOUND ENGIN 1.4 · 4D AUDIO MAX', '384kHz 8×OS・36和楽器・380音線4D音響', '31-Tap Kaiser FIR (-111dB) × 58物理素材リアルタイム合成', 4, totalActs);
     });
 
     // ACT 5 (17.2s): Golden Atelier Overdrive Bullet-Time Duel Climax!!
@@ -377,7 +377,7 @@ export class PVDirector {
         rollEnd: 0,
       });
       this.bridge.playPvAudioCue(5, 'atelier');
-      this.setCard('JANKEN · KIWAMI 3D', '極 — KIWAMI', 'FINGER S1.0 · JSound 1.3 · JHand 1.1 · KHDR · Shadow Flame', 6, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '極 — KIWAMI', 'FINGER S1.0 · JSound 1.4 4D · KHDR 1.1 · J-BioPulse · AeroVortex', 6, totalActs, true);
     });
 
     // End cleanly
@@ -481,7 +481,7 @@ export class PVDirector {
         fovEnd: 29,
       });
       this.bridge.playPvAudioCue(1, 'onsen');
-      this.setCard('CRAFT · 白磁ビスク × 黒曜金箔', '磁器釉薬と漆金継ぎの質感', 'KHDR物理グレア × SF-SSCS極微影', 2, totalActs);
+      this.setCard('CRAFT · 白磁ビスク × 黒曜金箔', '磁器釉薬と漆金継ぎの質感', 'KHDR 1.1物理グレア × SF-SSCS極微影', 2, totalActs);
     });
 
     this.addCue(9.2, () => {
@@ -504,7 +504,7 @@ export class PVDirector {
         fovEnd: 31,
       });
       this.bridge.playPvAudioCue(2, 'atelier');
-      this.setCard('ACOUSTICS · JSOUND ENGIN 1.3', '建築空間が奏でる230本立体残響', '5次3D音線追跡 × 384kHz 8×OS物理合成', 3, totalActs);
+      this.setCard('ACOUSTICS · JSOUND ENGIN 1.4 4D', '建築空間が奏でる380本4D立体残響', '6次4D音線追跡 × 384kHz 8×OS 31-Tap物理合成', 3, totalActs);
     });
 
     this.addCue(13.8, () => {
@@ -524,7 +524,7 @@ export class PVDirector {
         fovEnd: 40,
       });
       this.bridge.playPvAudioCue(5, 'atelier');
-      this.setCard('JANKEN · KIWAMI 3D', '極 — FINGER S1.0 × JSound 1.3', 'Zero-Neon Museum Craft Edition', 4, totalActs, true);
+      this.setCard('JANKEN · KIWAMI 3D', '極 — FINGER S1.0 × JSound 1.4 4D', 'KHDR 1.1 · 5K 48-Bit JNV-PROOF Edition', 4, totalActs, true);
     });
 
     this.addCue(17.9, () => {

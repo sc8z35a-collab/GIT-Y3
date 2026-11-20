@@ -1937,8 +1937,8 @@ html.immersive-fullscreen .bottom-dock {
 
   .top-bar {
     grid-template-columns: auto 1fr auto;
-    gap: 6px;
-    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+    gap: 5px;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   }
 
   .brand-wordmark {
@@ -1958,25 +1958,25 @@ html.immersive-fullscreen .bottom-dock {
 
   .match-crest {
     justify-self: center;
-    gap: 7px;
-    padding: 4px 10px;
+    gap: 5px;
+    padding: 3px 7px;
     border-radius: 8px;
   }
 
-  .crest-side { gap: 5px; }
-  .crest-num { font-size: 17px; min-width: 15px; }
-  .crest-pips { gap: 3px; }
-  .go-pip { width: 7px; height: 7px; }
-  .crest-center { padding: 0 5px; }
-  .round-medallion { width: 22px; height: 22px; font-size: 10px; }
+  .crest-side { gap: 3px; }
+  .crest-num { font-size: 15px; min-width: 13px; }
+  .crest-pips { gap: 2px; }
+  .go-pip { width: 6px; height: 6px; }
+  .crest-center { padding: 0 3px; }
+  .round-medallion { width: 20px; height: 20px; font-size: 9.5px; }
 
-  .top-actions { gap: 4px; }
+  .top-actions { gap: 3px; }
   .icon-medallion {
-    width: 28px;
-    height: 28px;
+    width: 25px;
+    height: 25px;
     border-radius: 7px;
   }
-  .icon-medallion svg { width: 13px; height: 13px; }
+  .icon-medallion svg { width: 12px; height: 12px; }
   .icon-medallion::after { display: none; }
 
   /* Much Smaller Touch-Friendly Mobile Hand Cards (72×58px!) */
@@ -2061,3 +2061,132 @@ html.immersive-fullscreen .bottom-dock {
   .cinema-bar { height: 34px; }
   .pv-top-strip, .pv-controls { height: 34px; }
 }
+
+/* ============================================================================
+   v1.4 & PROJECT KIWAMI-NEXT — 5K KHDR 1.1 SHUTTER, TOAST & JNV-PROOF VERIFIER
+   Strictly Zero-Neon Museum Lacquer, Warm Ivory & Antique Gold-Leaf Styling
+   ============================================================================ */
+.shutter-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(255, 249, 236, 0.58) 0%, rgba(246, 232, 204, 0.25) 100%);
+  opacity: 0;
+}
+
+.shutter-flash.flash {
+  animation: kiwami-shutter-blink 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes kiwami-shutter-blink {
+  0% { opacity: 0.72; }
+  35% { opacity: 0.28; }
+  100% { opacity: 0; }
+}
+
+.photo-toast {
+  position: fixed;
+  top: max(62px, calc(env(safe-area-inset-top) + 56px));
+  left: 50%;
+  transform: translate(-50%, -8px);
+  z-index: 88;
+  pointer-events: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(18, 14, 11, 0.92);
+  border: 1px solid var(--gold-border-strong);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.52);
+  color: #f9eed8;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.photo-toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.icon-medallion.photo-accent {
+  border-color: rgba(212, 175, 104, 0.52);
+  color: var(--gold-bright);
+}
+
+.hero-section {
+  background: linear-gradient(180deg, rgba(212, 175, 104, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid rgba(212, 175, 104, 0.22);
+  border-radius: 9px;
+  padding: 9px 9px 10px !important;
+  margin-bottom: 2px;
+}
+
+.hero-photo-btn {
+  padding: 8px 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.verify-upload-btn {
+  text-align: center;
+  border-style: dashed;
+  border-color: rgba(212, 175, 104, 0.42);
+  background: rgba(255, 250, 238, 0.03);
+}
+
+.proof-last-chip {
+  font-family: var(--font-mono);
+  font-size: 9.2px;
+  line-height: 1.45;
+  color: var(--washi-secondary);
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--hairline);
+}
+
+.proof-last-chip code,
+.proof-verify-card code {
+  font-family: var(--font-mono);
+  color: var(--gold-bright);
+}
+
+.proof-verify-card {
+  margin-top: 4px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--hairline);
+  font-size: 9.8px;
+  line-height: 1.5;
+}
+
+.proof-verify-card.valid {
+  background: rgba(94, 146, 108, 0.14);
+  border-color: rgba(138, 198, 152, 0.48);
+  color: #e4f5e7;
+}
+
+.proof-verify-card.invalid {
+  background: rgba(178, 72, 56, 0.16);
+  border-color: rgba(224, 114, 96, 0.52);
+  color: #fce2dd;
+}
+
+.proof-verify-card .pv-status {
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.proof-verify-card .pv-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--washi-secondary);
+}
+

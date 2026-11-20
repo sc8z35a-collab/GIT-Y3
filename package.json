@@ -11,7 +11,9 @@
     "test:jnv1": "tsx src/engine/jnv1/runBenchmarkCli.ts",
     "test:jhand": "tsx src/engine/jhand/runJHandTest.ts",
     "test:jsound": "tsx src/engine/jsound/runJSoundTest.ts",
-    "test:all": "npm run test:jnv1 && npm run test:jhand && npm run test:jsound"
+    "test:khdr5k": "tsx src/graphics/runPhoto5KTest.ts",
+    "test:nexttech": "tsx src/engine/runNextTechTest.ts",
+    "test:all": "npm run test:jnv1 && npm run test:jhand && npm run test:jsound && npm run test:khdr5k && npm run test:nexttech"
   },
   "dependencies": {
     "three": "^0.174.0"

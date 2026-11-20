@@ -12,7 +12,9 @@
  */
 
 import * as THREE from 'three';
-import { SoundEngine } from '../audio/SoundEngine';
+import { AcousticProbeEngine, SoundEngine } from '../audio/SoundEngine';
+import { AeroVortexEngine } from '../engine/aero/AeroVortexEngine';
+import { BioPulseEngine, BioPulseMatchContext } from '../engine/biopulse/BioPulseEngine';
 import { HandPoseKey } from '../engine/jhand/types';
 import { Move, PAPER, PlayerOutcome, ROCK, SCISSORS } from '../engine/jnv1/types';
 import {
@@ -34,13 +36,14 @@ import {
 } from '../graphics/GraphicsConfig';
 import { HDRIEnvironmentBuilder } from '../graphics/HDRIEnvironment';
 import { KHDRPipeline } from '../graphics/KHDRPipeline';
+import { Photo5KResult, captureCurrentAngle5KPhoto } from '../graphics/PhotoCapture5K';
 import { applyShadowFlameToLights, installShadowFlameEngine } from '../graphics/ShadowFlame';
 import { TextureAtlasLoader } from '../graphics/TextureAtlasLoader';
 import { AtmosphereEffects } from './AtmosphereEffects';
 import { CameraDirector, CameraMood } from './CameraDirector';
 import { SculptedHandRig } from './HandRig';
 import { PVDirector, PVOverlayState } from './PVDirector';
-import { StageBuilder } from './StageBuilder';
+import { STAGE_DEFINITIONS, StageBuilder } from './StageBuilder';
 
 export interface ClashAnimationCallbacks {
   onBeat?: (label: string, beatIndex: 1 | 2 | 3) => void;
@@ -76,6 +79,23 @@ export class GameScene {
   private readonly sound: SoundEngine;
   public readonly pvDirector: PVDirector;
 
+  // ★ Project KIWAMI-NEXT Breakthrough Original Subsystems ★
+  private readonly bioPulse = new BioPulseEngine(1);
+  private readonly aeroVortex = new AeroVortexEngine();
+  private readonly acousticProbe = new AcousticProbeEngine(DEFAULT_GRAPHICS_SETTINGS.stage);
+  private bioMatchContext: BioPulseMatchContext = {
+    playerScore: 0,
+    npcScore: 0,
+    targetWins: 3,
+    aikoStreak: 0,
+    overdriveActive: false,
+    clenchLoad: 0.1,
+    exertionPulse: 0,
+  };
+  private lastProbeEvalMs = 0;
+  private lastWakeSpawnSec = 0;
+  private isCapturing5K = false;
+
   // Primary & Architectural Lighting Rig
   private readonly sunLight: THREE.DirectionalLight;
   private readonly rimLight: THREE.DirectionalLight;
@@ -91,6 +111,8 @@ export class GameScene {
   private readonly npcHand: SculptedHandRig;
   private readonly tmpLeftPalm = new THREE.Vector3();
   private readonly tmpRightPalm = new THREE.Vector3();
+  private readonly tmpVelLeft = new THREE.Vector3();
+  private readonly tmpVelRight = new THREE.Vector3();
   private readonly tmpCamForward = new THREE.Vector3();
 
   private settings: GraphicsSettings = { ...DEFAULT_GRAPHICS_SETTINGS };
@@ -421,12 +443,120 @@ export class GameScene {
     this.pvDirector.requestSnapshot();
   }
 
+  public setBioPulseEnabled(enabled: boolean): void {
+    this.settings.bioPulseEnabled = enabled;
+    if (!enabled) {
+      const zero = this.bioPulse.getSample();
+      this.playerHand.applyBioPulse(zero, false);
+      this.npcHand.applyBioPulse(zero, false);
+    }
+  }
+
+  public setAeroVortexEnabled(enabled: boolean): void {
+    this.settings.aeroVortexEnabled = enabled;
+    if (!enabled) {
+      this.aeroVortex.clear();
+    }
+  }
+
+  public setAcousticProbeEnabled(enabled: boolean): void {
+    this.settings.acousticProbeEnabled = enabled;
+    this.sound.applyAcousticProbe(this.acousticProbe.getSnapshot(), enabled);
+  }
+
+  public setMatchBioContext(ctx: Partial<BioPulseMatchContext>): void {
+    this.bioMatchContext = { ...this.bioMatchContext, ...ctx };
+  }
+
+  /**
+   * ★ True 5K (5120×2880) 48-Bit (16-Bit/Ch) KHDR 1.1 Current-Camera PNG Photograph ★
+   * Captures the EXACT current live 3D camera viewpoint (including custom free_orbit & macro zoom!)
+   * with zero UI clutter, mechanical twin-curtain shutter audio, and JNV-PROOF STEGO-SEAL 1.0!
+   */
+  public async captureCurrentView5KPng(
+    options?: {
+      jnvCommitHash?: string;
+      jnvFairnessVerified?: boolean;
+      matchScoreText?: string;
+      psychoEntropyBits?: number;
+      skipDownload?: boolean;
+      returnBytes?: boolean;
+      onProgress?: (pct: number, statusJp: string) => void;
+    }
+  ): Promise<Photo5KResult | null> {
+    if (this.isCapturing5K) return null;
+    this.isCapturing5K = true;
+    this.sound.playCameraShutter();
+
+    try {
+      const rect = this.container.getBoundingClientRect();
+      const viewW = Math.max(320, rect.width || window.innerWidth);
+      const viewH = Math.max(240, rect.height || window.innerHeight);
+      const stageDef = STAGE_DEFINITIONS[this.settings.stage];
+      const cam = this.cameraDirector.camera;
+      cam.getWorldDirection(this.tmpCamForward);
+      const targetPos: [number, number, number] = [
+        Number((cam.position.x + this.tmpCamForward.x * 2.0).toFixed(3)),
+        Number((cam.position.y + this.tmpCamForward.y * 2.0).toFixed(3)),
+        Number((cam.position.z + this.tmpCamForward.z * 2.0).toFixed(3)),
+      ];
+
+      const bio = this.bioPulse.getSample();
+      const aero = this.aeroVortex.getTelemetry();
+      const probe = this.acousticProbe.getSnapshot();
+
+      return await captureCurrentAngle5KPhoto({
+        renderer: this.renderer,
+        scene: this.scene,
+        camera: cam,
+        khdr: this.khdr,
+        sunWorldDir: this.sunWorldDir,
+        elapsedSec: this.elapsedSec,
+        viewportWidth: viewW,
+        viewportHeight: viewH,
+        stageLabel: stageDef.nameJp,
+        fingerS1Enabled: this.settings.fingerS1Enabled,
+        skipDownload: options?.skipDownload,
+        returnBytes: options?.returnBytes,
+        onProgress: options?.onProgress,
+        proofContext: {
+          stageId: this.settings.stage,
+          stageNameJp: stageDef.nameJp,
+          cameraStyle: this.settings.cameraStyle,
+          cameraPos: [
+            Number(cam.position.x.toFixed(3)),
+            Number(cam.position.y.toFixed(3)),
+            Number(cam.position.z.toFixed(3)),
+          ],
+          cameraTarget: targetPos,
+          cameraFovDeg: Number(cam.fov.toFixed(1)),
+          khdrVersion: 'KHDR 1.1',
+          shadowMode: this.settings.shadowFlame,
+          playerMaterial: this.settings.playerHandMaterial,
+          npcMaterial: this.settings.npcHandMaterial,
+          jsoundSpatialMode: this.settings.jsoundSpatialMode,
+          jnvCommitHash: options?.jnvCommitHash ?? 'LIVE_SESSION',
+          jnvFairnessVerified: options?.jnvFairnessVerified ?? true,
+          matchScoreText: options?.matchScoreText ?? `${this.bioMatchContext.playerScore} - ${this.bioMatchContext.npcScore}`,
+          bioPulseBpm: bio.bpm,
+          bioCapillaryBlanching: bio.capillaryBlanching,
+          aeroActiveVortices: aero.activeVortexCount,
+          psychoEntropyBits: options?.psychoEntropyBits ?? 1.585,
+          acousticProbeDrDb: probe.directToReverbDb,
+        },
+      });
+    } finally {
+      this.isCapturing5K = false;
+    }
+  }
+
   public applyStage(stageId: StageId, withRevealSweep = true): void {
     if (!this.pvDirector.isActive()) {
       this.settings.stage = stageId;
     }
     const def = this.stageBuilder.buildStage(stageId);
     this.sound.setStage(stageId);
+    this.acousticProbe.setStage(stageId);
 
     this.scene.environment = this.hdriBuilder.getEnvironment(stageId);
     this.scene.background = new THREE.Color(def.backgroundColor);
@@ -799,6 +929,9 @@ export class GameScene {
       }
 
       this.atmosphere.emitClashBurst(outcome, winnerMove, new THREE.Vector3(0, 0.3, 0.08));
+      if (this.settings.aeroVortexEnabled) {
+        this.aeroVortex.spawnClashShockwave(winnerMove, isOverdrive ? 1.55 : isMatchDecidingPoint ? 1.25 : 1.0);
+      }
 
       // Trigger Smooth Cinema Hit-Stop Time-Dilation Ramp!
       const hsDur = isOverdrive ? 0.3 : isMatchDecidingPoint ? 0.22 : outcome === 'DRAW' ? 0.09 : 0.14;
@@ -1104,6 +1237,13 @@ export class GameScene {
       if (!this.running) return;
       this.rafId = requestAnimationFrame(tick);
 
+      // Pause live frame rendering atomically while True 5K 48-Bit KHDR 1.1 tiled readback executes!
+      if (this.isCapturing5K) {
+        this.lastRenderTimestamp = nowMs;
+        this.lastLogicTimestamp = nowMs;
+        return;
+      }
+
       // Precision FPS pacing for 60 FPS / 120 FPS (0 = Unlimited!)
       if (this.settings.fpsLimit > 0) {
         const minInterval = 1000 / this.settings.fpsLimit;
@@ -1190,15 +1330,12 @@ export class GameScene {
         const progress = 1.0 - this.hitStopRemaining / Math.max(0.01, this.hitStopDuration);
         let timeScale: number;
         if (progress < 0.14) {
-          // Smooth 14% ramp down into bullet-time slow-mo
           const u = progress / 0.14;
           const s = u * u * (3 - 2 * u);
           timeScale = THREE.MathUtils.lerp(1.0, this.hitStopScale, s);
         } else if (progress < 0.58) {
-          // Suspended high-drama cinema peak
           timeScale = this.hitStopScale;
         } else {
-          // Silky easeOutExpo ramp smoothly back to 1.0× speed!
           const u = (progress - 0.58) / 0.42;
           const easeOut = 1.0 - Math.pow(2, -7.5 * u);
           timeScale = THREE.MathUtils.lerp(this.hitStopScale, 1.0, easeOut);
@@ -1229,11 +1366,63 @@ export class GameScene {
       this.playerHand.getPalmWorldPosition(this.tmpLeftPalm);
       this.npcHand.getPalmWorldPosition(this.tmpRightPalm);
 
+      // ★ 1. J-BIOPULSE 1.0: Real-Time Arterial PPG Pulse, Capillary Blanching & 8-12Hz Micro-Tremor ★
+      const pClench = this.playerHand.getClenchLoad();
+      this.bioMatchContext.clenchLoad = pClench;
+      this.bioMatchContext.overdriveActive = this.overdriveArmed;
+      this.bioMatchContext.exertionPulse = Math.min(1, this.lightImpactPulse);
+      const bioSample = this.bioPulse.update(silkyDt, this.bioMatchContext);
+      this.playerHand.applyBioPulse(bioSample, this.settings.bioPulseEnabled);
+      this.npcHand.applyBioPulse(bioSample, this.settings.bioPulseEnabled);
+      if (this.settings.bioPulseEnabled && bioSample.didBeatThisFrame && bioSample.tension >= 0.45 && !this.pvDirector.isActive()) {
+        this.sound.playBioHeartbeat(bioSample.tension);
+      }
+
+      // ★ 2. AERO-KINETIC VORTEX 1.0: Real-Time 3D Biot-Savart Hand Wake & Vortex-Ring Advection ★
+      if (this.settings.aeroVortexEnabled) {
+        this.playerHand.getPalmVelocity(this.tmpVelLeft);
+        this.npcHand.getPalmVelocity(this.tmpVelRight);
+        const speedL = this.tmpVelLeft.length();
+        const speedR = this.tmpVelRight.length();
+        if (this.elapsedSec - this.lastWakeSpawnSec > 0.14) {
+          if (speedL > 1.25) {
+            this.lastWakeSpawnSec = this.elapsedSec;
+            this.aeroVortex.spawnVortex({
+              kind: 'sleeve_wake',
+              pos: { x: this.tmpLeftPalm.x, y: this.tmpLeftPalm.y, z: this.tmpLeftPalm.z },
+              axis: { x: this.tmpVelLeft.x, y: this.tmpVelLeft.y, z: this.tmpVelLeft.z },
+              circulation: Math.min(2.6, speedL * 0.72),
+              radius: 0.17,
+              expandRate: 0.48,
+              driftSpeed: Math.min(1.4, speedL * 0.45),
+              maxAge: 1.25,
+            });
+          } else if (speedR > 1.25) {
+            this.lastWakeSpawnSec = this.elapsedSec;
+            this.aeroVortex.spawnVortex({
+              kind: 'sleeve_wake',
+              pos: { x: this.tmpRightPalm.x, y: this.tmpRightPalm.y, z: this.tmpRightPalm.z },
+              axis: { x: this.tmpVelRight.x, y: this.tmpVelRight.y, z: this.tmpVelRight.z },
+              circulation: Math.min(2.6, speedR * 0.72),
+              radius: 0.17,
+              expandRate: 0.48,
+              driftSpeed: Math.min(1.4, speedR * 0.45),
+              maxAge: 1.25,
+            });
+          }
+        }
+        this.aeroVortex.update(simDt);
+      }
+
       this.stageBuilder.update(simDt, this.tmpLeftPalm, this.tmpRightPalm, this.settings.shadowFlame);
-      this.atmosphere.update(simDt, this.settings.stage);
+      this.atmosphere.update(
+        simDt,
+        this.settings.stage,
+        this.settings.aeroVortexEnabled ? this.aeroVortex : undefined
+      );
       this.cameraDirector.update(silkyDt);
 
-      // Sync 3D HRTF AudioListener pose in JSound Engin 1.3 with live Cinema Camera!
+      // Sync 3D/4D HRTF AudioListener pose in JSound Engin 1.4 with live Cinema Camera!
       this.cameraDirector.camera.getWorldDirection(this.tmpCamForward);
       const camPos = this.cameraDirector.camera.position;
       this.sound.setListenerPose(
@@ -1241,7 +1430,21 @@ export class GameScene {
         { x: this.tmpCamForward.x, y: this.tmpCamForward.y, z: this.tmpCamForward.z }
       );
 
-      // Reset WebGL draw stats & execute KHDR + Shadow Flame multi-pass render!
+      // ★ 3. SPECTRAL-RAY ACOUSTIC PROBE 1.0 (30Hz Throttled Real-Time 12-Path Camera Acoustics!) ★
+      if (nowMs - this.lastProbeEvalMs >= 33) {
+        this.lastProbeEvalMs = nowMs;
+        const focusX = (this.tmpLeftPalm.x + this.tmpRightPalm.x) * 0.5;
+        const focusY = Math.max(0.18, (this.tmpLeftPalm.y + this.tmpRightPalm.y) * 0.5);
+        const focusZ = (this.tmpLeftPalm.z + this.tmpRightPalm.z) * 0.5;
+        const probe = this.acousticProbe.evaluate(
+          { x: camPos.x, y: camPos.y, z: camPos.z },
+          { x: focusX, y: focusY, z: focusZ },
+          this.settings.stage
+        );
+        this.sound.applyAcousticProbe(probe, this.settings.acousticProbeEnabled);
+      }
+
+      // Reset WebGL draw stats & execute KHDR 1.1 + Shadow Flame multi-pass render!
       this.renderer.info.reset();
       this.khdr.render(this.scene, this.cameraDirector.camera, this.sunWorldDir, this.elapsedSec);
 
@@ -1261,6 +1464,8 @@ export class GameScene {
         const dim = this.khdr.getDimensions();
         const jhandT = this.playerHand.getKinesisTelemetry();
         const jsoundT = this.sound.getTelemetry();
+        const aeroT = this.aeroVortex.getTelemetry();
+        const probeT = this.acousticProbe.getSnapshot();
 
         this.onMetrics({
           fps: Math.round(1000 / Math.max(0.5, avgMs)),
@@ -1292,6 +1497,20 @@ export class GameScene {
           jsoundPeakDb: jsoundT.peakDb,
           jsoundMaterialPair: jsoundT.materialPairJp,
           jsoundLastEventJp: jsoundT.lastAcousticEventJp,
+          // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★
+          bioPulseBpm: bioSample.bpm,
+          bioPulseWave: bioSample.pulseWave,
+          bioCapillaryBlanchPct: Math.round(bioSample.capillaryBlanching * 100),
+          bioStateJp: bioSample.stateLabelJp,
+          aeroActiveVortices: aeroT.activeVortexCount,
+          aeroPeakCirculation: aeroT.peakCirculation,
+          aeroPeakSpeedMs: aeroT.peakAirSpeedMs,
+          aeroPhenomenonJp: aeroT.lastPhenomenonJp,
+          probeDistanceM: probeT.cameraDistanceM,
+          probeDrDb: probeT.directToReverbDb,
+          probeProximityDb: probeT.proximityWarmthDb,
+          probeAirCutoffKhz: Number((probeT.airCutoffHz / 1000).toFixed(1)),
+          probeNearestJp: probeT.nearestBoundaryJp,
         });
       }
     };

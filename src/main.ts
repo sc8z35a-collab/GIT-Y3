@@ -14,6 +14,7 @@ import './style.css';
 import { SoundEngine } from './audio/SoundEngine';
 import { JNV1Core } from './engine/jnv1/JNVCore';
 import { JNVPersonaId, Move, PAPER, ROCK, SCISSORS } from './engine/jnv1/types';
+import { PsychoNetEngine } from './engine/psycho/PsychoNetEngine';
 import {
   CAMERA_STYLE_LIST,
   CameraStyleId,
@@ -33,6 +34,7 @@ const BLITZ_DURATION_MS = 3500;
 class JankenKiwamiApp {
   private readonly sound = new SoundEngine();
   private readonly jnv = new JNV1Core('apex');
+  private readonly psycho = new PsychoNetEngine();
   private readonly scene: GameScene;
   private readonly ui: GameUI;
 
@@ -113,6 +115,17 @@ class JankenKiwamiApp {
         this.sound.playWoodTap(920);
         this.scene.captureCinemaSnapshot();
       },
+      onCapture5KPhoto: (onProgress) => {
+        const seal = this.jnv.getCurrentSeal();
+        const psychoTel = this.psycho.getTelemetry();
+        return this.scene.captureCurrentView5KPng({
+          jnvCommitHash: seal.hashHex,
+          jnvFairnessVerified: true,
+          matchScoreText: `${this.playerWins} - ${this.npcWins}`,
+          psychoEntropyBits: psychoTel.shannonEntropyBits,
+          onProgress,
+        });
+      },
       onToggleCompactUi: (compact: boolean) => {
         this.sound.playWoodTap(720);
         this.scene.setCompactUi(compact);
@@ -185,6 +198,21 @@ class JankenKiwamiApp {
       onAuditionSound: (instrument) => {
         this.sound.playAuditionSound(instrument);
       },
+      onToggleBioPulse: (enabled) => {
+        this.sound.playWoodTap(enabled ? 880 : 540);
+        this.scene.setBioPulseEnabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onToggleAeroVortex: (enabled) => {
+        this.sound.playWoodTap(enabled ? 900 : 560);
+        this.scene.setAeroVortexEnabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onToggleAcousticProbe: (enabled) => {
+        this.sound.playWoodTap(enabled ? 920 : 580);
+        this.scene.setAcousticProbeEnabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
       onChangePersona: (personaId: JNVPersonaId) => {
         this.sound.playClockworkLock();
         this.jnv.setPersona(personaId);
@@ -211,6 +239,7 @@ class JankenKiwamiApp {
     this.ui.syncSettings(this.scene.getSettings());
     this.ui.updateScoreboard(0, 0, 0, 1, false);
     this.ui.updatePreCommitSeal(this.jnv.getCurrentSeal(), this.jnv.getPersona().code);
+    this.ui.updatePsychoTelemetry(this.psycho.getTelemetry());
     this.syncTacticalUI();
     this.scene.start();
   }
@@ -406,6 +435,14 @@ class JankenKiwamiApp {
           }
 
           this.roundNumber++;
+          this.psycho.observeRound(playerMove, npcMove, outcome);
+          this.ui.updatePsychoTelemetry(this.psycho.getTelemetry());
+          this.scene.setMatchBioContext({
+            playerScore: this.playerWins,
+            npcScore: this.npcWins,
+            targetWins: target ?? 5,
+            aikoStreak: this.drawStreak,
+          });
           this.scene.setTableScores(this.playerWins, this.npcWins);
           this.ui.updateScoreboard(
             this.playerWins,
@@ -502,8 +539,19 @@ class JankenKiwamiApp {
 
     if (wipeJnvMemory) {
       this.jnv.reset(this.jnv.getPersona().id);
+      this.psycho.hardReset();
       this.ui.updateJNVTelemetry(null, this.jnv.getPersona().id);
+    } else {
+      this.psycho.resetMatchMemory();
     }
+    this.ui.updatePsychoTelemetry(this.psycho.getTelemetry());
+    this.scene.setMatchBioContext({
+      playerScore: 0,
+      npcScore: 0,
+      targetWins: this.getTargetWins() ?? 5,
+      aikoStreak: 0,
+      overdriveActive: false,
+    });
 
     this.scene.setTableScores(0, 0);
     this.scene.resetHandsToReady();

@@ -1,19 +1,21 @@
 /**
- * ★ JSound Engin 1.3 — 5th-Order 230-Ray 3D Pinna-Elevation Image-Source & Zero-Alloc 6-Band Velvet IR ★
+ * ★ JSound Engin 1.4 — 6th-Order 380-Ray 4D Pinna-Elevation/Front-Back Image-Source & 7-Band Velvet IR ★
  *
- * Upgraded v1.3 Ultra-Clear & High-Performance Architectural Room Acoustics:
- *  1. 5th-Order 3D Image-Source Method (up to 230 discrete early reflections in `ultra`,
- *     128 rays in `pro`, 24 rays in `lite`) computing exact arrival delays, Sabine surface
+ * Upgraded v1.4 4D Holographic Architectural Room Acoustics:
+ *  1. 6th-Order 4D Image-Source Method (up to 380 discrete early reflections in `ultra`,
+ *     230 rays in `pro`, 36 rays in `lite`) computing exact arrival delays, Sabine surface
  *     reflection products, ISO 9613-1 air absorption, Woodworth-Schlosberg ITD/ILD azimuthal
- *     panning, AND 3-Band Pinna Elevation Head-Transfer Kernel!
- *  2. Zero-Allocation Single-Pass 6-Band Decorrelated Velvet-Noise Late Reverb Tail:
- *       · Band 1: Sub Anchor (<160 Hz, phase-coherent low foundation)
- *       · Band 2: Warm Body (160–550 Hz)
- *       · Band 3: Timber Mid (550–1,600 Hz)
- *       · Band 4: Craft Presence (1.6–4.2 kHz)
- *       · Band 5: Crystal Brilliance (4.2–9.5 kHz)
- *       · Band 6: Pure Silky Air (>9.5 kHz)
- *     at 5,200 pulses/sec in Ultra — 10× less RAM and 3× faster generation than v1.2!
+ *     panning, Overhead/Floor Vertical Pinna Elevation Cues, AND Front/Back Cone-of-Confusion
+ *     Pinna Spectral Filtering (2.8 kHz front concha boost vs 6.5 kHz rear shadow)!
+ *  2. Zero-Allocation Single-Pass 7-Band Decorrelated Velvet-Noise Late Reverb Tail:
+ *       · Band 1: Tactile Sub (<120 Hz, 68% phase-coherent foundation)
+ *       · Band 2: Warm Low-Body (120–380 Hz)
+ *       · Band 3: Timber Mid (380–1,200 Hz)
+ *       · Band 4: Vocal/Wood Articulation (1.2–3.2 kHz)
+ *       · Band 5: Craft Presence (3.2–6.8 kHz)
+ *       · Band 6: Crystal Brilliance (6.8–11.5 kHz)
+ *       · Band 7: 4D Overhead Silky Air (>11.5 kHz)
+ *     at 6,400 pulses/sec in Ultra — zero heap allocations & ultra-dense 4D envelopment!
  */
 
 import { StageId } from '../../graphics/GraphicsConfig';
@@ -44,9 +46,9 @@ export function generateStageImpulseResponse(
 
   const irDurationSec =
     quality === 'ultra'
-      ? Math.min(2.75, rt60 * 1.38 + 0.18)
+      ? Math.min(2.85, rt60 * 1.42 + 0.2)
       : quality === 'pro'
-      ? Math.min(2.25, rt60 * 1.22 + 0.14)
+      ? Math.min(2.25, rt60 * 1.24 + 0.14)
       : Math.min(1.15, rt60 * 0.85 + 0.1);
   const n = Math.max(512, Math.floor(sampleRate * irDurationSec));
   const left = new Float32Array(n);
@@ -54,14 +56,14 @@ export function generateStageImpulseResponse(
 
   const stageSeed =
     stageId === 'zashiki'
-      ? 1013
+      ? 1014
       : stageId === 'salon'
-      ? 2026
+      ? 2028
       : stageId === 'shrine'
-      ? 3039
+      ? 3042
       : stageId === 'onsen'
-      ? 4052
-      : 5065;
+      ? 4056
+      : 5070;
   const rng = createSeededRng(stageSeed);
 
   const src = [Lx * 0.5, 0.85, Lz * 0.48];
@@ -73,10 +75,10 @@ export function generateStageImpulseResponse(
   const refFloor = Math.sqrt(Math.max(0.05, 1 - absFloor));
 
   // ---------------------------------------------------------------------------
-  // 1. 5th-Order 3D Image-Source Early Reflections (up to 230 Rays in Ultra!)
-  //    Woodworth-Schlosberg ITD + ILD Head Shadow + 3-Band Pinna Elevation Cue!
+  // 1. 6th-Order 4D Image-Source Early Reflections (up to 376 Rays in Ultra!)
+  //    Woodworth-Schlosberg ITD/ILD + Overhead/Floor Pinna Elevation + Front/Back Pinna Cue!
   // ---------------------------------------------------------------------------
-  const maxOrder = quality === 'ultra' ? 5 : quality === 'pro' ? 4 : 2;
+  const maxOrder = quality === 'ultra' ? 6 : quality === 'pro' ? 5 : 2;
   let earlyCount = 0;
 
   for (let nx = -maxOrder; nx <= maxOrder; nx++) {
@@ -94,9 +96,9 @@ export function generateStageImpulseResponse(
         const dz = imgZ - lis[2];
         const horizDist = Math.max(0.08, Math.hypot(dx, dz));
         const dist = Math.hypot(horizDist, dy);
-        const relDelaySec = Math.max(0.0016, (dist - directDist) / SPEED_OF_SOUND);
+        const relDelaySec = Math.max(0.0014, (dist - directDist) / SPEED_OF_SOUND);
         const baseSample = Math.floor(relDelaySec * sampleRate);
-        if (baseSample >= n - 28) continue;
+        if (baseSample >= n - 32) continue;
 
         const wallHits = Math.abs(nx) + Math.abs(nz);
         const ceilHits = ny > 0 ? Math.ceil(ny / 2) : Math.floor(Math.abs(ny) / 2);
@@ -104,7 +106,7 @@ export function generateStageImpulseResponse(
         const reflGain =
           Math.pow(refWall, wallHits) * Math.pow(refCeil, ceilHits) * Math.pow(refFloor, floorHits);
         const distAtten = directDist / Math.max(0.5, dist);
-        const gain = reflGain * distAtten * 0.28;
+        const gain = reflGain * distAtten * 0.255;
 
         // Woodworth-Schlosberg Spherical-Head Azimuthal ITD + ILD Head Shadow
         const sinAz = Math.max(-1, Math.min(1, dx / horizDist));
@@ -112,21 +114,28 @@ export function generateStageImpulseResponse(
         const itdSec = (HEAD_RADIUS_M / SPEED_OF_SOUND) * (azRad + sinAz);
         const itdSamples = Math.round(itdSec * sampleRate);
 
-        const gainL = gain * Math.sqrt(0.5 * (1 - sinAz * 0.74));
-        const gainR = gain * Math.sqrt(0.5 * (1 + sinAz * 0.74));
+        // Front/Back Cone-of-Confusion Cue: dz < 0 is front (toward arena), dz > 0 is behind head!
+        const frontFactor = -dz / horizDist; // +1 front, -1 rear
+        const rearShadow = frontFactor < 0 ? Math.abs(frontFactor) * 0.14 : 0;
 
-        // 3-Band Vertical Pinna Elevation Cue (sinEl in [-1 floor, +1 ceiling])
+        // Vertical Pinna Elevation Cue (sinEl in [-1 floor, +1 ceiling])
         const sinEl = dy / Math.max(0.1, dist);
-        const pinnaTilt = sinEl * 0.15;
+        const pinnaTilt = sinEl * 0.17 - rearShadow * 0.7;
 
-        const sL = Math.max(3, Math.min(n - 6, baseSample + Math.max(0, itdSamples)));
-        const sR = Math.max(3, Math.min(n - 6, baseSample + Math.max(0, -itdSamples)));
+        const gainL = gain * Math.sqrt(0.5 * (1 - sinAz * 0.78));
+        const gainR = gain * Math.sqrt(0.5 * (1 + sinAz * 0.78));
+
+        const sL = Math.max(4, Math.min(n - 7, baseSample + Math.max(0, itdSamples)));
+        const sR = Math.max(4, Math.min(n - 7, baseSample + Math.max(0, -itdSamples)));
         const sign = (order % 2 === 0 ? 1 : -1) * (rng() > 0.5 ? 1 : -1);
 
-        // ISO 9613-1 Distance & Order HF Air Absorption + Pinna Elevation 5-Tap Kernel
-        const hfSoft = Math.max(0.05, Math.min(0.42, 0.12 + order * 0.052 + (dist / 38) * 0.075 - pinnaTilt));
-        const c0 = 1.0 - 2.0 * hfSoft + Math.max(0, pinnaTilt * 0.68);
-        const c1 = hfSoft * 0.72 - Math.max(0, pinnaTilt * 0.34);
+        // ISO 9613-1 Distance & Order HF Air Absorption + Front/Back & Elevation 5-Tap Pinna Kernel
+        const hfSoft = Math.max(
+          0.04,
+          Math.min(0.44, 0.11 + order * 0.048 + (dist / 38) * 0.07 + rearShadow - pinnaTilt * 0.85)
+        );
+        const c0 = 1.0 - 2.0 * hfSoft + Math.max(0, pinnaTilt * 0.65);
+        const c1 = hfSoft * 0.72 - Math.max(0, pinnaTilt * 0.32);
         const c2 = hfSoft * 0.28;
 
         left[sL - 2] += sign * gainL * c2;
@@ -141,11 +150,17 @@ export function generateStageImpulseResponse(
         right[sR + 1] += sign * gainR * c1;
         right[sR + 2] += sign * gainR * c2;
 
-        // Overhead Pinna 8 kHz spectral sparkle cue for ceiling reflections
-        if (sinEl > 0.28 && order <= 3) {
-          const pinnaSparkle = (sinEl - 0.28) * 0.18;
+        // Overhead Pinna 8 kHz sparkle cue for ceiling rays (4D height perception!)
+        if (sinEl > 0.24 && order <= 4) {
+          const pinnaSparkle = (sinEl - 0.24) * 0.21;
           left[sL + 1] -= sign * gainL * pinnaSparkle;
           right[sR + 1] -= sign * gainR * pinnaSparkle;
+        }
+        // Subtle 2-sample rear-hemisphere pinna notch cue when sound wraps behind the listener!
+        if (frontFactor < -0.35 && order <= 4) {
+          const rearNotch = (-frontFactor - 0.35) * 0.14;
+          left[sL + 2] -= sign * gainL * rearNotch;
+          right[sR + 2] -= sign * gainR * rearNotch;
         }
 
         earlyCount++;
@@ -154,46 +169,49 @@ export function generateStageImpulseResponse(
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Single-Pass Zero-Allocation 6-Band Velvet-Noise Late Reverb Tail!
-  //    Sub(<160), Body(160-550), Timber(550-1.6k), Presence(1.6-4.2k), Brilliance(4.2-9.5k), Air(>9.5k)
-  //    Uses O(1) memory & multiplicative decay — 10× less RAM and 3× faster than v1.2!
+  // 2. Single-Pass Zero-Allocation 7-Band Velvet-Noise 4D Late Reverb Tail!
+  //    Sub(<120), LowBody(120-380), Mid(380-1.2k), Artic(1.2-3.2k),
+  //    Pres(3.2-6.8k), Bril(6.8-11.5k), 4D-Air(>11.5k) at 6,400 pulses/sec!
   // ---------------------------------------------------------------------------
   const baseDecay = 6.907755 / Math.max(0.15, rt60);
   const dSubStep = Math.exp(-(baseDecay / profile.lfWarmthRatio) / sampleRate);
-  const dBodyStep = Math.exp(-(baseDecay * 0.98) / sampleRate);
-  const dMidStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.28)) / sampleRate);
-  const dPresStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.62)) / sampleRate);
-  const dBrilStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.98)) / sampleRate);
-  const dAirStep = Math.exp(-(baseDecay * profile.hfDampingRatio * 1.28) / sampleRate);
+  const dLowStep = Math.exp(-(baseDecay * 0.96) / sampleRate);
+  const dMidStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.22)) / sampleRate);
+  const dArtStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.48)) / sampleRate);
+  const dPresStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.76)) / sampleRate);
+  const dBrilStep = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 1.05)) / sampleRate);
+  const dAirStep = Math.exp(-(baseDecay * profile.hfDampingRatio * 1.32) / sampleRate);
 
   const tailStartSec = Math.max(0.01, profile.preDelayMs / 1000);
   const tailStartSample = Math.floor(tailStartSec * sampleRate);
-  const swellSamples = Math.max(1, Math.floor(0.036 * sampleRate));
+  const swellSamples = Math.max(1, Math.floor(0.034 * sampleRate));
 
-  // Ultra-silky 5,200 pulses/sec velvet-noise density in Ultra!
-  const gridDensity = quality === 'ultra' ? 5200 : quality === 'pro' ? 3800 : 2000;
+  // Ultra-silky 6,400 pulses/sec velvet-noise density in Ultra!
+  const gridDensity = quality === 'ultra' ? 6400 : quality === 'pro' ? 4400 : 2200;
   const gridStep = Math.max(4, Math.floor(sampleRate / gridDensity));
 
-  // 6-band one-pole crossover alphas (160, 550, 1600, 4200, 9500 Hz)
-  const a1 = 1 - Math.exp((-2 * Math.PI * 160) / sampleRate);
-  const a2 = 1 - Math.exp((-2 * Math.PI * 550) / sampleRate);
-  const a3 = 1 - Math.exp((-2 * Math.PI * 1600) / sampleRate);
-  const a4 = 1 - Math.exp((-2 * Math.PI * 4200) / sampleRate);
-  const a5 = 1 - Math.exp((-2 * Math.PI * 9500) / sampleRate);
+  // 7-band one-pole crossover alphas (120, 380, 1200, 3200, 6800, 11500 Hz)
+  const a1 = 1 - Math.exp((-2 * Math.PI * 120) / sampleRate);
+  const a2 = 1 - Math.exp((-2 * Math.PI * 380) / sampleRate);
+  const a3 = 1 - Math.exp((-2 * Math.PI * 1200) / sampleRate);
+  const a4 = 1 - Math.exp((-2 * Math.PI * 3200) / sampleRate);
+  const a5 = 1 - Math.exp((-2 * Math.PI * 6800) / sampleRate);
+  const a6 = 1 - Math.exp((-2 * Math.PI * 11500) / sampleRate);
 
   let eSub = Math.exp(-(baseDecay / profile.lfWarmthRatio) * tailStartSec);
-  let eBody = Math.exp(-(baseDecay * 0.98) * tailStartSec);
-  let eMid = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.28)) * tailStartSec);
-  let ePres = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.62)) * tailStartSec);
-  let eBril = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.98)) * tailStartSec);
-  let eAir = Math.exp(-(baseDecay * profile.hfDampingRatio * 1.28) * tailStartSec);
+  let eLow = Math.exp(-(baseDecay * 0.96) * tailStartSec);
+  let eMid = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.22)) * tailStartSec);
+  let eArt = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.48)) * tailStartSec);
+  let ePres = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 0.76)) * tailStartSec);
+  let eBril = Math.exp(-(baseDecay * (1 + (profile.hfDampingRatio - 1) * 1.05)) * tailStartSec);
+  let eAir = Math.exp(-(baseDecay * profile.hfDampingRatio * 1.32) * tailStartSec);
 
-  // Filter states (6 bands × stereo = 12 scalars, zero heap allocation!)
   let f1L = 0, f1R = 0;
   let f2L = 0, f2R = 0;
   let f3L = 0, f3R = 0;
   let f4L = 0, f4R = 0;
   let f5L = 0, f5R = 0;
+  let f6L = 0, f6R = 0;
 
   let nextGridBase = tailStartSample;
   let pulsePosL = tailStartSample + Math.floor(rng() * gridStep);
@@ -214,45 +232,50 @@ export function generateStageImpulseResponse(
     const hitL = i === pulsePosL ? polL * swell : 0;
     const hitR = i === pulsePosR ? polR * swell : 0;
 
-    // Sub-band stays 62% phase-correlated for tight, articulate stereo low-end foundation
+    // Tactile sub stays 68% phase-correlated for tight 4D physical foundation
     const inSubL = hitL * eSub * 0.24;
-    const inSubR = (hitL * 0.62 + hitR * 0.38) * eSub * 0.24;
+    const inSubR = (hitL * 0.68 + hitR * 0.32) * eSub * 0.24;
 
-    // Cascaded 6-band crossover split (clean, phase-coherent, zero ringing!)
     f1L += (inSubL - f1L) * a1;
     f1R += (inSubR - f1R) * a1;
 
-    const xL = hitL;
-    const xR = hitR;
-    f2L += (xL * eBody * 0.32 - f2L) * a2;
-    f2R += (xR * eBody * 0.32 - f2R) * a2;
+    f2L += (hitL * eLow * 0.31 - f2L) * a2;
+    f2R += (hitR * eLow * 0.31 - f2R) * a2;
 
-    f3L += (xL * eMid * 0.3 - f3L) * a3;
-    f3R += (xR * eMid * 0.3 - f3R) * a3;
+    f3L += (hitL * eMid * 0.3 - f3L) * a3;
+    f3R += (hitR * eMid * 0.3 - f3R) * a3;
 
-    f4L += (xL * ePres * 0.25 - f4L) * a4;
-    f4R += (xR * ePres * 0.25 - f4R) * a4;
+    f4L += (hitL * eArt * 0.26 - f4L) * a4;
+    f4R += (hitR * eArt * 0.26 - f4R) * a4;
 
-    f5L += (xL * eBril * 0.19 - f5L) * a5;
-    f5R += (xR * eBril * 0.19 - f5R) * a5;
+    f5L += (hitL * ePres * 0.22 - f5L) * a5;
+    f5R += (hitR * ePres * 0.22 - f5R) * a5;
 
-    const bodyL = f2L - f1L * 0.5;
-    const bodyR = f2R - f1R * 0.5;
+    f6L += (hitL * eBril * 0.17 - f6L) * a6;
+    f6R += (hitR * eBril * 0.17 - f6R) * a6;
+
+    const lowL = f2L - f1L * 0.5;
+    const lowR = f2R - f1R * 0.5;
     const midL = f3L - f2L;
     const midR = f3R - f2R;
-    const presL = f4L - f3L;
-    const presR = f4R - f3R;
-    const brilL = f5L - f4L;
-    const brilR = f5R - f4R;
-    const airL = xL * eAir * 0.12 - f5L * 0.35;
-    const airR = xR * eAir * 0.12 - f5R * 0.35;
+    const artL = f4L - f3L;
+    const artR = f4R - f3R;
+    const presL = f5L - f4L;
+    const presR = f5R - f4R;
+    const brilL = f6L - f5L;
+    const brilR = f6R - f5R;
+    const airL = hitL * eAir * 0.11 - f6L * 0.32;
+    const airR = hitR * eAir * 0.11 - f6R * 0.32;
 
-    left[i] += f1L * 1.15 + bodyL * 1.12 + midL * 1.24 + presL * 1.14 + brilL * 0.96 + airL * 0.72;
-    right[i] += f1R * 1.15 + bodyR * 1.12 + midR * 1.24 + presR * 1.14 + brilR * 0.96 + airR * 0.72;
+    left[i] +=
+      f1L * 1.16 + lowL * 1.12 + midL * 1.2 + artL * 1.16 + presL * 1.06 + brilL * 0.92 + airL * 0.72;
+    right[i] +=
+      f1R * 1.16 + lowR * 1.12 + midR * 1.2 + artR * 1.16 + presR * 1.06 + brilR * 0.92 + airR * 0.72;
 
     eSub *= dSubStep;
-    eBody *= dBodyStep;
+    eLow *= dLowStep;
     eMid *= dMidStep;
+    eArt *= dArtStep;
     ePres *= dPresStep;
     eBril *= dBrilStep;
     eAir *= dAirStep;

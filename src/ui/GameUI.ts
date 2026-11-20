@@ -27,6 +27,11 @@ import {
   SCISSORS,
 } from '../engine/jnv1/types';
 import {
+  PhotoProofVerificationResult,
+  verify5KPhotoProofPng,
+} from '../engine/proof/PhotoProofEngine';
+import { PsychoNetTelemetry } from '../engine/psycho/PsychoNetEngine';
+import {
   CAMERA_STYLE_LIST,
   CAMERA_STYLE_SPECS,
   CameraStyleId,
@@ -45,6 +50,7 @@ import {
   ShadowFlameMode,
   StageId,
 } from '../graphics/GraphicsConfig';
+import { Photo5KResult } from '../graphics/PhotoCapture5K';
 import { PVOverlayState } from '../scene/PVDirector';
 import { STAGE_LIST } from '../scene/StageBuilder';
 
@@ -76,6 +82,7 @@ export interface GameUIHandlers {
   onStartPV: (mode: PVModeId, recordVideo: boolean) => void;
   onStopPV: () => void;
   onCaptureSnapshot: () => void;
+  onCapture5KPhoto: (onProgress?: (pct: number, statusJp: string) => void) => Promise<Photo5KResult | null>;
   onToggleCompactUi: (compact: boolean) => void;
   onChangeResolution: (res: ResolutionPresetId) => void;
   onChangeFpsLimit: (fps: FpsLimitMode) => void;
@@ -92,34 +99,45 @@ export interface GameUIHandlers {
   onChangeJSoundSpatialMode: (spatial: JSoundSpatialMode) => void;
   onToggleJSoundAmbience: (enabled: boolean) => void;
   onAuditionSound: (instrument: AuditionInstrumentId) => void;
+  onToggleBioPulse: (enabled: boolean) => void;
+  onToggleAeroVortex: (enabled: boolean) => void;
+  onToggleAcousticProbe: (enabled: boolean) => void;
   onChangePersona: (persona: JNVPersonaId) => void;
   onToggleSound: () => boolean;
 }
 
 const AUDITION_INSTRUMENTS: Array<{ id: AuditionInstrumentId; label: string }> = [
   { id: 'taiko', label: '大太鼓' },
+  { id: 'shime_daiko', label: '締太鼓' },
   { id: 'otsuzumi', label: '大鼓' },
   { id: 'kotsuzumi', label: '小鼓' },
   { id: 'kakko', label: '鞨鼓' },
   { id: 'koto', label: '十三絃箏' },
+  { id: 'taisho_koto', label: '大正琴' },
   { id: 'shamisen', label: '三味線' },
+  { id: 'sanshin', label: '三線' },
   { id: 'biwa', label: '薩摩琵琶' },
   { id: 'ichigenkin', label: '一絃琴' },
+  { id: 'kokyu', label: '胡弓' },
   { id: 'shakuhachi', label: '尺八' },
   { id: 'shinobue', label: '篠笛' },
   { id: 'ryuteki', label: '龍笛' },
+  { id: 'nokan', label: '能管' },
   { id: 'hichiriki', label: '篳篥' },
   { id: 'sho', label: '雅楽笙' },
   { id: 'horagai', label: '法螺貝' },
   { id: 'rin_bell', label: 'おりん' },
   { id: 'bonsho', label: '梵鐘' },
+  { id: 'kane_chime', label: '銅鐸風鐸' },
   { id: 'dora', label: '銅鑼' },
   { id: 'atarigane', label: '祭摺鉦' },
+  { id: 'shakujo', label: '錫杖' },
   { id: 'mokugyo', label: '楠木魚' },
   { id: 'hyoshigi', label: '拍子木' },
+  { id: 'binzasara', label: '編木' },
   { id: 'furin', label: '江戸風鈴' },
   { id: 'sensu', label: '舞扇' },
-  { id: 'shishi_odoshi', label: '鹿威し' },
+  { id: 'yumi_bow', label: '弓道和弓' },
   { id: 'suikinkutsu', label: '水琴窟' },
 ];
 
@@ -159,6 +177,7 @@ const ARTISAN_HAND_SVG: Record<Move, string> = {
 };
 
 const NAV_ICONS = {
+  photo5k: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   pv: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polygon points="10 9 15 12 10 15 10 9" fill="currentColor" stroke="none"/></svg>`,
   camera: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`,
   graphics: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>`,
@@ -182,6 +201,11 @@ export class GameUI {
   private showHudTelemetry = false;
   private soundOn = true;
   private isImmersiveFs = false;
+  private isCapturing5K = false;
+  private photoToastTimer = 0;
+  private lastPhoto5K: Photo5KResult | null = null;
+  private photoVerifyResult: PhotoProofVerificationResult | null = null;
+  private lastPsychoTelemetry: PsychoNetTelemetry | null = null;
   private currentSettings: GraphicsSettings;
   private currentPersona: JNVPersonaId = 'apex';
   private matchFormat: MatchFormat = 'bo5';
@@ -247,12 +271,15 @@ export class GameUI {
 
   private graphicsDrawerEl!: HTMLElement;
   private inspectorDrawerEl!: HTMLElement;
+  private photo5kNavBtn!: HTMLButtonElement;
   private pvNavBtn!: HTMLButtonElement;
   private cameraNavBtn!: HTMLButtonElement;
   private graphicsNavBtn!: HTMLButtonElement;
   private inspectorNavBtn!: HTMLButtonElement;
   private soundNavBtn!: HTMLButtonElement;
   private fsNavBtn!: HTMLButtonElement;
+  private shutterFlashEl!: HTMLElement;
+  private photoToastEl!: HTMLElement;
 
   private graphicsBodyEl!: HTMLElement;
   private inspectorBodyEl!: HTMLElement;
@@ -302,6 +329,10 @@ export class GameUI {
 
   private buildShell(): void {
     this.root.innerHTML = `
+      <!-- Subtle Ivory Mechanical Shutter Flash & Non-Intrusive 5K Photo Status Toast -->
+      <div class="shutter-flash" id="shutter-flash" aria-hidden="true"></div>
+      <div class="photo-toast" id="photo-toast" aria-live="polite"></div>
+
       <!-- Dramatic Cinema 2.35:1 Letterbox Bars (Overdrive / Match Point / PV Mode) -->
       <div class="cinema-letterbox" id="cinema-letterbox" aria-hidden="true">
         <div class="cinema-bar top"></div>
@@ -337,11 +368,11 @@ export class GameUI {
         </div>
       </div>
 
-      <!-- KHDR vs Standard SDR Live A/B Split Overlay -->
+      <!-- KHDR 1.1 vs Standard SDR Live A/B Split Overlay -->
       <div class="khdr-split-overlay" id="khdr-split-overlay">
         <div class="khdr-split-label left">標準 SDR</div>
-        <div class="khdr-split-label right">KHDR ON</div>
-        <div class="khdr-split-handle" id="khdr-split-handle" title="ドラッグしてKHDR比較位置を移動">
+        <div class="khdr-split-label right">KHDR 1.1 ON</div>
+        <div class="khdr-split-handle" id="khdr-split-handle" title="ドラッグしてKHDR 1.1比較位置を移動">
           <div class="khdr-split-knob">⇄</div>
         </div>
       </div>
@@ -379,20 +410,23 @@ export class GameUI {
 
         <!-- Compact Sculpted Brass & Lacquer Icon Medallions -->
         <nav class="top-actions" aria-label="コントロール">
+          <button class="icon-medallion photo-accent" id="btn-photo-5k" data-tip="現視点 5K KHDR1.1 PNG保存 (K)" aria-label="5K KHDR1.1撮影">
+            ${NAV_ICONS.photo5k}
+          </button>
           <button class="icon-medallion" id="btn-pv" data-tip="PVシネマ再生・録画 (P)" aria-label="PVシネマ">
             ${NAV_ICONS.pv}
           </button>
           <button class="icon-medallion desktop-only" id="btn-camera" data-tip="カメラ切替 (C)" aria-label="カメラ視点切替">
             ${NAV_ICONS.camera}
           </button>
-          <button class="icon-medallion" id="btn-graphics" data-tip="FINGER S1.0・音響1.3・設定 (G)" aria-label="スタジオ設定">
+          <button class="icon-medallion" id="btn-graphics" data-tip="5K撮影・4D音響1.4・NEXT技術 (G)" aria-label="スタジオ設定">
             ${NAV_ICONS.graphics}
           </button>
-          <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 解析 (J)" aria-label="JNV1.0解析">
+          <button class="icon-medallion" id="btn-inspector" data-tip="JNV1.0 / Psycho-Net 解析 (J)" aria-label="JNV1.0解析">
             ${NAV_ICONS.inspector}
             <span class="medallion-seal-dot"></span>
           </button>
-          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.3 ON/OFF" aria-label="音響切替">
+          <button class="icon-medallion" id="btn-sound" data-tip="JSound 1.4 4D ON/OFF" aria-label="音響切替">
             ${NAV_ICONS.soundOn}
           </button>
           <button class="icon-medallion" id="btn-fullscreen" data-tip="全画面表示 (F)" aria-label="全画面切替">
@@ -478,23 +512,23 @@ export class GameUI {
         </div>
       </footer>
 
-      <!-- Left Slide-Out Drawer: FINGER S1.0 · Camera 2.1 · JHand 1.1 · JSound 1.3 · PV Studio -->
+      <!-- Left Slide-Out Drawer: 5K KHDR 1.1 · JSound 1.4 4D · KIWAMI-NEXT · FINGER S1.0 · JHand 1.1 -->
       <aside class="drawer left" id="drawer-graphics" aria-label="スタジオ設定">
         <div class="drawer-header">
           <div class="drawer-title">
-            <h2>映像 · 音響 · 演出</h2>
-            <span class="drawer-badge">v1.3 極</span>
+            <h2>映像 · 4D音響 · 革新技術</h2>
+            <span class="drawer-badge">v1.4 極</span>
           </div>
           <button class="drawer-close" id="close-graphics" aria-label="閉じる">✕</button>
         </div>
         <div class="drawer-body" id="graphics-body"></div>
       </aside>
 
-      <!-- Right Slide-Out Drawer: JNV1.0 Cognitive Core Inspector -->
+      <!-- Right Slide-Out Drawer: JNV1.0 + J-PSYCHO-NET 1.0 Cognitive Inspector -->
       <aside class="drawer right" id="drawer-inspector" aria-label="JNV1.0解析">
         <div class="drawer-header">
           <div class="drawer-title">
-            <h2>JNV1.0 解析</h2>
+            <h2>JNV1.0 · 読心解析</h2>
             <span class="drawer-badge">36 EXP</span>
           </div>
           <button class="drawer-close" id="close-inspector" aria-label="閉じる">✕</button>
@@ -517,6 +551,8 @@ export class GameUI {
       </div>
     `;
 
+    this.shutterFlashEl = this.root.querySelector('#shutter-flash')!;
+    this.photoToastEl = this.root.querySelector('#photo-toast')!;
     this.microTelemetryEl = this.root.querySelector('#micro-telemetry')!;
     this.scorePlayerEl = this.root.querySelector('#score-player')!;
     this.scoreNpcEl = this.root.querySelector('#score-npc')!;
@@ -540,6 +576,7 @@ export class GameUI {
 
     this.graphicsDrawerEl = this.root.querySelector('#drawer-graphics')!;
     this.inspectorDrawerEl = this.root.querySelector('#drawer-inspector')!;
+    this.photo5kNavBtn = this.root.querySelector('#btn-photo-5k')!;
     this.pvNavBtn = this.root.querySelector('#btn-pv')!;
     this.cameraNavBtn = this.root.querySelector('#btn-camera')!;
     this.graphicsNavBtn = this.root.querySelector('#btn-graphics')!;
@@ -602,6 +639,10 @@ export class GameUI {
     this.btnFeintEl.addEventListener('click', () => this.handlers.onTriggerFeint());
 
     // Top-right medallion controls
+    this.photo5kNavBtn.addEventListener('click', () => {
+      void this.trigger5KPhotoCapture();
+    });
+
     this.pvNavBtn.addEventListener('click', () => {
       if (this.pvState.active) {
         this.handlers.onStopPV();
@@ -674,6 +715,58 @@ export class GameUI {
     this.root.querySelector('#pv-btn-stop')!.addEventListener('click', () => {
       this.handlers.onStopPV();
     });
+  }
+
+  private showPhotoToast(msg: string, sticky = false): void {
+    window.clearTimeout(this.photoToastTimer);
+    this.photoToastEl.textContent = msg;
+    this.photoToastEl.classList.add('visible');
+    if (!sticky) {
+      this.photoToastTimer = window.setTimeout(() => {
+        this.photoToastEl.classList.remove('visible');
+      }, 4200);
+    }
+  }
+
+  public async trigger5KPhotoCapture(): Promise<Photo5KResult | null> {
+    if (this.isCapturing5K) return null;
+    this.isCapturing5K = true;
+    this.photo5kNavBtn.classList.add('active');
+
+    // Subtle warm ivory mechanical shutter blink (zero neon!)
+    this.shutterFlashEl.classList.remove('flash');
+    void this.shutterFlashEl.offsetWidth;
+    this.shutterFlashEl.classList.add('flash');
+
+    this.showPhotoToast('5K KHDR 1.1 (48-bit) 撮影開始...', true);
+    this.renderGraphicsDrawer();
+
+    try {
+      const res = await this.handlers.onCapture5KPhoto((pct, statusJp) => {
+        this.showPhotoToast(`${statusJp} (${pct}%)`, pct < 100);
+      });
+      if (res) {
+        if (this.lastPhoto5K?.downloadUrl && this.lastPhoto5K.downloadUrl !== res.downloadUrl) {
+          URL.revokeObjectURL(this.lastPhoto5K.downloadUrl);
+        }
+        this.lastPhoto5K = res;
+        const mb = (res.byteLength / (1024 * 1024)).toFixed(1);
+        this.showPhotoToast(
+          `✓ ${res.width}×${res.height} · 48bit KHDR1.1 (${mb} MB) · JNV暗号証明刻印完了`
+        );
+      } else {
+        this.showPhotoToast('5K撮影をキャンセルしました');
+      }
+      return res;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.showPhotoToast(`5K撮影エラー: ${msg}`);
+      return null;
+    } finally {
+      this.isCapturing5K = false;
+      this.photo5kNavBtn.classList.remove('active');
+      this.renderGraphicsDrawer();
+    }
   }
 
   public async toggleFullscreen(): Promise<void> {
@@ -793,6 +886,8 @@ export class GameUI {
         this.handlers.onTriggerFeint();
       } else if (k === 'c') {
         this.handlers.onCycleCameraStyle();
+      } else if (k === 'k') {
+        void this.trigger5KPhotoCapture();
       } else if (k === 'p') {
         this.graphicsOpen = false;
         this.inspectorOpen = false;
@@ -1063,10 +1158,30 @@ export class GameUI {
     this.theatreEl.className = 'theatre-stage';
   }
 
+  private formatSpatialTag(mode: JSoundSpatialMode): string {
+    if (mode === '4d_audio_max') return '4D MAX';
+    if (mode === '4d_audio') return '4D音場';
+    if (mode === 'binaural_3d') return '立体3D';
+    if (mode === 'studio_wide') return '広域';
+    return '集中';
+  }
+
+  public updatePsychoTelemetry(psycho: PsychoNetTelemetry): void {
+    this.lastPsychoTelemetry = psycho;
+    const el = this.graphicsBodyEl.querySelector('#live-psycho-chip');
+    if (el) {
+      el.textContent = `H=${psycho.shannonEntropyBits.toFixed(2)}bit · ${psycho.playerTendencyJp}`;
+    }
+    if (this.inspectorOpen) {
+      this.renderInspectorDrawer();
+    }
+  }
+
   public updateRenderMetrics(m: RenderMetrics): void {
     this.lastMetrics = m;
     const sfShort = SHADOW_FLAME_SPECS[m.shadowFlameMode].shortLabel;
     const camShort = CAMERA_STYLE_SPECS[m.cameraStyle].shortJp;
+    const spTag = this.formatSpatialTag(m.jsoundSpatialMode);
 
     if (this.showHudTelemetry) {
       this.microTelemetryEl.style.display = 'inline-flex';
@@ -1075,10 +1190,11 @@ export class GameUI {
         <span class="sep">·</span>
         <span>${this.currentSettings.resolution.toUpperCase()}</span>
         <span class="sep">·</span>
-        <span class="accent">${m.khdrActive ? 'KHDR' : 'SDR'}</span>
+        <span class="accent">${m.khdrActive ? 'KHDR 1.1' : 'SDR'}</span>
         <span class="sep">·</span>
         <span class="accent">${sfShort}</span>
-        ${m.fingerS1Active ? `<span class="sep">·</span><span class="accent">FINGER S1</span>` : ''}
+        <span class="sep">·</span>
+        <span class="accent">${spTag}</span>
         <span class="sep">·</span>
         <span>${camShort}</span>
       `;
@@ -1110,10 +1226,20 @@ export class GameUI {
     if (jsoundEl) {
       const peakStr = m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`;
       jsoundEl.innerHTML = `
-        <div class="metric-box"><div class="k">内部DSP / 立体反射</div><div class="v gold">${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×) · ${m.jsoundEarlyRays}Ray</div></div>
-        <div class="metric-box"><div class="k">RT60 / キャッシュ率</div><div class="v">${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundCacheHitPct}%</div></div>
-        <div class="metric-box"><div class="k">衝突素材 / Peak</div><div class="v">${m.jsoundMaterialPair} · ${peakStr}</div></div>
-        <div class="metric-box"><div class="k">直近発音 (${m.jsoundVoices}ch)</div><div class="v">${m.jsoundLastEventJp}</div></div>
+        <div class="metric-box"><div class="k">空間 / 内部DSP</div><div class="v gold">${spTag} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)</div></div>
+        <div class="metric-box"><div class="k">4D音線 / RT60</div><div class="v">${m.jsoundEarlyRays}Ray · ${m.jsoundRt60Sec.toFixed(2)}s</div></div>
+        <div class="metric-box"><div class="k">音響プローブ D/R</div><div class="v">${m.probeDrDb >= 0 ? '+' : ''}${m.probeDrDb.toFixed(1)}dB (近接+${m.probeProximityDb.toFixed(1)}dB)</div></div>
+        <div class="metric-box"><div class="k">発音 (${m.jsoundVoices}ch · ${peakStr})</div><div class="v">${m.jsoundLastEventJp}</div></div>
+      `;
+    }
+
+    const nextEl = this.graphicsBodyEl.querySelector('#live-nexttech-stats');
+    if (nextEl) {
+      nextEl.innerHTML = `
+        <div class="metric-box"><div class="k">J-BioPulse 心拍/白化</div><div class="v gold">${m.bioPulseBpm} BPM · 白化${m.bioCapillaryBlanchPct}%</div></div>
+        <div class="metric-box"><div class="k">生体状態</div><div class="v">${m.bioStateJp}</div></div>
+        <div class="metric-box"><div class="k">AeroVortex 3D渦輪</div><div class="v">${m.aeroActiveVortices}渦 · Γ=${m.aeroPeakCirculation.toFixed(2)} (${m.aeroPeakSpeedMs.toFixed(1)}m/s)</div></div>
+        <div class="metric-box"><div class="k">Acoustic Probe (${m.probeDistanceM.toFixed(2)}m)</div><div class="v">LPF ${m.probeAirCutoffKhz}kHz · ${m.probeNearestJp}近接</div></div>
       `;
     }
   }
@@ -1168,12 +1294,16 @@ export class GameUI {
   }
 
   // ===========================================================================
-  // LEFT DRAWER: STUDIO (FINGER S1.0 · GAMEPLAY · PV · CAMERA 2.1 · JSOUND 1.3 · JHAND 36-POSE · GPU)
+  // LEFT DRAWER: STUDIO v1.4 (5K KHDR 1.1 · JSOUND 1.4 4D MAX · KIWAMI-NEXT · FINGER S1.0 · JHAND)
   // ===========================================================================
   private renderGraphicsDrawer(): void {
     const prevScroll = this.graphicsBodyEl.scrollTop;
     const s = this.currentSettings;
     const m = this.lastMetrics;
+    const p5k = this.lastPhoto5K;
+    const pv = this.photoVerifyResult;
+    const psycho = this.lastPsychoTelemetry;
+
     const fpsOptions: Array<{ v: FpsLimitMode; label: string }> = [
       { v: 60, label: '60 FPS' },
       { v: 120, label: '120 FPS' },
@@ -1189,13 +1319,146 @@ export class GameUI {
       { v: 'bo9', label: '5本先取' },
       { v: 'endless', label: '無制限' },
     ];
-    const spatialOptions: Array<{ v: JSoundSpatialMode; label: string; sub: string }> = [
+    const spatial3DOptions: Array<{ v: JSoundSpatialMode; label: string; sub: string }> = [
       { v: 'binaural_3d', label: '立体3D', sub: 'HRTF+ITD' },
       { v: 'studio_wide', label: '広域音場', sub: 'M/S拡張' },
       { v: 'focused', label: '集中定位', sub: '明瞭定位' },
     ];
 
+    const verifyResultHtml = pv
+      ? `<div class="proof-verify-card ${pv.valid ? 'valid' : 'invalid'}">
+           <div class="pv-status">${pv.reasonJp}</div>
+           ${
+             pv.record
+               ? `<div class="pv-meta">
+                    ${pv.width}×${pv.height} · ${pv.bitDepth * 3}bit (${pv.bitDepth}bit/ch) · ${pv.record.khdrVersion}<br/>
+                    舞台: ${pv.record.stageNameJp} · BPM ${pv.record.bioPulseBpm} · D/R ${pv.record.acousticProbeDrDb}dB<br/>
+                    視点: (${pv.record.cameraPos.join(', ')}) FOV ${pv.record.cameraFovDeg}°<br/>
+                    JNV-SEAL: <code>${pv.record.sealSha256.slice(0, 22)}…</code>
+                  </div>`
+               : ''
+           }
+         </div>`
+      : '';
+
     this.graphicsBodyEl.innerHTML = `
+      <section class="panel-section hero-section">
+        <div class="section-head">
+          <span class="section-title">5K KHDR 1.1 現視点撮影</span>
+          <span class="section-meta">5120×2880 · 48bit PNG</span>
+        </div>
+        <button class="pill-btn full-pill active hero-photo-btn" id="btn-drawer-photo-5k" ${this.isCapturing5K ? 'disabled' : ''}>
+          <span>${this.isCapturing5K ? '撮影中… KHDR 1.1 5K タイル生成中' : '◎ 現カメラアングルで 5K 48bit PNG 保存 (K)'}</span>
+        </button>
+        <div class="finger-s1-caption">
+          32bit浮動小数KHDR 1.1スペクトル描画 → True 48-bit (16bit/ch) 高ビットレート無劣化PNG（自由視点・マクロ対応／UI非表示／JNV-PROOF暗号証明自動刻印）
+        </div>
+        ${
+          p5k
+            ? `<div class="proof-last-chip">
+                 直近保存: ${p5k.width}×${p5k.height} · ${(p5k.byteLength / (1024 * 1024)).toFixed(1)}MB (${p5k.captureMs}ms)
+                 ${p5k.proof ? ` · SEAL <code>${p5k.proof.sealSha256.slice(0, 12)}…</code>` : ''}
+                 ${p5k.downloadUrl ? ` · <a href="${p5k.downloadUrl}" download="${p5k.filename}" style="color:var(--gold-hi);text-decoration:underline">↓ PNG再保存</a>` : ''}
+               </div>`
+            : ''
+        }
+        <label class="pill-btn full-pill verify-upload-btn" for="input-verify-5k-png">
+          <span>✓ JNV-PROOF 5K PNG 改ざん検証</span>
+        </label>
+        <input type="file" id="input-verify-5k-png" accept="image/png" style="display:none" />
+        ${verifyResultHtml}
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head">
+          <span class="section-title">JSound Engin 1.4 · 4D音響</span>
+          <span class="section-meta">${this.formatSpatialTag(s.jsoundSpatialMode)} · ${s.jsoundQuality === 'ultra' ? '384kHz·380Ray' : s.jsoundQuality === 'pro' ? '192kHz·230Ray' : '96kHz·高速'}</span>
+        </div>
+        <div class="pill-grid cols-2">
+          <button class="pill-btn ${s.jsoundSpatialMode === '4d_audio_max' ? 'active' : ''}" data-spatial="4d_audio_max">
+            <span>★ 4D Audio MAX</span>
+            <span class="sub">360°球面+頭上+重低音</span>
+          </button>
+          <button class="pill-btn ${s.jsoundSpatialMode === '4d_audio' ? 'active' : ''}" data-spatial="4d_audio">
+            <span>4D Audio</span>
+            <span class="sub">4D音場+頭上気流</span>
+          </button>
+        </div>
+        <div class="pill-grid cols-3" style="margin-top:5px">
+          ${spatial3DOptions
+            .map(
+              (sp) => `
+            <button class="pill-btn ${s.jsoundSpatialMode === sp.v ? 'active' : ''}" data-spatial="${sp.v}">
+              <span>${sp.label}</span>
+              <span class="sub">${sp.sub}</span>
+            </button>
+          `
+            )
+            .join('')}
+        </div>
+        <div class="pill-grid cols-3" style="margin-top:5px">
+          <button class="pill-btn ${s.jsoundQuality === 'ultra' ? 'active' : ''}" data-jsound="ultra">
+            <span>1.4 Ultra</span>
+            <span class="sub">384kHz·380Ray</span>
+          </button>
+          <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
+            <span>1.4 Pro</span>
+            <span class="sub">192kHz·230Ray</span>
+          </button>
+          <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
+            <span>1.4 Lite</span>
+            <span class="sub">96kHz·高速</span>
+          </button>
+        </div>
+        <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
+          <span>${s.jsoundAmbience ? '✓ 4D空間環境音 ON（20種・竹林風/鈴虫/錫杖/能管/水琴窟他）' : '4D空間環境音 OFF'}</span>
+        </button>
+        <div class="swatch-row-label">32和楽器 4D物理試聴デッキ（384kHz 31-Tap -111dB · 58素材 · 380音線）</div>
+        <div class="audition-grid cols-4">
+          ${AUDITION_INSTRUMENTS.map(
+            (inst) => `
+            <button class="audition-btn" data-audition="${inst.id}">${inst.label}</button>
+          `
+          ).join('')}
+        </div>
+        <div class="metric-grid" id="live-jsound-stats">
+          <div class="metric-box"><div class="k">空間 / 内部DSP</div><div class="v gold">${m ? `${this.formatSpatialTag(m.jsoundSpatialMode)} · ${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×)` : '4D MAX · 384kHz(8×)'}</div></div>
+          <div class="metric-box"><div class="k">4D音線 / RT60</div><div class="v">${m ? `${m.jsoundEarlyRays}Ray · ${m.jsoundRt60Sec.toFixed(2)}s` : '376Ray · 0.46s'}</div></div>
+          <div class="metric-box"><div class="k">音響プローブ D/R</div><div class="v">${m ? `${m.probeDrDb >= 0 ? '+' : ''}${m.probeDrDb.toFixed(1)}dB (近接+${m.probeProximityDb.toFixed(1)}dB)` : '—'}</div></div>
+          <div class="metric-box"><div class="k">発音 (${m ? m.jsoundVoices : 0}ch)</div><div class="v">${m ? m.jsoundLastEventJp : '—'}</div></div>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-head">
+          <span class="section-title">KIWAMI-NEXT 5大革新技術</span>
+          <span class="section-meta">世界初級独自実装</span>
+        </div>
+        <div class="pill-grid cols-3">
+          <button class="pill-btn ${s.bioPulseEnabled ? 'active' : ''}" id="btn-toggle-biopulse">
+            <span>BioPulse</span>
+            <span class="sub">心拍脈波+白化</span>
+          </button>
+          <button class="pill-btn ${s.aeroVortexEnabled ? 'active' : ''}" id="btn-toggle-aerovortex">
+            <span>AeroVortex</span>
+            <span class="sub">3D渦輪流体</span>
+          </button>
+          <button class="pill-btn ${s.acousticProbeEnabled ? 'active' : ''}" id="btn-toggle-acousticprobe">
+            <span>AcousticProbe</span>
+            <span class="sub">12音線連動</span>
+          </button>
+        </div>
+        <div class="finger-s1-caption" id="live-psycho-chip">
+          ${psycho ? `J-PsychoNet: H=${psycho.shannonEntropyBits.toFixed(2)}bit · ${psycho.playerTendencyJp}` : 'J-PsychoNet 1.0: シャノン情報エントロピー & VLMC先読解析 待機中'}
+        </div>
+        <div class="metric-grid" id="live-nexttech-stats">
+          <div class="metric-box"><div class="k">J-BioPulse 心拍/白化</div><div class="v gold">${m ? `${m.bioPulseBpm} BPM · 白化${m.bioCapillaryBlanchPct}%` : '68 BPM · 白化8%'}</div></div>
+          <div class="metric-box"><div class="k">生体状態</div><div class="v">${m ? m.bioStateJp : '明鏡止水'}</div></div>
+          <div class="metric-box"><div class="k">AeroVortex 3D渦輪</div><div class="v">${m ? `${m.aeroActiveVortices}渦 · Γ=${m.aeroPeakCirculation.toFixed(2)}` : '0渦 · 層流静穏'}</div></div>
+          <div class="metric-box"><div class="k">Acoustic Probe</div><div class="v">${m ? `${m.probeDistanceM.toFixed(2)}m · LPF ${m.probeAirCutoffKhz}kHz` : '—'}</div></div>
+        </div>
+      </section>
+
       <section class="panel-section">
         <div class="section-head"><span class="section-title">FINGER S1.0 極写実ハンド</span><span class="section-meta">${s.fingerS1Enabled ? 'ON · 彫刻関節+SSS' : 'OFF · 従来造形'}</span></div>
         <div class="pill-grid cols-2">
@@ -1209,7 +1472,7 @@ export class GameUI {
           </button>
         </div>
         <div class="finger-s1-caption">
-          32×24 非対称解剖指節 · 3層動的関節皺 · 二重曲率爪半月 · 指紋/毛穴/静脈PBR · GLSLヘモグロビン皮下散乱SSS（Shadow Flame 1.0 完全対応）
+          32×24 非対称解剖指節 · 3層動的関節皺 · 二重曲率爪半月 · J-BioPulse脈波&amp;毛細血管白化連動 · GLSL皮下散乱SSS
         </div>
         <button class="pill-btn full-pill ${s.cameraStyle === 'macro_artisan' ? 'active' : ''}" id="btn-s1-macro">
           <span>◎ 匠マクロカメラで指先・関節を極近接鑑賞</span>
@@ -1254,7 +1517,7 @@ export class GameUI {
           </button>
           <button class="pill-btn" data-start-pv="grand_trailer" data-rec="1">
             <span>● PV録画 (WebM)</span>
-            <span class="sub">映像+3D音響</span>
+            <span class="sub">映像+4D音響</span>
           </button>
           <button class="pill-btn" data-start-pv="battle_reel" data-rec="0">
             <span>激闘リール</span>
@@ -1265,7 +1528,7 @@ export class GameUI {
             <span class="sub">マクロ · 18秒</span>
           </button>
         </div>
-        <button class="pill-btn full-pill" id="btn-drawer-snap"><span>静止画シネマ保存 (1920×1080 PNG)</span></button>
+        <button class="pill-btn full-pill" id="btn-drawer-snap"><span>高速シネマ保存 (1920×1080 PNG)</span></button>
       </section>
 
       <section class="panel-section">
@@ -1278,53 +1541,6 @@ export class GameUI {
             </button>
           `
           ).join('')}
-        </div>
-      </section>
-
-      <section class="panel-section">
-        <div class="section-head"><span class="section-title">JSound Engin 1.3</span><span class="section-meta">${s.jsoundQuality === 'ultra' ? '384kHz 8×OS · 230Ray' : s.jsoundQuality === 'pro' ? '192kHz 4×OS · 128Ray' : '96kHz 2×OS · 24Ray'}</span></div>
-        <div class="pill-grid cols-3">
-          <button class="pill-btn ${s.jsoundQuality === 'ultra' ? 'active' : ''}" data-jsound="ultra">
-            <span>1.3 Ultra</span>
-            <span class="sub">384kHz·230Ray</span>
-          </button>
-          <button class="pill-btn ${s.jsoundQuality === 'pro' ? 'active' : ''}" data-jsound="pro">
-            <span>1.3 Pro</span>
-            <span class="sub">192kHz·128Ray</span>
-          </button>
-          <button class="pill-btn ${s.jsoundQuality === 'lite' ? 'active' : ''}" data-jsound="lite">
-            <span>1.3 Lite</span>
-            <span class="sub">96kHz·高速</span>
-          </button>
-        </div>
-        <div class="pill-grid cols-3" style="margin-top:5px">
-          ${spatialOptions
-            .map(
-              (sp) => `
-            <button class="pill-btn ${s.jsoundSpatialMode === sp.v ? 'active' : ''}" data-spatial="${sp.v}">
-              <span>${sp.label}</span>
-              <span class="sub">${sp.sub}</span>
-            </button>
-          `
-            )
-            .join('')}
-        </div>
-        <button class="pill-btn full-pill ${s.jsoundAmbience ? 'active' : ''}" id="btn-jsound-ambience">
-          <span>${s.jsoundAmbience ? '✓ 空間環境音 ON（14種・水琴窟/龍笛/銅鑼/鹿威し他）' : '空間環境音 OFF'}</span>
-        </button>
-        <div class="swatch-row-label">24和楽器 物理試聴デッキ（384kHz 8×OS · 230本立体残響）</div>
-        <div class="audition-grid cols-4">
-          ${AUDITION_INSTRUMENTS.map(
-            (inst) => `
-            <button class="audition-btn" data-audition="${inst.id}">${inst.label}</button>
-          `
-          ).join('')}
-        </div>
-        <div class="metric-grid" id="live-jsound-stats">
-          <div class="metric-box"><div class="k">内部DSP / 立体反射</div><div class="v gold">${m ? `${m.jsoundDspRateKhz}kHz(${m.jsoundOversampling}×) · ${m.jsoundEarlyRays}Ray` : '384kHz(8×) · 230Ray'}</div></div>
-          <div class="metric-box"><div class="k">RT60 / キャッシュ率</div><div class="v">${m ? `${m.jsoundRt60Sec.toFixed(2)}s · ${m.jsoundCacheHitPct}%` : '—'}</div></div>
-          <div class="metric-box"><div class="k">衝突素材 / Peak</div><div class="v">${m ? `${m.jsoundMaterialPair} · ${m.jsoundPeakDb <= -72 ? '待機' : `${m.jsoundPeakDb} dBFS`}` : '—'}</div></div>
-          <div class="metric-box"><div class="k">直近発音 (${m ? m.jsoundVoices : 0}ch)</div><div class="v">${m ? m.jsoundLastEventJp : '—'}</div></div>
         </div>
       </section>
 
@@ -1361,7 +1577,7 @@ export class GameUI {
       </section>
 
       <section class="panel-section">
-        <div class="section-head"><span class="section-title">解像度 · FPS · KHDR · 影</span></div>
+        <div class="section-head"><span class="section-title">解像度 · FPS · KHDR 1.1 · 影</span></div>
         <div class="pill-grid cols-4">
           ${RESOLUTION_LIST.map(
             (r) => `
@@ -1384,11 +1600,11 @@ export class GameUI {
             .join('')}
         </div>
         <div class="pill-grid cols-2" style="margin-top:5px">
-          <button class="pill-btn ${s.khdrEnabled ? 'active' : ''}" data-khdr="on"><span>KHDR ON</span></button>
-          <button class="pill-btn ${!s.khdrEnabled ? 'active' : ''}" data-khdr="off"><span>KHDR OFF</span></button>
+          <button class="pill-btn ${s.khdrEnabled ? 'active' : ''}" data-khdr="on"><span>KHDR 1.1 ON</span></button>
+          <button class="pill-btn ${!s.khdrEnabled ? 'active' : ''}" data-khdr="off"><span>KHDR 1.1 OFF</span></button>
         </div>
         <button class="pill-btn full-pill ${s.khdrSplitCompare ? 'active' : ''}" id="btn-khdr-split">
-          <span>${s.khdrSplitCompare ? '✓ KHDR A/B 分割比較中' : 'KHDR A/B 分割比較'}</span>
+          <span>${s.khdrSplitCompare ? '✓ KHDR 1.1 A/B 分割比較中' : 'KHDR 1.1 A/B 分割比較'}</span>
         </button>
         <div class="pill-grid cols-3" style="margin-top:5px">
           ${sfOptions
@@ -1468,6 +1684,39 @@ export class GameUI {
         </div>
       </section>
     `;
+
+    // Bind 5K Photo Capture & JNV-PROOF Verifier
+    this.graphicsBodyEl.querySelector('#btn-drawer-photo-5k')!.addEventListener('click', () => {
+      void this.trigger5KPhotoCapture();
+    });
+    const verifyInput = this.graphicsBodyEl.querySelector<HTMLInputElement>('#input-verify-5k-png');
+    if (verifyInput) {
+      verifyInput.addEventListener('change', async () => {
+        const file = verifyInput.files?.[0];
+        if (!file) return;
+        this.showPhotoToast('JNV-PROOF SHA-256 全ピクセル検証中...', true);
+        try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          this.photoVerifyResult = await verify5KPhotoProofPng(bytes);
+          this.showPhotoToast(this.photoVerifyResult.reasonJp);
+        } catch {
+          this.photoVerifyResult = null;
+          this.showPhotoToast('PNGの読み込みに失敗しました');
+        }
+        this.renderGraphicsDrawer();
+      });
+    }
+
+    // Bind Project KIWAMI-NEXT toggles
+    this.graphicsBodyEl.querySelector('#btn-toggle-biopulse')!.addEventListener('click', () => {
+      this.handlers.onToggleBioPulse(!this.currentSettings.bioPulseEnabled);
+    });
+    this.graphicsBodyEl.querySelector('#btn-toggle-aerovortex')!.addEventListener('click', () => {
+      this.handlers.onToggleAeroVortex(!this.currentSettings.aeroVortexEnabled);
+    });
+    this.graphicsBodyEl.querySelector('#btn-toggle-acousticprobe')!.addEventListener('click', () => {
+      this.handlers.onToggleAcousticProbe(!this.currentSettings.acousticProbeEnabled);
+    });
 
     // Bind listeners
     this.graphicsBodyEl.querySelectorAll<HTMLButtonElement>('[data-fingers1]').forEach((b) => {
@@ -1578,11 +1827,12 @@ export class GameUI {
   }
 
   // ===========================================================================
-  // RIGHT DRAWER: JNV1.0 COGNITIVE CORE INSPECTOR
+  // RIGHT DRAWER: JNV1.0 + J-PSYCHO-NET 1.0 COGNITIVE CORE INSPECTOR
   // ===========================================================================
   private renderInspectorDrawer(): void {
     const t = this.lastTelemetry;
     const seal = this.currentSeal;
+    const psycho = this.lastPsychoTelemetry;
 
     const personaHtml = JNV_PERSONA_LIST.map(
       (p) => `
@@ -1596,6 +1846,24 @@ export class GameUI {
     const predEntropy = t
       ? -t.predictedPlayerDist.reduce((acc, p) => (p > 1e-6 ? acc + p * Math.log2(p) : acc), 0)
       : 0;
+
+    const psychoHtml = psycho
+      ? `
+      <section class="panel-section">
+        <div class="section-head">
+          <span class="section-title">J-PSYCHO-NET 1.0 情報理論解析</span>
+          <span class="section-meta">${psycho.dominantExpertJp}</span>
+        </div>
+        <div class="jnv-verdict-chip">${psycho.playerTendencyJp}</div>
+        <div class="metric-grid" style="margin-top:6px">
+          <div class="metric-box"><div class="k">シャノン情報量 H(X)</div><div class="v gold">${psycho.shannonEntropyBits.toFixed(3)} bit</div></div>
+          <div class="metric-box"><div class="k">KLダイバージェンス</div><div class="v">${psycho.klDivergenceBits.toFixed(3)} bit</div></div>
+          <div class="metric-box"><div class="k">読破予測度</div><div class="v">${psycho.predictabilityPct}%</div></div>
+          <div class="metric-box"><div class="k">解析局数</div><div class="v">${psycho.roundsAnalyzed}局</div></div>
+        </div>
+      </section>
+    `
+      : '';
 
     const telemetryHtml = t
       ? `
@@ -1700,6 +1968,7 @@ export class GameUI {
         </div>
       </section>
 
+      ${psychoHtml}
       ${telemetryHtml}
 
       <section class="panel-section">

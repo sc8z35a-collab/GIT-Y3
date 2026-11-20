@@ -28,7 +28,13 @@ export type SoundscapeActorKind =
   | 'distant_shinobue'
   | 'distant_suikinkutsu'
   | 'distant_ryuteki'
-  | 'distant_dora';
+  | 'distant_dora'
+  | 'bamboo_wind_rustle'
+  | 'crickets_suzumushi'
+  | 'distant_nokan'
+  | 'distant_shakujo'
+  | 'onsen_steam_hiss'
+  | 'distant_binzasara';
 
 export interface StageSoundscapeSpec {
   minIntervalSec: number;
@@ -45,12 +51,12 @@ export interface StageSoundscapeSpec {
 
 export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
   zashiki: {
-    minIntervalSec: 4.2,
-    maxIntervalSec: 8.2,
+    minIntervalSec: 3.8,
+    maxIntervalSec: 7.5,
     actors: [
       {
         kind: 'shishi_odoshi',
-        weight: 0.34,
+        weight: 0.24,
         gain: 0.14,
         pos: { x: -3.4, y: 0.35, z: -2.5 },
         posJitter: { x: 0.4, y: 0.1, z: 0.3 },
@@ -58,7 +64,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_suikinkutsu',
-        weight: 0.24,
+        weight: 0.2,
         gain: 0.12,
         pos: { x: -2.4, y: 0.15, z: -3.1 },
         posJitter: { x: 0.3, y: 0.08, z: 0.3 },
@@ -66,15 +72,31 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'furin',
-        weight: 0.28,
+        weight: 0.2,
         gain: 0.085,
-        pos: { x: 2.8, y: 2.05, z: -1.6 },
-        posJitter: { x: 0.35, y: 0.18, z: 0.25 },
-        labelJp: '縁側・江戸風鈴',
+        pos: { x: 2.8, y: 2.35, z: -1.4 },
+        posJitter: { x: 0.35, y: 0.22, z: 0.25 },
+        labelJp: '軒先・江戸風鈴',
+      },
+      {
+        kind: 'bamboo_wind_rustle',
+        weight: 0.14,
+        gain: 0.09,
+        pos: { x: 1.4, y: 3.2, z: -2.2 },
+        posJitter: { x: 1.6, y: 0.35, z: 1.2 },
+        labelJp: '頭上・竹林の葉擦れ',
+      },
+      {
+        kind: 'crickets_suzumushi',
+        weight: 0.12,
+        gain: 0.075,
+        pos: { x: 3.6, y: 0.4, z: 1.8 },
+        posJitter: { x: 0.7, y: 0.15, z: 0.8 },
+        labelJp: '縁側外・鈴虫',
       },
       {
         kind: 'distant_shamisen',
-        weight: 0.14,
+        weight: 0.1,
         gain: 0.055,
         pos: { x: -4.2, y: 1.1, z: -3.6 },
         posJitter: { x: 0.5, y: 0.2, z: 0.4 },
@@ -83,12 +105,12 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     ],
   },
   salon: {
-    minIntervalSec: 2.2,
-    maxIntervalSec: 4.0,
+    minIntervalSec: 2.1,
+    maxIntervalSec: 3.8,
     actors: [
       {
         kind: 'pendulum_clock',
-        weight: 0.72,
+        weight: 0.58,
         gain: 0.095,
         pos: { x: 3.6, y: 1.55, z: -3.4 },
         posJitter: { x: 0.1, y: 0.05, z: 0.1 },
@@ -96,37 +118,61 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_dora',
-        weight: 0.14,
+        weight: 0.15,
         gain: 0.065,
         pos: { x: -3.8, y: 1.2, z: -4.0 },
         posJitter: { x: 0.4, y: 0.2, z: 0.4 },
         labelJp: '遠間・茶席銅鑼',
       },
       {
-        kind: 'furin',
+        kind: 'distant_binzasara',
         weight: 0.14,
+        gain: 0.058,
+        pos: { x: -2.6, y: 2.2, z: 1.6 },
+        posJitter: { x: 0.6, y: 0.2, z: 0.5 },
+        labelJp: '回廊・編木波音',
+      },
+      {
+        kind: 'furin',
+        weight: 0.13,
         gain: 0.048,
-        pos: { x: -3.4, y: 2.4, z: -2.8 },
+        pos: { x: -3.4, y: 2.8, z: -2.6 },
         posJitter: { x: 0.3, y: 0.2, z: 0.3 },
-        labelJp: '窓辺・硝子響',
+        labelJp: '高窓・硝子響',
       },
     ],
   },
   shrine: {
-    minIntervalSec: 3.6,
-    maxIntervalSec: 7.4,
+    minIntervalSec: 3.2,
+    maxIntervalSec: 6.6,
     actors: [
       {
         kind: 'suzu_breeze',
-        weight: 0.32,
+        weight: 0.22,
         gain: 0.09,
-        pos: { x: 0.4, y: 2.35, z: -2.8 },
-        posJitter: { x: 1.2, y: 0.25, z: 0.6 },
-        labelJp: '拝殿・神楽鈴風',
+        pos: { x: 0.4, y: 2.85, z: -2.2 },
+        posJitter: { x: 1.2, y: 0.3, z: 0.6 },
+        labelJp: '頭上拝殿・神楽鈴風',
+      },
+      {
+        kind: 'distant_shakujo',
+        weight: 0.18,
+        gain: 0.072,
+        pos: { x: -3.4, y: 1.2, z: 2.4 },
+        posJitter: { x: 0.7, y: 0.2, z: 0.6 },
+        labelJp: '参道背後・錫杖',
+      },
+      {
+        kind: 'distant_nokan',
+        weight: 0.15,
+        gain: 0.055,
+        pos: { x: 3.6, y: 2.6, z: -3.8 },
+        posJitter: { x: 0.7, y: 0.3, z: 0.6 },
+        labelJp: '社叢・能管遠音',
       },
       {
         kind: 'cedar_creak',
-        weight: 0.24,
+        weight: 0.15,
         gain: 0.11,
         pos: { x: -2.6, y: 1.7, z: -1.8 },
         posJitter: { x: 0.8, y: 0.3, z: 0.8 },
@@ -134,7 +180,7 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_mokugyo',
-        weight: 0.18,
+        weight: 0.12,
         gain: 0.075,
         pos: { x: 3.8, y: 0.9, z: -3.8 },
         posJitter: { x: 0.4, y: 0.15, z: 0.5 },
@@ -142,15 +188,15 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'distant_ryuteki',
-        weight: 0.14,
+        weight: 0.1,
         gain: 0.055,
-        pos: { x: 3.4, y: 2.2, z: -4.4 },
+        pos: { x: 3.4, y: 2.4, z: -4.4 },
         posJitter: { x: 0.6, y: 0.3, z: 0.6 },
         labelJp: '社叢・龍笛遠音',
       },
       {
         kind: 'distant_shinobue',
-        weight: 0.12,
+        weight: 0.08,
         gain: 0.05,
         pos: { x: -4.0, y: 2.1, z: -4.2 },
         posJitter: { x: 0.8, y: 0.3, z: 0.6 },
@@ -160,23 +206,31 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
   },
   onsen: {
     minIntervalSec: 1.1,
-    maxIntervalSec: 2.5,
+    maxIntervalSec: 2.4,
     actors: [
       {
         kind: 'water_droplet',
-        weight: 0.58,
+        weight: 0.44,
         gain: 0.18,
-        pos: { x: 0.0, y: 0.6, z: -1.4 },
-        posJitter: { x: 2.6, y: 0.9, z: 1.8 },
-        labelJp: '岩窟・雫滴音',
+        pos: { x: 0.0, y: 1.8, z: -1.2 },
+        posJitter: { x: 2.6, y: 1.1, z: 2.1 },
+        labelJp: '岩窟天井・雫滴音',
       },
       {
         kind: 'distant_suikinkutsu',
-        weight: 0.26,
+        weight: 0.22,
         gain: 0.15,
         pos: { x: -2.2, y: 0.35, z: -2.1 },
         posJitter: { x: 0.5, y: 0.15, z: 0.5 },
         labelJp: '岩庭・水琴窟',
+      },
+      {
+        kind: 'onsen_steam_hiss',
+        weight: 0.18,
+        gain: 0.095,
+        pos: { x: 1.8, y: 2.6, z: 1.4 },
+        posJitter: { x: 1.4, y: 0.4, z: 1.2 },
+        labelJp: '頭上湯気・源泉蒸気',
       },
       {
         kind: 'shishi_odoshi',
@@ -189,12 +243,12 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
     ],
   },
   atelier: {
-    minIntervalSec: 2.3,
-    maxIntervalSec: 5.2,
+    minIntervalSec: 2.2,
+    maxIntervalSec: 4.8,
     actors: [
       {
         kind: 'hearth_pop',
-        weight: 0.54,
+        weight: 0.44,
         gain: 0.13,
         pos: { x: -2.8, y: 0.45, z: -2.1 },
         posJitter: { x: 0.4, y: 0.15, z: 0.3 },
@@ -202,11 +256,19 @@ export const STAGE_SOUNDSCAPE_SPECS: Record<StageId, StageSoundscapeSpec> = {
       },
       {
         kind: 'chronometer_tick',
-        weight: 0.46,
+        weight: 0.38,
         gain: 0.085,
         pos: { x: 2.2, y: 0.8, z: -1.6 },
         posJitter: { x: 0.2, y: 0.1, z: 0.2 },
         labelJp: '書斎・精密時計',
+      },
+      {
+        kind: 'crickets_suzumushi',
+        weight: 0.18,
+        gain: 0.065,
+        pos: { x: -3.2, y: 0.9, z: 2.2 },
+        posJitter: { x: 0.6, y: 0.2, z: 0.6 },
+        labelJp: '窓外・秋鈴虫',
       },
     ],
   },

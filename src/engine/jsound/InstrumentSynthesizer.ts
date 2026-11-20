@@ -1497,4 +1497,619 @@ export function synthesizeSuikinkutsu(
   return { left, right };
 }
 
+// =============================================================================
+// JSOUND ENGIN 1.4 — 10 NEW PURE-PHYSICAL INSTRUMENTS (26 -> 36) & 4D EFFECTS!
+// =============================================================================
+
+/**
+ * 27. Yamabushi Monk's Six-Ring Iron Staff — Shakujo (錫杖 — 六環金属連鎖衝突):
+ *     Coupled 6-ring iron-on-bronze cascade + oak staff resonance + high-Q glistening halo!
+ */
+export function synthesizeShakujo(
+  sampleRate: number,
+  velocity = 0.92,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 27027
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.65;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  // Heavy oak staff floor plant thump
+  const staff = synthesizeModalImpactStereo('chabudai_oak', sampleRate, {
+    velocity: velocity * 0.52,
+    pitchScale: 0.72,
+    durationSec: 0.22,
+    quality,
+    seed,
+  });
+  for (let i = 0; i < staff.left.length && i < n; i++) {
+    left[i] += staff.left[i] * 0.48;
+    right[i] += staff.right[i] * 0.48;
+  }
+
+  // 9 coupled cascading iron rings shimmering across stereo azimuth!
+  const hits = [0.0, 0.018, 0.039, 0.068, 0.11, 0.165, 0.23, 0.31, 0.41];
+  for (let h = 0; h < hits.length; h++) {
+    const start = Math.floor((hits[h] + rng() * 0.008) * sampleRate);
+    const ring = synthesizeModalImpactStereo('shakujo_iron_ring', sampleRate, {
+      velocity: velocity * (1.0 - h * 0.075),
+      pitchScale: 0.88 + rng() * 0.32,
+      durationSec: 0.92,
+      quality,
+      seed: seed + h * 53,
+      stereoWidth: 0.95,
+    });
+    const pan = (h % 2 === 0 ? -1 : 1) * (0.25 + rng() * 0.55);
+    const gL = Math.sqrt(0.5 * (1 - pan * 0.7));
+    const gR = Math.sqrt(0.5 * (1 + pan * 0.7));
+    for (let i = 0; i < ring.left.length && start + i < n; i++) {
+      left[start + i] += ring.left[i] * 0.46 * gL;
+      right[start + i] += ring.right[i] * 0.46 * gR;
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    left[i] = Math.tanh(left[i] * 0.88);
+    right[i] = Math.tanh(right[i] * 0.88);
+  }
+  return { left, right };
+}
+
+/**
+ * 28. Ancient Imperial Bronze Chime Bell — Dotaku / Hen-Sho (銅鐸・編鐘 — 楕円二音青銅鐘):
+ *     Elliptical ancient bronze chime with authentic dual-strike beating doublet & ceremonial sustain!
+ */
+export function synthesizeKaneChime(
+  pitchScale = 1.0,
+  sampleRate = 48000,
+  velocity = 0.92,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 28028
+): { left: Float32Array; right: Float32Array } {
+  const strike1 = synthesizeModalImpactStereo('dotaku_ancient_bronze', sampleRate, {
+    velocity,
+    pitchScale,
+    durationSec: 2.35,
+    quality,
+    seed,
+    stereoWidth: 0.96,
+  });
+  const strike2 = synthesizeModalImpactStereo('dotaku_ancient_bronze', sampleRate, {
+    velocity: velocity * 0.56,
+    pitchScale: pitchScale * 1.1892, // Authentic minor-third secondary ridge mode of elliptical bell!
+    durationSec: 1.9,
+    quality,
+    seed: seed + 19,
+    stereoWidth: 0.92,
+  });
+  const n = strike1.left.length;
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const delay = Math.floor(0.014 * sampleRate);
+  for (let i = 0; i < n; i++) {
+    const s2Idx = i - delay;
+    const s2L = s2Idx >= 0 && s2Idx < strike2.left.length ? strike2.left[s2Idx] * 0.54 : 0;
+    const s2R = s2Idx >= 0 && s2Idx < strike2.right.length ? strike2.right[s2Idx] * 0.54 : 0;
+    left[i] = Math.tanh((strike1.left[i] * 0.82 + s2R) * 0.96);
+    right[i] = Math.tanh((strike1.right[i] * 0.82 + s2L) * 0.96);
+  }
+  return { left, right };
+}
+
+/**
+ * 29. Taisho-Goto Keyed Harp-Zither (大正琴 — 複弦スチール＆鍵盤打鍵):
+ *     Twin-course slightly detuned steel strings via 4-point Cubic Hermite waveguide + crisp mechanical key clack!
+ */
+export function synthesizeTaishoKoto(
+  baseHz = 440,
+  sampleRate = 48000,
+  velocity = 0.9,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 29029
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.65;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  const keyClick = synthesizeModalImpactStereo('taisho_steel_string', sampleRate, {
+    velocity: velocity * 0.65,
+    pitchScale: baseHz / 440,
+    durationSec: 0.25,
+    quality,
+    seed,
+  });
+
+  // Twin unison courses with natural 1.8 Hz chorus shimmer!
+  const freqs = [baseHz, baseHz + 1.85];
+  for (let c = 0; c < 2; c++) {
+    const f = freqs[c];
+    const maxDelay = Math.max(24, Math.ceil(sampleRate / (f * 0.95)) + 6);
+    const ring = new Float32Array(maxDelay);
+    let wIdx = 0;
+    let lp = 0;
+    const initLen = Math.floor(sampleRate / f);
+    for (let i = 0; i < initLen; i++) {
+      // Tortoiseshell pick bright steel-string excitation
+      ring[i] = ((rng() * 2 - 1) * 0.72 + Math.sin((i / initLen) * Math.PI * 4) * 0.28) * velocity;
+    }
+    const gL = c === 0 ? 0.64 : 0.42;
+    const gR = c === 0 ? 0.42 : 0.64;
+    for (let i = 0; i < n; i++) {
+      const delayF = sampleRate / f;
+      const readPos = (wIdx - delayF + maxDelay * 2) % maxDelay;
+      const val = readCubicHermite(ring, readPos);
+      const filt = (val * 0.82 + lp * 0.18) * 0.9964;
+      lp = val;
+      ring[wIdx] = filt;
+      wIdx = (wIdx + 1) % maxDelay;
+      const env = Math.exp(-(i / sampleRate) / 1.15);
+      left[i] += filt * env * gL * 0.66;
+      right[i] += filt * env * gR * 0.66;
+    }
+  }
+
+  for (let i = 0; i < keyClick.left.length && i < n; i++) {
+    left[i] += keyClick.left[i] * 0.34;
+    right[i] += keyClick.right[i] * 0.34;
+  }
+  for (let i = 0; i < n; i++) {
+    left[i] = Math.tanh(left[i]);
+    right[i] = Math.tanh(right[i]);
+  }
+  return { left, right };
+}
+
+/**
+ * 30. Okinawan Ryukyu Sanshin Lute (沖縄三線 — 蛇皮共鳴＆琉球音階):
+ *     Snappy python-skin membrane pluck with characteristic bright twang & warm resonant decay!
+ */
+export function synthesizeSanshin(
+  baseHz = 293.66,
+  sampleRate = 48000,
+  velocity = 0.92,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 30030
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.28;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  const skin = synthesizeModalImpactStereo('sanshin_membrane', sampleRate, {
+    velocity: velocity * 0.78,
+    pitchScale: 0.96 + rng() * 0.08,
+    durationSec: 0.35,
+    quality,
+    seed,
+  });
+
+  const maxDelay = Math.max(24, Math.ceil(sampleRate / (baseHz * 0.85)) + 6);
+  const ring = new Float32Array(maxDelay);
+  let wIdx = 0;
+  let lp = 0;
+  const initLen = Math.floor(sampleRate / baseHz);
+  for (let i = 0; i < initLen; i++) {
+    // Water-buffalo horn plectrum (tsume) crisp pluck
+    ring[i] = ((rng() * 2 - 1) * 0.62 + Math.sin((i / initLen) * Math.PI * 3) * 0.38) * velocity;
+  }
+
+  const svf = new FormantSvf();
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    // Expressive Ryukyu grace-note micro-bend at onset
+    const bend = 1.0 + 0.032 * Math.exp(-t / 0.045);
+    const delayF = Math.max(4, Math.min(maxDelay - 4, sampleRate / (baseHz * bend)));
+    const readPos = (wIdx - delayF + maxDelay * 2) % maxDelay;
+    const val = readCubicHermite(ring, readPos);
+    const filt = (val * 0.66 + lp * 0.34) * 0.9922;
+    lp = val;
+    ring[wIdx] = filt;
+    wIdx = (wIdx + 1) % maxDelay;
+
+    const nasalBody = svf.process(filt, 920, 2.2, sampleRate) * 0.55;
+    const skinL = i < skin.left.length ? skin.left[i] * 0.44 : 0;
+    const skinR = i < skin.right.length ? skin.right[i] * 0.44 : 0;
+    left[i] = Math.tanh((filt * 0.62 + nasalBody + skinL) * 0.95);
+    right[i] = Math.tanh((filt * 0.66 + nasalBody * 0.92 + skinR) * 0.95);
+  }
+  return { left, right };
+}
+
+/**
+ * 31. Traditional Japanese Bowed Spike Fiddle — Kokyu (胡弓 — 馬尾弓ヘルムホルツ摩擦発振):
+ *     True Helmholtz stick-slip bow-friction synthesis + wooden body formant resonator + singing vibrato!
+ */
+export function synthesizeKokyu(
+  baseHz = 440,
+  sampleRate = 48000,
+  durationSec = 1.65,
+  intensity = 0.88,
+  seed = 31031
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const n = Math.max(512, Math.floor(sampleRate * durationSec));
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  const bodySvf1 = new FormantSvf();
+  const bodySvf2 = new FormantSvf();
+  const rosinSvf = new FormantSvf();
+  const twoPi = Math.PI * 2;
+  let phase = 0;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const u = t / durationSec;
+    const bowPressure =
+      Math.sin(Math.min(1, t / 0.22) * Math.PI * 0.5) *
+      (u > 0.76 ? Math.max(0, (1 - u) / 0.24) : 1.0);
+    // Expressive Japanese Kokyu vibrato + slight sliding portamento entry
+    const portamento = 1.0 - 0.045 * Math.exp(-t / 0.14);
+    const vib = Math.sin(twoPi * 5.6 * t) * 0.011 * Math.min(1, Math.max(0, (t - 0.18) / 0.35));
+    const freq = baseHz * portamento * (1 + vib);
+    phase += (twoPi * freq) / sampleRate;
+
+    // Physical Helmholtz sawtooth-like stick-slip bow excitation (smoothly band-limited up to 8th harmonic!)
+    let helmholtz = 0;
+    for (let h = 1; h <= 8; h++) {
+      const fH = freq * h;
+      if (fH > sampleRate * 0.44) break;
+      const sign = h % 2 === 0 ? -1 : 1;
+      helmholtz += (sign / (h * Math.pow(h, 0.25))) * Math.sin(phase * h);
+    }
+    // Rosin horsehair micro-friction breath
+    const rosin = rosinSvf.process(rng() * 2 - 1, 3100, 1.8, sampleRate) * 0.14 * bowPressure;
+    const raw = (helmholtz * 0.78 + rosin) * bowPressure * intensity;
+
+    // Kokyu square cat/silk-skin wooden resonator dual formants (640 Hz & 1920 Hz)
+    const b1 = bodySvf1.process(raw, 640, 2.6, sampleRate);
+    const b2 = bodySvf2.process(raw, 1920, 3.1, sampleRate);
+    left[i] = Math.tanh((raw * 0.42 + b1 * 0.65 + b2 * 0.45) * 0.92);
+    right[i] = Math.tanh((raw * 0.44 + b1 * 0.58 + b2 * 0.52) * 0.92);
+  }
+  return { left, right };
+}
+
+/**
+ * 32. Noh Theatre Bamboo Flute — Nokan (能管 — 喉管非調和オーバートーン「ヒシギ」):
+ *     Models the authentic internal throat constriction (*nodo*) producing Noh's piercing spectral hishigi cry!
+ */
+export function synthesizeNokan(
+  baseHz = 880,
+  sampleRate = 48000,
+  durationSec = 1.45,
+  intensity = 0.88,
+  seed = 32032
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const n = Math.max(512, Math.floor(sampleRate * durationSec));
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const jetSvf = new FormantSvf();
+  const nodoSvf = new FormantSvf();
+  const twoPi = Math.PI * 2;
+  let phase = 0;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const u = t / durationSec;
+    const env =
+      Math.sin(Math.min(1, t / 0.08) * Math.PI * 0.5) *
+      (u > 0.72 ? Math.max(0, (1 - u) / 0.28) : 1.0);
+    // Dramatic Noh *hishigi* upward overblow surge + intense rapid vibrato
+    const hishigiLift = 1.0 + 0.14 * Math.exp(-Math.pow((u - 0.22) / 0.16, 2)) - 0.05 * u;
+    const vib = Math.sin(twoPi * 6.8 * t) * 0.015 * Math.min(1, t / 0.25);
+    const freq = baseHz * hishigiLift * (1 + vib);
+    phase += (twoPi * freq) / sampleRate;
+
+    // Nodo constriction causes characteristic slightly flat 2nd & sharp 3rd overtone ratios (1.0, 1.93, 2.89)
+    const pipe =
+      Math.sin(phase) * 0.62 +
+      Math.sin(phase * 1.93) * 0.34 +
+      Math.sin(phase * 2.89) * 0.16;
+    const breath = jetSvf.process(rng() * 2 - 1, freq * 1.8, 3.4, sampleRate) * 0.24;
+    const nodoBody = nodoSvf.process(pipe + breath, 2450, 2.8, sampleRate) * 0.36;
+    const sig = (pipe * 0.68 + breath + nodoBody) * env * intensity * 0.8;
+    left[i] = Math.tanh(sig * 0.96);
+    right[i] = Math.tanh(sig * 1.04);
+  }
+  return { left, right };
+}
+
+/**
+ * 33. High-Tension Rope-Tuned Shime-Daiko (締太鼓 — 緊締牛革＆縁打ち):
+ *     Ultra-crisp high-tension Noh/Kabuki drum with sharp bachi slap & tight pitch-drop bounce!
+ */
+export function synthesizeShimeDaiko(
+  sampleRate: number,
+  velocity = 0.95,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 33033
+): { left: Float32Array; right: Float32Array } {
+  const skin = synthesizeModalImpactStereo('shime_tight_hide', sampleRate, {
+    velocity,
+    pitchScale: 1.0,
+    durationSec: 0.65,
+    quality,
+    seed,
+    stereoWidth: 0.72,
+  });
+  const rim = synthesizeModalImpactStereo('hyoshigi_rosewood', sampleRate, {
+    velocity: velocity * 0.52,
+    pitchScale: 1.18,
+    durationSec: 0.12,
+    quality,
+    seed: seed + 17,
+  });
+  const n = skin.left.length;
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  let phase = 0;
+  const twoPi = Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    // Tight rope-head Bessel fundamental pitch snap: 295 Hz -> 232 Hz!
+    const f = 232 + 68 * Math.exp(-t / 0.022) * velocity;
+    phase += (twoPi * f) / sampleRate;
+    const head = Math.sin(phase) * Math.exp(-t / 0.13) * 0.56 * velocity;
+    const rL = i < rim.left.length ? rim.left[i] * 0.36 : 0;
+    const rR = i < rim.right.length ? rim.right[i] * 0.36 : 0;
+    left[i] = Math.tanh(skin.left[i] * 0.62 + head + rL);
+    right[i] = Math.tanh(skin.right[i] * 0.62 + head + rR);
+  }
+  return { left, right };
+}
+
+/**
+ * 34. Binzasara 108-Slat Cascading Oak Clapper Wave (編木 — 4D立体連鎖波打音):
+ *     24 sequential oak wood slats sweeping dramatically across the stereo/4D soundfield!
+ */
+export function synthesizeBinzasara(
+  sampleRate: number,
+  velocity = 0.92,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 34034
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 0.95;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  const slatCount = 24;
+  // Pre-synthesize 3 bright oak slat micro-variants so 24 slats synthesize in <1ms!
+  const variants = [0, 1, 2].map((v) =>
+    synthesizeModalImpactStereo('binzasara_oak_slat', sampleRate, {
+      velocity: velocity * 0.82,
+      pitchScale: 0.9 + v * 0.11,
+      durationSec: 0.065,
+      quality: quality === 'ultra' ? 'pro' : quality,
+      seed: seed + v * 31,
+    })
+  );
+
+  for (let s = 0; s < slatCount; s++) {
+    const u = s / (slatCount - 1);
+    // Accelerating whip wave curve!
+    const tAt = Math.pow(u, 1.18) * 0.52 + rng() * 0.004;
+    const start = Math.floor(tAt * sampleRate);
+    const v = variants[s % 3];
+    const amp = (0.45 + 0.55 * Math.sin(u * Math.PI)) * 0.44;
+    // Dramatic left-to-right panoramic sweep across the 4D stage!
+    const pan = -0.92 + u * 1.84;
+    const gL = Math.sqrt(0.5 * (1 - pan * 0.85));
+    const gR = Math.sqrt(0.5 * (1 + pan * 0.85));
+    for (let i = 0; i < v.left.length && start + i < n; i++) {
+      left[start + i] += v.left[i] * amp * gL;
+      right[start + i] += v.right[i] * amp * gR;
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    left[i] = Math.tanh(left[i] * 0.94);
+    right[i] = Math.tanh(right[i] * 0.94);
+  }
+  return { left, right };
+}
+
+/**
+ * 35. Traditional Japanese Kyudo Longbow Release & Arrow Whiz — Yumi (和弓放弦・矢風):
+ *     Nonlinear hemp bowstring twang + whistling bamboo shaft Strouhal vortex flight!
+ */
+export function synthesizeYumiBow(
+  sampleRate: number,
+  velocity = 0.96,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 35035
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.15;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  const twang = synthesizeModalImpactStereo('kyudo_hemp_string', sampleRate, {
+    velocity,
+    pitchScale: 1.0,
+    durationSec: 0.48,
+    quality,
+    seed,
+  });
+
+  const windSvfL = new FormantSvf();
+  const windSvfR = new FormantSvf();
+  let strPhase = 0;
+  const twoPi = Math.PI * 2;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    // Hemp string tension release pitch snap (210 Hz -> 112 Hz)
+    const strFreq = 112 + 108 * Math.exp(-t / 0.032);
+    strPhase += (twoPi * strFreq) / sampleRate;
+    const strBody = Math.sin(strPhase) * Math.exp(-t / 0.16) * 0.48 * velocity;
+
+    // Aerodynamic bamboo arrow flight whistle sweeping rapidly L -> R with Doppler drop!
+    const u = Math.min(1, t / 0.65);
+    const arrowEnv = t > 0.025 ? Math.sin(Math.min(1, (t - 0.025) / 0.14) * Math.PI * 0.5) * Math.exp(-Math.max(0, t - 0.12) / 0.22) : 0;
+    const dopplerHz = 3600 - u * 1650;
+    const noise = rng() * 2 - 1;
+    const whizL = windSvfL.process(noise, dopplerHz, 4.6, sampleRate) * arrowEnv * 0.56 * (1 - u * 0.72);
+    const whizR = windSvfR.process(noise, dopplerHz * 0.98, 4.6, sampleRate) * arrowEnv * 0.56 * (0.28 + u * 0.72);
+
+    const twL = i < twang.left.length ? twang.left[i] * 0.65 : 0;
+    const twR = i < twang.right.length ? twang.right[i] * 0.65 : 0;
+    left[i] = Math.tanh(twL + strBody * 0.85 + whizL);
+    right[i] = Math.tanh(twR + strBody * 0.65 + whizR);
+  }
+  return { left, right };
+}
+
+/**
+ * 36. Distant Mountain Thunder & Deep Temple Sub-Taiko Swell (雷鳴大太鼓 — 4D重低音圧):
+ *     Designed specifically to shine on 4D Audio / 4D Audio MAX with 38 Hz visceral rumble & rolling air!
+ */
+export function synthesizeThunderTaiko(
+  sampleRate: number,
+  intensity = 0.95,
+  seed = 36036
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 2.45;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+
+  let lpL = 0, lpR = 0, lp2L = 0, lp2R = 0;
+  let subPhase = 0;
+  const twoPi = Math.PI * 2;
+  const aLow = 1 - Math.exp((-2 * Math.PI * 155) / sampleRate);
+  const aSub = 1 - Math.exp((-2 * Math.PI * 62) / sampleRate);
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    // Deep temple chest fundamental 56 Hz -> 37 Hz
+    const fSub = 37 + 21 * Math.exp(-t / 0.14);
+    subPhase += (twoPi * fSub) / sampleRate;
+    const sub = Math.sin(subPhase) * Math.exp(-t / 0.72) * 0.66 * intensity;
+
+    // Dual-channel rolling thunder pressure waves (decorrelated L/R for massive 4D dome!)
+    const rollEnv =
+      Math.min(1, t / 0.08) *
+      Math.exp(-t / 1.15) *
+      (0.62 + 0.38 * Math.sin(twoPi * 2.4 * t + Math.sin(twoPi * 0.85 * t)));
+    const wL = (rng() * 2 - 1) * rollEnv * 2.6;
+    const wR = (rng() * 2 - 1) * rollEnv * 2.6;
+    lpL += (wL - lpL) * aLow;
+    lpR += (wR - lpR) * aLow;
+    lp2L += (lpL - lp2L) * aSub;
+    lp2R += (lpR - lp2R) * aSub;
+
+    left[i] = Math.tanh((sub + lpL * 0.44 + lp2L * 0.78) * 0.92);
+    right[i] = Math.tanh((sub + lpR * 0.44 + lp2R * 0.78) * 0.92);
+  }
+  return { left, right };
+}
+
+/**
+ * Physical Japanese Bell-Cricket Stridulation — Suzumushi (鈴虫 — 4.3kHz翅摩擦共鳴):
+ * Authentic autumn evening garden 4D spatial actor!
+ */
+export function synthesizeSuzumushiCricket(
+  sampleRate: number,
+  seed = 37037
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.1;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const twoPi = Math.PI * 2;
+  const carrierHz = 4280 + (rng() - 0.5) * 180;
+  const pulseHz = 46 + rng() * 6;
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const burstEnv = Math.sin((t / durSec) * Math.PI);
+    const wingPulse = Math.pow(Math.max(0, Math.sin(twoPi * pulseHz * t)), 2.2);
+    const tone =
+      Math.sin(twoPi * carrierHz * t) * 0.78 +
+      Math.sin(twoPi * carrierHz * 2.0 * t) * 0.16;
+    const sig = tone * wingPulse * burstEnv * 0.28;
+    left[i] = sig * 0.92;
+    right[i] = sig * 1.08;
+  }
+  return { left, right };
+}
+
+/**
+ * Overhead Bamboo Grove Canopy Breeze (竹林の葉擦れ — 4D頭上気流):
+ */
+export function synthesizeBambooWind(
+  sampleRate: number,
+  seed = 38038
+): { left: Float32Array; right: Float32Array } {
+  const rng = createSeededRng(seed);
+  const durSec = 1.9;
+  const n = Math.floor(sampleRate * durSec);
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  const svfL = new FormantSvf();
+  const svfR = new FormantSvf();
+
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const env = Math.pow(Math.sin((t / durSec) * Math.PI), 1.6);
+    const leafL = svfL.process(rng() * 2 - 1, 2400 + Math.sin(t * 2.1) * 520, 1.3, sampleRate);
+    const leafR = svfR.process(rng() * 2 - 1, 2750 + Math.cos(t * 1.8) * 520, 1.3, sampleRate);
+    left[i] = Math.tanh(leafL * env * 0.36);
+    right[i] = Math.tanh(leafR * env * 0.36);
+  }
+  return { left, right };
+}
+
+/**
+ * Precision Medium-Format Mechanical Twin-Curtain Camera Shutter (5K KHDR 1.1 撮影シャッター音):
+ * Two crisp micro-timed metallic leaf-shutter clicks (mirror flip + front/rear curtain) with tactile body snap!
+ */
+export function synthesizeCameraShutter(
+  sampleRate: number,
+  quality: JSoundQualityMode = 'ultra',
+  seed = 39039
+): { left: Float32Array; right: Float32Array } {
+  const curtain1 = synthesizeModalImpactStereo('camera_shutter_leaf', sampleRate, {
+    velocity: 1.05,
+    pitchScale: 1.06,
+    durationSec: 0.08,
+    quality,
+    seed,
+  });
+  const curtain2 = synthesizeModalImpactStereo('camera_shutter_leaf', sampleRate, {
+    velocity: 0.82,
+    pitchScale: 0.92,
+    durationSec: 0.09,
+    quality,
+    seed: seed + 13,
+  });
+  const delay = Math.floor(0.052 * sampleRate); // Crisp 1/20s medium-format curtain cadence
+  const n = delay + curtain2.left.length + 64;
+  const left = new Float32Array(n);
+  const right = new Float32Array(n);
+  for (let i = 0; i < curtain1.left.length && i < n; i++) {
+    left[i] += curtain1.left[i] * 0.92;
+    right[i] += curtain1.right[i] * 0.86;
+  }
+  for (let i = 0; i < curtain2.left.length && delay + i < n; i++) {
+    left[delay + i] += curtain2.left[i] * 0.78;
+    right[delay + i] += curtain2.right[i] * 0.88;
+  }
+  return { left, right };
+}
+
+
 

@@ -15,6 +15,7 @@
  */
 
 import * as THREE from 'three';
+import type { AeroVortexEngine } from '../engine/aero/AeroVortexEngine';
 import { Move, PAPER, ROCK, SCISSORS } from '../engine/jnv1/types';
 import { StageId } from '../graphics/GraphicsConfig';
 
@@ -378,11 +379,13 @@ export class AtmosphereEffects {
     this.victoryShowerTimer = durationSec;
   }
 
-  public update(dt: number, stage: StageId): void {
+  private readonly tmpFlow = { vx: 0, vy: 0, vz: 0 };
+
+  public update(dt: number, stage: StageId, aeroVortex?: AeroVortexEngine): void {
     const safeDt = Math.min(dt, 0.05);
     this.elapsed += safeDt;
 
-    // 1. Update drifting dust motes / rising onsen mist / falling shrine petals
+    // 1. Update drifting dust motes / rising onsen mist / falling shrine petals + 3D Biot-Savart fluid advection!
     const posAttr = this.moteGeo.getAttribute('position') as THREE.BufferAttribute;
     const isOnsen = stage === 'onsen';
     const isShrine = stage === 'shrine';
@@ -395,6 +398,13 @@ export class AtmosphereEffects {
 
       x += Math.sin(this.elapsed * 0.45 + phase) * 0.048 * safeDt;
       z += Math.cos(this.elapsed * 0.35 + phase * 1.3) * 0.036 * safeDt;
+
+      if (aeroVortex) {
+        aeroVortex.sampleVelocity(x, y, z, this.tmpFlow);
+        x += this.tmpFlow.vx * 0.65 * safeDt;
+        y += this.tmpFlow.vy * 0.65 * safeDt;
+        z += this.tmpFlow.vz * 0.65 * safeDt;
+      }
 
       if (isOnsen) {
         y += (0.12 + (phase % 0.08)) * safeDt;
@@ -409,6 +419,14 @@ export class AtmosphereEffects {
       } else {
         y += Math.sin(this.elapsed * 0.6 + phase) * 0.025 * safeDt;
       }
+
+      // Soft spatial bounds wrap so motes pushed far by clash vortices respawn gracefully
+      if (x > 3.2) x = -3.1;
+      else if (x < -3.2) x = 3.1;
+      if (z > 2.8) z = -2.7;
+      else if (z < -2.8) z = 2.7;
+      if (y < 0.06) y = 0.08;
+      else if (y > 2.8) y = 2.75;
 
       this.motePositions[i * 3] = x;
       this.motePositions[i * 3 + 1] = y;
@@ -444,7 +462,7 @@ export class AtmosphereEffects {
       }
     }
 
-    // 4. Update all 120 fluttering physical flakes with tabletop bounce & aerodynamic wobble
+    // 4. Update all 120 fluttering physical flakes with tabletop bounce & 3D Vortex Ring aerodynamic coupling
     let anyActive = false;
     for (let i = 0; i < this.burstMax; i++) {
       const p = this.bursts[i];
@@ -458,6 +476,14 @@ export class AtmosphereEffects {
           const rz = p.pos.z - 0.08;
           p.vel.x += -rz * p.swirlStrength * safeDt;
           p.vel.z += rx * p.swirlStrength * safeDt;
+        }
+
+        // ★ AERO-KINETIC VORTEX 1.0 Aerodynamic Drag Coupling into Live Hand Wake! ★
+        if (aeroVortex && p.pos.y > 0.025) {
+          aeroVortex.sampleVelocity(p.pos.x, p.pos.y, p.pos.z, this.tmpFlow);
+          p.vel.x += this.tmpFlow.vx * 1.45 * safeDt;
+          p.vel.y += this.tmpFlow.vy * 1.45 * safeDt;
+          p.vel.z += this.tmpFlow.vz * 1.45 * safeDt;
         }
 
         // Physical gravity + aerodynamic leaf-flutter lateral drift

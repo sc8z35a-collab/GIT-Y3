@@ -179,6 +179,10 @@ export interface GraphicsSettings {
   jsoundAmbience: boolean;
   cameraStyle: CameraStyleId;
   compactUi: boolean;
+  /** Project KIWAMI-NEXT breakthrough engine toggles */
+  bioPulseEnabled: boolean;
+  aeroVortexEnabled: boolean;
+  acousticProbeEnabled: boolean;
 }
 
 export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
@@ -193,10 +197,13 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   npcHandMaterial: 'karakuri_bronze',
   jhandMode: 'biomech_ultra',
   jsoundQuality: 'ultra',
-  jsoundSpatialMode: 'binaural_3d',
+  jsoundSpatialMode: '4d_audio_max',
   jsoundAmbience: true,
   cameraStyle: 'cinematic',
   compactUi: false,
+  bioPulseEnabled: true,
+  aeroVortexEnabled: true,
+  acousticProbeEnabled: true,
 };
 
 export interface RenderMetrics {
@@ -229,6 +236,20 @@ export interface RenderMetrics {
   jsoundPeakDb: number;
   jsoundMaterialPair: string;
   jsoundLastEventJp: string;
+  // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★
+  bioPulseBpm: number;
+  bioPulseWave: number;
+  bioCapillaryBlanchPct: number;
+  bioStateJp: string;
+  aeroActiveVortices: number;
+  aeroPeakCirculation: number;
+  aeroPeakSpeedMs: number;
+  aeroPhenomenonJp: string;
+  probeDistanceM: number;
+  probeDrDb: number;
+  probeProximityDb: number;
+  probeAirCutoffKhz: number;
+  probeNearestJp: string;
 }
 
 /**
