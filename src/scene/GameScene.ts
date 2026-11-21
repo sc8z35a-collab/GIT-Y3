@@ -25,6 +25,7 @@ import {
   HandMaterialPreset,
   JHandModeSetting,
   JSoundModeSetting,
+  JSoundDeviceProfileSetting,
   JSoundSpatialMode,
   PVModeId,
   RenderMetrics,
@@ -34,7 +35,16 @@ import {
   StageId,
   computeRenderDimensions,
 } from '../graphics/GraphicsConfig';
+import {
+  FingerS11DetailGovernor,
+  FingerS11FrameBudgetGovernor,
+  FingerS11HDTextureStreamer,
+  FingerS11Telemetry,
+  S11_TIER_SPECS,
+  S11TierSpec,
+} from '../graphics/FingerS11DetailEngine';
 import { HDRIEnvironmentBuilder } from '../graphics/HDRIEnvironment';
+import { DeviceDecision, KiwamiFramePacer, PacerDecision, computeHudFraming } from '../engine/mobile/KiwamiMobileCore';
 import { KHDRPipeline } from '../graphics/KHDRPipeline';
 import { Photo5KResult, captureCurrentAngle5KPhoto } from '../graphics/PhotoCapture5K';
 import { applyShadowFlameToLights, installShadowFlameEngine } from '../graphics/ShadowFlame';
@@ -56,6 +66,8 @@ export interface ClashAnimationCallbacks {
 export interface ClashSequenceOptions {
   overdriveActive?: boolean;
   streakCount?: number;
+  /** JSound 1.6: the spirit gauge will hit 100% at this reveal (pre-render the charge cue) */
+  spiritWillCharge?: boolean;
 }
 
 interface TimelineCue {
@@ -118,7 +130,36 @@ export class GameScene {
   private activeMicroscopeFocus: import('../graphics/GraphicsConfig').MicroscopeFocusPreset | null = null;
 
   private settings: GraphicsSettings = { ...DEFAULT_GRAPHICS_SETTINGS };
+
+  // ★ FINGER S1.1 zoom-adaptive detail state ★
+  private readonly s11Governor = new FingerS11DetailGovernor();
+  private readonly s11FrameGovernor = new FingerS11FrameBudgetGovernor();
+  private s11OctaveCap = 4;
+  private readonly s11Streamer = FingerS11HDTextureStreamer.get();
+  private s11AppliedTier: S11TierSpec = S11_TIER_SPECS[0];
+  private s11Dirty = true;
+  private s11IdleTimer = 0;
+
+  // ★ KIWAMI MOBILE CORE: POCO F7-first adaptive pacing (vsync-divisor tiers + DRS + idle saving) ★
+  private pacer = new KiwamiFramePacer({ refreshHz: 60, targetFps: 60, minScale: 0.62 });
+  private deviceDecision: DeviceDecision | null = null;
+  private displayRefreshHz = 60;
+  private adaptivePerformance = true;
+  private renderScale = 1;
+  private lastInputMs = performance.now();
+  private pacerDecision: PacerDecision | null = null;
+  private shaderPrewarmMs = 0;
+  private readonly prevCamPos = new THREE.Vector3();
+  private readonly prevCamQuat = new THREE.Quaternion();
   private currentShadowMapSize = 2048;
+
+  // ★ HUD-AWARE OPTICAL CENTRE: off-axis projection keeps the hands in the band the HUD leaves free ★
+  private hudOcclusionViewport = { topPx: 0, bottomPx: 0 };
+  private hudFramingEnabled = true;
+  private hudOffsetTargetPx = 0;
+  private hudOffsetCurrentPx = 0;
+  private hudOffsetAppliedPx = Number.NaN;
+  private hudViewH = 1;
 
   // Pre-PV restoration state
   private prePvStage: StageId = DEFAULT_GRAPHICS_SETTINGS.stage;
@@ -262,6 +303,29 @@ export class GameScene {
     };
     this.scene.add(this.npcHand.root);
 
+    // ★ FINGER S1.1: HD textures stream from workers; re-apply the tier as surfaces arrive.
+    //   Strong desktops pre-generate at idle so the first zoom is already HD; phones generate on demand.
+    // Input activity tracking for power-aware idle pacing (passive, zero cost)
+    const markInput = (): void => {
+      this.lastInputMs = performance.now();
+    };
+    for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart'] as const) {
+      window.addEventListener(type, markInput, { passive: true });
+    }
+
+    this.s11Streamer.setMaxAnisotropy(this.renderer.capabilities.getMaxAnisotropy());
+    this.s11Streamer.onSurfaceReady(() => {
+      this.s11Dirty = true;
+    });
+    {
+      const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+      const cores = navigator.hardwareConcurrency || 4;
+      const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+      if (!coarse && cores >= 6 && mem >= 6) {
+        this.scheduleHdPregen(6000);
+      }
+    }
+
     // Initialize Built-In PV Cinema Director & WebM Exporter!
     this.pvDirector = new PVDirector(
       {
@@ -318,6 +382,7 @@ export class GameScene {
     this.sound.setQualityMode(this.settings.jsoundQuality);
     this.sound.setSpatialMode(this.settings.jsoundSpatialMode);
     this.sound.setAmbienceEnabled(this.settings.jsoundAmbience);
+    this.sound.setDeviceProfile(this.settings.jsoundDeviceProfile);
     this.playerHand.setKinesisMode(this.settings.jhandMode);
     this.npcHand.setKinesisMode(this.settings.jhandMode);
     this.cameraDirector.setStyle(this.settings.cameraStyle);
@@ -342,6 +407,7 @@ export class GameScene {
 
   public setFpsLimit(fps: FpsLimitMode): void {
     this.settings.fpsLimit = fps;
+    this.rebuildPacer();
   }
 
   public setCameraStyle(style: CameraStyleId): void {
@@ -446,6 +512,7 @@ export class GameScene {
     this.settings.fingerS1Enabled = enabled;
     this.playerHand.setFingerS1Enabled(enabled);
     this.npcHand.setFingerS1Enabled(enabled);
+    this.s11Dirty = true;
     // Subtle appreciative flex so user sees FINGER S1.0 sculpted joints & wrinkles come alive immediately!
     this.playerHand.addMotionImpulse(0, 0.35, 0, -0.5, 0.7);
     this.npcHand.addMotionImpulse(0, 0.35, 0, -0.5, -0.7);
@@ -461,6 +528,146 @@ export class GameScene {
     this.settings.chromaDermEnabled = enabled;
     this.playerHand.setChromaDermEnabled(enabled);
     this.npcHand.setChromaDermEnabled(enabled);
+  }
+
+  /** FINGER S1.1 zoom-adaptive 2× HD detail ON/OFF */
+  public setFingerS11Enabled(enabled: boolean): void {
+    this.settings.fingerS11Enabled = enabled;
+    this.s11Dirty = true;
+  }
+
+  private scheduleHdPregen(delayMs: number): void {
+    window.clearTimeout(this.s11IdleTimer);
+    this.s11IdleTimer = window.setTimeout(() => {
+      if (this.settings.fingerS1Enabled && this.settings.fingerS11Enabled) this.s11Streamer.start();
+    }, delayMs);
+  }
+
+  /**
+   * ★ KIWAMI MOBILE CORE: apply the device fingerprint (e.g. POCO F7 / Adreno 825 / 120 Hz).
+   * Rebuilds the pacer on the panel's vsync-divisor tiers, aligns A/V sync with the display pipeline
+   * latency (≈1.5 frames), and pre-generates the FINGER S1.1 HD tier at idle on 12 GB-class phones.
+   */
+  public applyDeviceDecision(decision: DeviceDecision, refreshHz: number): void {
+    this.deviceDecision = decision;
+    this.displayRefreshHz = refreshHz;
+    this.rebuildPacer();
+    this.sound.setVisualLatency(1.5 / Math.max(30, refreshHz));
+    this.sound.setRenderWorkerBudget(decision.renderWorkers);
+    if (decision.hdPregenAtIdle) this.scheduleHdPregen(4500);
+  }
+
+  private rebuildPacer(): void {
+    const d = this.deviceDecision;
+    const deviceTarget = d ? d.targetFps : 60;
+    const user = this.settings.fpsLimit;
+    const target = user > 0 ? Math.min(user, Math.max(deviceTarget, user === 120 ? 120 : 60)) : deviceTarget;
+    const mobile = Boolean(d && /android|apple_mobile/.test(d.deviceClass));
+    this.pacer = new KiwamiFramePacer({
+      refreshHz: this.displayRefreshHz,
+      targetFps: target,
+      minScale: d ? d.drsMinScale : 0.62,
+      idleSaving: mobile,
+    });
+    this.pacer.enabled = this.adaptivePerformance;
+    if (this.renderScale !== 1) {
+      this.renderScale = 1;
+      this.handleResize();
+    }
+  }
+
+  /** 自動最適化 ON/OFF (dynamic resolution + vsync-divisor pacing + idle power saving). */
+  public setAdaptivePerformance(enabled: boolean): void {
+    this.adaptivePerformance = enabled;
+    this.settings.adaptivePerformance = enabled;
+    this.pacer.enabled = enabled;
+    if (!enabled && this.renderScale !== 1) {
+      this.renderScale = 1;
+      this.handleResize();
+    }
+  }
+
+  public isAdaptivePerformance(): boolean {
+    return this.adaptivePerformance;
+  }
+
+  public setHapticsEnabled(enabled: boolean): void {
+    this.settings.hapticsEnabled = enabled;
+    this.sound.setHapticsEnabled(enabled);
+  }
+
+  /** WebGL context for device fingerprinting (GPU renderer string). */
+  public getGLContext(): WebGL2RenderingContext | WebGLRenderingContext {
+    return this.renderer.getContext();
+  }
+
+  public getPerfTelemetry(): {
+    deviceLabelJp: string;
+    pocoF7Class: boolean;
+    refreshHz: number;
+    fpsCap: number;
+    renderScale: number;
+    idle: boolean;
+    thermal: boolean;
+    reasonJp: string;
+    shaderPrewarmMs: number;
+  } {
+    const d = this.pacerDecision;
+    return {
+      deviceLabelJp: this.deviceDecision?.labelJp ?? '判定中…',
+      pocoF7Class: Boolean(this.deviceDecision?.isPocoF7Class),
+      refreshHz: this.displayRefreshHz,
+      fpsCap: d ? d.fpsCap : this.settings.fpsLimit,
+      renderScale: this.renderScale,
+      idle: Boolean(d?.idle),
+      thermal: Boolean(d?.thermal),
+      reasonJp: this.adaptivePerformance ? d?.reasonJp ?? '安定' : '固定（自動最適化OFF）',
+      shaderPrewarmMs: this.shaderPrewarmMs,
+    };
+  }
+
+  /** Update the FINGER S1.1 detail tier from the live optical magnification. */
+  private updateFingerS11Detail(dtSec: number, frameMs: number): void {
+    const mag = this.cameraDirector.getZoomTelemetry().magnification;
+    const enabled = this.settings.fingerS1Enabled && this.settings.fingerS11Enabled;
+    // Start HD synthesis a little before the HD tier is reached (2.5×) so it is usually ready in time
+    if (enabled && mag >= 1.6 && !this.s11Streamer.isStarted) this.s11Streamer.start();
+    const spec = this.s11Governor.update(mag, enabled);
+    if (spec.tier !== this.s11AppliedTier.tier || this.s11Dirty) {
+      this.s11AppliedTier = spec;
+      this.s11Dirty = false;
+      const hd = this.s11Streamer.isComplete ? this.s11Streamer.getTextures() : null;
+      this.playerHand.setDetailTier(spec, hd, enabled);
+      this.npcHand.setDetailTier(spec, hd, enabled);
+      this.s11OctaveCap = spec.maxOctave;
+    }
+    // GPU budget guard for the finest octaves (shed while frames are slow, restore when fast)
+    const cap = enabled ? this.s11FrameGovernor.update(dtSec, frameMs, spec.maxOctave) : 4;
+    if (cap !== this.s11OctaveCap) {
+      this.s11OctaveCap = cap;
+      this.playerHand.setDetailOctaveCap(cap);
+      this.npcHand.setDetailOctaveCap(cap);
+    }
+  }
+
+  private getFingerS11Telemetry(): FingerS11Telemetry {
+    const st = this.playerHand.getDetailState();
+    const spec = this.s11AppliedTier;
+    const building = spec.geometryScale > 1 && !st.geometryHd;
+    const streaming = spec.hdTextures && !st.texturesHd && this.s11Streamer.isStarted && !this.s11Streamer.failed;
+    let labelJp = spec.labelJp;
+    if (building || streaming) {
+      const pct = Math.round(((st.hdBuildProgress + this.s11Streamer.readyCount / 4) / 2) * 100);
+      labelJp = `${spec.shortJp} 読込中 ${pct}%`;
+    }
+    return {
+      tier: spec.tier,
+      labelJp,
+      textureResolution: st.texturesHd ? 2048 : 1024,
+      geometryScale: st.geometryHd ? 2 : 1,
+      shaderOctaves: this.settings.fingerS1Enabled && this.settings.fingerS11Enabled ? st.maxOctave : 4,
+      hdReady: st.texturesHd,
+    };
   }
 
   /** Interactive 36-Pose Showcase Preview (triggered from Studio Drawer Pose Gallery!) */
@@ -530,7 +737,14 @@ export class GameScene {
     this.sound.setSympatheticResonance(enabled);
   }
 
+  /** JSound 1.6: playback device (イヤホン / スマホ本体 / PCスピーカー / 自動) */
+  public setJSoundDeviceProfile(setting: JSoundDeviceProfileSetting): void {
+    this.settings.jsoundDeviceProfile = setting;
+    this.sound.setDeviceProfile(setting);
+  }
+
   public startPV(mode: PVModeId = 'grand_trailer', recordVideo = false): void {
+    this.sound.cancelScheduledReveal();
     this.activeMicroscopeFocus = null;
     if (!this.pvDirector.isActive()) {
       this.prePvStage = this.settings.stage;
@@ -736,6 +950,7 @@ export class GameScene {
   }
 
   public resetHandsToReady(): void {
+    this.sound.cancelScheduledReveal();
     this.activeMicroscopeFocus = null;
     this.clearTimeline();
     this.isAnimatingRound = false;
@@ -1002,6 +1217,19 @@ export class GameScene {
 
     const revealAt = isAikoFollowup ? 0.32 : 0.61;
     const winnerMove = outcome === 'LOSS' ? npcMove : playerMove;
+
+    // ★ JSound 1.6 Predictive Render Farm: the outcome is sealed now, the reveal is ≥0.32 s away —
+    // render every physical-model layer of the reveal, Overdrive, streak, spirit and finale in workers.
+    this.sound.prepareRoundSounds({
+      outcome,
+      winnerMove,
+      isMatchPoint: isMatchDecidingPoint,
+      overdrive: isOverdrive,
+      streak: outcome === 'WIN' ? streakCount : 0,
+      matchWinner: isMatchDecidingPoint && outcome !== 'DRAW' ? (outcome === 'WIN' ? 'player' : 'npc') : null,
+      spiritWillCharge: Boolean(options.spiritWillCharge),
+      revealInSec: revealAt,
+    });
 
     // === BEAT 3 (PON!!): Explosive Forward Lunge + 38-DOF + Bullet-Time Orbit + JSound 1.3 ===
     addCue(revealAt, () => {
@@ -1328,16 +1556,91 @@ export class GameScene {
 
     const maxTex = this.renderer.capabilities.maxTextureSize || 4096;
     const dim = computeRenderDimensions(this.settings.resolution, viewW, viewH, maxTex);
+    // KIWAMI MOBILE CORE dynamic resolution scale (even dimensions for the half-res KHDR passes)
+    const w = Math.max(320, Math.round((dim.width * this.renderScale) / 2) * 2);
+    const h = Math.max(240, Math.round((dim.height * this.renderScale) / 2) * 2);
 
     this.renderer.setPixelRatio(1);
-    this.renderer.setSize(dim.width, dim.height, false);
-    this.khdr.resize(dim.width, dim.height);
+    this.renderer.setSize(w, h, false);
+    this.khdr.resize(w, h);
     this.cameraDirector.resize(viewW / viewH);
+    // the projection was rebuilt: re-derive and re-apply the HUD-aware optical centre
+    this.updateHudFramingTarget(rect, viewH);
+    this.hudOffsetAppliedPx = Number.NaN;
+    this.stepHudFraming(1);
+  }
+
+  /**
+   * Report the persistent HUD's coverage in viewport CSS px: the bottom edge of the top bar and
+   * the height covered by the hand dock. The scene shifts its optical centre to the free band.
+   */
+  public setHudOcclusion(topPx: number, bottomPx: number): void {
+    const t = Math.max(0, topPx || 0);
+    const b = Math.max(0, bottomPx || 0);
+    if (Math.abs(t - this.hudOcclusionViewport.topPx) < 0.5 && Math.abs(b - this.hudOcclusionViewport.bottomPx) < 0.5) return;
+    this.hudOcclusionViewport = { topPx: t, bottomPx: b };
+    this.updateHudFramingTarget();
+  }
+
+  public setHudFramingEnabled(enabled: boolean): void {
+    this.hudFramingEnabled = enabled;
+  }
+
+  public getHudFramingOffsetPx(): number {
+    return this.hudOffsetCurrentPx;
+  }
+
+  private updateHudFramingTarget(rectIn?: DOMRect, viewHIn?: number): void {
+    const rect = rectIn ?? this.container.getBoundingClientRect();
+    const viewH = viewHIn ?? Math.max(240, rect.height || window.innerHeight);
+    const winH = window.innerHeight || viewH;
+    // viewport coordinates → container coordinates
+    const top = Math.max(0, this.hudOcclusionViewport.topPx - Math.max(0, rect.top));
+    const bottomEdgeGap = Math.max(0, winH - (rect.top + viewH));
+    const bottom = Math.max(0, this.hudOcclusionViewport.bottomPx - bottomEdgeGap);
+    const f = computeHudFraming({ viewW: rect.width || window.innerWidth, viewH, topOcclusionPx: top, bottomOcclusionPx: bottom });
+    this.hudOffsetTargetPx = f.offsetYPx;
+    this.hudViewH = viewH;
+  }
+
+  /** Critically-damped glide of the optical centre (τ = 120 ms) so dock changes never pop the image. */
+  private stepHudFraming(dtSec: number): void {
+    const target = this.hudFramingEnabled && !this.pvDirector.isActive() ? this.hudOffsetTargetPx : 0;
+    const k = 1 - Math.exp(-Math.max(0, dtSec) / 0.12);
+    this.hudOffsetCurrentPx += (target - this.hudOffsetCurrentPx) * k;
+    if (Math.abs(target - this.hudOffsetCurrentPx) < 0.05) this.hudOffsetCurrentPx = target;
+    if (!Number.isNaN(this.hudOffsetAppliedPx) && Math.abs(this.hudOffsetCurrentPx - this.hudOffsetAppliedPx) < 0.1) return;
+    const cam = this.cameraDirector.camera;
+    if (Math.abs(this.hudOffsetCurrentPx) < 0.05) {
+      cam.clearViewOffset();
+    } else {
+      // keep the director's aspect: full = sub-window size, only the y origin moves
+      const fullH = this.hudViewH;
+      const fullW = fullH * cam.aspect;
+      cam.setViewOffset(fullW, fullH, 0, this.hudOffsetCurrentPx, fullW, fullH);
+    }
+    this.hudOffsetAppliedPx = this.hudOffsetCurrentPx;
   }
 
   public start(): void {
     if (this.running) return;
     this.running = true;
+    // ★ Parallel shader pre-warm (KHR_parallel_shader_compile via compileAsync): compile every program
+    //   in the scene off the critical path so the first frames on mobile don't hitch ★
+    const t0 = performance.now();
+    const rendererWithAsync = this.renderer as THREE.WebGLRenderer & {
+      compileAsync?: (scene: THREE.Object3D, camera: THREE.Camera) => Promise<unknown>;
+    };
+    // Only where the driver compiles in parallel (Adreno/Mali/Apple ANGLE do); without
+    // KHR_parallel_shader_compile three.js would just compile synchronously and warn.
+    if (typeof rendererWithAsync.compileAsync === 'function' && this.renderer.extensions.has('KHR_parallel_shader_compile')) {
+      rendererWithAsync
+        .compileAsync(this.scene, this.cameraDirector.camera)
+        .then(() => {
+          this.shaderPrewarmMs = Math.round(performance.now() - t0);
+        })
+        .catch(() => undefined);
+    }
     const now = performance.now();
     this.lastRenderTimestamp = now;
     this.lastLogicTimestamp = now;
@@ -1354,9 +1657,12 @@ export class GameScene {
         return;
       }
 
-      // Precision FPS pacing for 60 FPS / 120 FPS (0 = Unlimited!)
-      if (this.settings.fpsLimit > 0) {
-        const minInterval = 1000 / this.settings.fpsLimit;
+      // Precision pacing: user cap (60 / 120 / unlimited) ∩ KIWAMI pacer vsync-divisor tier
+      const userCap = this.settings.fpsLimit;
+      const pacerCap = this.adaptivePerformance && this.pacerDecision ? this.pacerDecision.fpsCap : 0;
+      const cap = userCap > 0 && pacerCap > 0 ? Math.min(userCap, pacerCap) : userCap > 0 ? userCap : pacerCap;
+      if (cap > 0) {
+        const minInterval = 1000 / cap;
         if (nowMs - this.lastRenderTimestamp < minInterval - 0.7) {
           return;
         }
@@ -1545,6 +1851,7 @@ export class GameScene {
         }
       }
       this.cameraDirector.update(silkyDt);
+      this.updateFingerS11Detail(rawDt, frameMs);
 
       // Sync 3D/4D HRTF AudioListener pose in JSound Engin 1.4 with live Cinema Camera!
       this.cameraDirector.camera.getWorldDirection(this.tmpCamForward);
@@ -1568,12 +1875,34 @@ export class GameScene {
         this.sound.applyAcousticProbe(probe, this.settings.acousticProbeEnabled);
       }
 
+      // HUD-aware optical centre glide (no-op once settled)
+      this.stepHudFraming(rawDt);
+
       // Reset WebGL draw stats & execute KHDR 1.1 + Shadow Flame multi-pass render!
       this.renderer.info.reset();
       this.khdr.render(this.scene, this.cameraDirector.camera, this.sunWorldDir, this.elapsedSec);
 
       // Immediately capture fresh backbuffer for PV WebM recording or 1-click Cinema PNG Snapshot!
       this.pvDirector.onPostRender(this.canvas);
+
+      // ★ KIWAMI MOBILE CORE pacer: missed-vsync control of resolution & refresh tier ★
+      {
+        const cam = this.cameraDirector.camera;
+        const moved =
+          cam.position.distanceToSquared(this.prevCamPos) > 1e-10 || 1 - Math.abs(cam.quaternion.dot(this.prevCamQuat)) > 1e-9;
+        this.prevCamPos.copy(cam.position);
+        this.prevCamQuat.copy(cam.quaternion);
+        const decision = this.pacer.update(rawDt, frameMs, {
+          animating: this.isAnimatingRound || this.pvDirector.isActive() || this.overdriveArmed || this.hitStopRemaining > 0,
+          cameraMoving: moved,
+          msSinceInput: nowMs - this.lastInputMs,
+        });
+        this.pacerDecision = decision;
+        if (decision.scaleChanged && Math.abs(decision.renderScale - this.renderScale) > 1e-3) {
+          this.renderScale = decision.renderScale;
+          this.handleResize();
+        }
+      }
 
       // Collect rolling performance telemetry
       this.frameTimesMs.push(frameMs);
@@ -1592,6 +1921,8 @@ export class GameScene {
         const jsoundT = this.sound.getTelemetry();
         const aeroT = this.aeroVortex.getTelemetry();
         const probeT = this.acousticProbe.getSnapshot();
+        const fingerT = this.getFingerS11Telemetry();
+        const perfT = this.getPerfTelemetry();
 
         this.onMetrics({
           fps: Math.round(1000 / Math.max(0.5, avgMs)),
@@ -1639,6 +1970,35 @@ export class GameScene {
           jsoundWorkletActive: jsoundT.workletActive,
           jsoundMaterialPair: jsoundT.materialPairJp,
           jsoundLastEventJp: jsoundT.lastAcousticEventJp,
+          jsoundDeviceProfile: jsoundT.deviceProfile,
+          jsoundLufsShortTerm: jsoundT.lufsShortTerm,
+          jsoundLufsIntegrated: jsoundT.lufsIntegrated,
+          jsoundLimiterGrDb: jsoundT.limiterGrDb,
+          jsoundVirtualBassDb: jsoundT.virtualBassDb,
+          jsoundRenderWorkers: jsoundT.renderFarmWorkers,
+          jsoundRenderHitPct: jsoundT.renderFarmHitPct,
+          jsoundRenderAvgMs: jsoundT.renderFarmAvgMs,
+          jsoundRenderQuality: jsoundT.renderQuality,
+          jsoundRevealMainMs: jsoundT.revealMainThreadMs,
+          jsoundVoicesStolen: jsoundT.voicesStolen,
+          fingerDetailTier: fingerT.tier,
+          fingerDetailLabelJp: fingerT.labelJp,
+          fingerTexRes: fingerT.textureResolution,
+          fingerGeoScale: fingerT.geometryScale,
+          fingerShaderOctaves: fingerT.shaderOctaves,
+          fingerHdReady: fingerT.hdReady,
+          perfDeviceLabelJp: perfT.deviceLabelJp,
+          perfPocoF7Class: perfT.pocoF7Class,
+          perfRefreshHz: perfT.refreshHz,
+          perfFpsCap: perfT.fpsCap,
+          perfRenderScale: perfT.renderScale,
+          perfIdle: perfT.idle,
+          perfThermal: perfT.thermal,
+          perfReasonJp: perfT.reasonJp,
+          perfShaderPrewarmMs: perfT.shaderPrewarmMs,
+          avSyncLeadMs: this.sound.avSync.leadMs,
+          avSyncAudioLatencyMs: this.sound.avSync.audioLatencyMs,
+          avSyncScheduledLayers: this.sound.avSync.scheduledLayers,
           // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★
           bioPulseBpm: bioSample.bpm,
           bioPulseWave: bioSample.pulseWave,
@@ -1663,6 +2023,7 @@ export class GameScene {
   public dispose(): void {
     this.running = false;
     cancelAnimationFrame(this.rafId);
+    window.clearTimeout(this.s11IdleTimer);
     this.pvDirector.dispose();
     this.clearTimeline();
     this.unbindCameraEvents();

@@ -20,16 +20,45 @@ import {
   CameraStyleId,
   DEFAULT_GRAPHICS_SETTINGS,
   GameModeId,
+  JSoundDeviceProfileSetting,
   PVModeId,
+  QUALITY_PRESETS,
+  QualityPresetId,
   StageId,
 } from './graphics/GraphicsConfig';
 import { GameScene } from './scene/GameScene';
+import { DeviceDecision, classifyDevice, probeDeviceSignals, snapRefreshHz } from './engine/mobile/KiwamiMobileCore';
 import { GameUI, MatchFormat } from './ui/GameUI';
 
 const SURVIVAL_STAGES: StageId[] = ['zashiki', 'shrine', 'salon', 'onsen', 'atelier'];
 const SURVIVAL_PERSONAS: JNVPersonaId[] = ['zero', 'mirror', 'stochastic', 'apex'];
 const BEST_STREAK_STORAGE_KEY = 'janken_kiwami_best_survival_streak_v1';
 const BLITZ_DURATION_MS = 3500;
+const PREFS_STORAGE_KEY = 'janken_kiwami_prefs_v16';
+
+interface StoredPrefs {
+  qualityPreset?: QualityPresetId | 'device';
+  deviceProfile?: JSoundDeviceProfileSetting;
+  haptics?: boolean;
+  adaptive?: boolean;
+}
+
+function loadPrefs(): StoredPrefs {
+  try {
+    const raw = window.localStorage.getItem(PREFS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as StoredPrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePrefs(patch: StoredPrefs): void {
+  try {
+    window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ ...loadPrefs(), ...patch }));
+  } catch {
+    // storage unavailable — settings simply are not remembered
+  }
+}
 
 class JankenKiwamiApp {
   private readonly sound = new SoundEngine();
@@ -175,6 +204,11 @@ class JankenKiwamiApp {
         this.scene.setFingerS1Enabled(enabled);
         this.ui.syncSettings(this.scene.getSettings());
       },
+      onToggleFingerS11: (enabled) => {
+        this.sound.playWoodTap(enabled ? 960 : 620);
+        this.scene.setFingerS11Enabled(enabled);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
       onToggleDermaTensor: (enabled) => {
         this.sound.playWoodTap(enabled ? 920 : 600);
         this.scene.setDermaTensorEnabled(enabled);
@@ -209,6 +243,31 @@ class JankenKiwamiApp {
       onChangeJSoundSpatialMode: (spatial) => {
         this.scene.setJSoundSpatialMode(spatial);
         this.sound.playWoodTap(860);
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onChangeJSoundDeviceProfile: (profile) => {
+        this.scene.setJSoundDeviceProfile(profile);
+        this.sound.playWoodTap(880);
+        savePrefs({ deviceProfile: profile });
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onApplyQualityPreset: (preset) => {
+        if (preset === 'device') this.applyDeviceTuning();
+        else this.applyQualityPreset(preset);
+        this.ui.setActivePreset(preset);
+        this.sound.playWoodTap(preset === 'max' ? 960 : preset === 'balanced' || preset === 'device' ? 820 : 640);
+        savePrefs({ qualityPreset: preset });
+      },
+      onToggleHaptics: (enabled) => {
+        this.scene.setHapticsEnabled(enabled);
+        this.ui.setHapticsEnabled(enabled);
+        savePrefs({ haptics: enabled });
+        this.ui.syncSettings(this.scene.getSettings());
+      },
+      onToggleAdaptivePerformance: (enabled) => {
+        this.sound.playWoodTap(enabled ? 900 : 600);
+        this.scene.setAdaptivePerformance(enabled);
+        savePrefs({ adaptive: enabled });
         this.ui.syncSettings(this.scene.getSettings());
       },
       onToggleJSoundAmbience: (enabled) => {
@@ -267,7 +326,66 @@ class JankenKiwamiApp {
     this.ui.updatePreCommitSeal(this.jnv.getCurrentSeal(), this.jnv.getPersona().code);
     this.ui.updatePsychoTelemetry(this.psycho.getTelemetry());
     this.syncTacticalUI();
+    // HUD-aware optical centre: keep the hands in the band between the top bar and the hand dock
+    this.ui.observeHudOcclusion((o) => this.scene.setHudOcclusion(o.topPx, o.bottomPx));
     this.scene.start();
+    void this.initDeviceProfile();
+  }
+
+  private deviceDecision: DeviceDecision | null = null;
+
+  /**
+   * ★ KIWAMI MOBILE CORE: fingerprint the device (GPU string, cores, memory, measured refresh rate)
+   * and start from a tuned configuration — e.g. POCO F7 (Adreno 825 · 120 Hz) ⇒ FHD + dynamic
+   * resolution at 120 Hz, Pro-quality physical audio, HD hand textures pre-generated at idle.
+   */
+  private async initDeviceProfile(): Promise<void> {
+    const prefs = loadPrefs();
+    try {
+      const sig = await probeDeviceSignals(this.scene.getGLContext());
+      const decision = classifyDevice(sig);
+      this.deviceDecision = decision;
+      this.scene.applyDeviceDecision(decision, snapRefreshHz(sig.refreshHz));
+      this.ui.setDeviceDecision(decision);
+    } catch {
+      // probing is best-effort; defaults stay in place
+    }
+    if (prefs.adaptive === false) this.scene.setAdaptivePerformance(false);
+    if (prefs.haptics === false) {
+      this.scene.setHapticsEnabled(false);
+      this.ui.setHapticsEnabled(false);
+    }
+    if (prefs.deviceProfile) this.scene.setJSoundDeviceProfile(prefs.deviceProfile);
+    const preset = prefs.qualityPreset ?? (this.deviceDecision && this.deviceDecision.initialPreset === 'device' ? 'device' : this.deviceDecision?.initialPreset);
+    if (preset === 'device') this.applyDeviceTuning();
+    else if (preset) this.applyQualityPreset(preset);
+    if (preset) this.ui.setActivePreset(preset);
+    this.ui.syncSettings(this.scene.getSettings());
+  }
+
+  private applyDeviceTuning(): void {
+    const d = this.deviceDecision;
+    if (!d) {
+      this.applyQualityPreset('balanced');
+      return;
+    }
+    this.scene.setResolution(d.resolution);
+    this.scene.setFpsLimit(0); // pacer-managed: vsync-divisor tiers up to the panel's refresh
+    this.scene.applyShadowFlame(d.shadow);
+    this.scene.setJSoundQuality(d.jsoundQuality);
+    this.scene.setJHandMode('biomech_ultra');
+    this.scene.setAdaptivePerformance(true);
+    this.ui.syncSettings(this.scene.getSettings());
+  }
+
+  private applyQualityPreset(preset: QualityPresetId): void {
+    const p = QUALITY_PRESETS[preset].settings;
+    this.scene.setResolution(p.resolution);
+    this.scene.setFpsLimit(p.fpsLimit);
+    this.scene.applyShadowFlame(p.shadowFlame);
+    this.scene.setJSoundQuality(p.jsoundQuality);
+    this.scene.setJHandMode(p.jhandMode);
+    this.ui.syncSettings(this.scene.getSettings());
   }
 
   private loadBestStreak(): number {
@@ -404,6 +522,11 @@ class JankenKiwamiApp {
     const isMatchDecidingPoint =
       isSurvivalDefeat || (target !== null && (nextPlayerWins >= target || nextNpcWins >= target));
     const projectedStreak = outcome === 'WIN' ? this.winStreak + 1 : 0;
+
+    // JSound 1.6: predict whether this reveal fills the spirit gauge so its cue is pre-rendered
+    const fastBonusPredict = decisionLatencyMs < 1300 ? 8 : 0;
+    const spiritWillCharge =
+      outcome === 'WIN' && !usingOverdrive && this.spiritPct < 100 && this.spiritPct + 36 + fastBonusPredict >= 100;
 
     const topConf = telemetry.topExperts[0]?.confidence ?? 0.5;
     this.scene.syncJNVClockwork(topConf, telemetry.volatilityIndex, true);
@@ -542,12 +665,14 @@ class JankenKiwamiApp {
       {
         overdriveActive: usingOverdrive,
         streakCount: projectedStreak,
+        spiritWillCharge,
       }
     );
   }
 
   private resetMatch(wipeJnvMemory: boolean): void {
     this.stopBlitzTimer();
+    this.sound.resetLoudnessHistory();
     this.playerWins = 0;
     this.npcWins = 0;
     this.draws = 0;

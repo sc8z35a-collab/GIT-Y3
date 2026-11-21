@@ -5,9 +5,9 @@
  * Camera Director 2.0 styles, and JSound Engin 1.2 spatialization modes.
  */
 
-import type { JSoundSpatialMode } from '../engine/jsound/types';
+import type { JSoundDeviceProfileId, JSoundDeviceProfileSetting, JSoundSpatialMode } from '../engine/jsound/types';
 
-export type { JSoundSpatialMode };
+export type { JSoundDeviceProfileId, JSoundDeviceProfileSetting, JSoundSpatialMode };
 
 export type ResolutionPresetId = 'hd' | 'fhd' | '1.5k' | '2k';
 export type FpsLimitMode = 60 | 120 | 0; // 0 = Unlimited (無制限)
@@ -180,6 +180,14 @@ export interface GraphicsSettings {
   jsoundSpatialMode: JSoundSpatialMode;
   jsoundAmbience: boolean;
   jsoundSympathetic: boolean;
+  /** JSound 1.6 playback device (auto / headphones / phone speaker / PC speakers) */
+  jsoundDeviceProfile: JSoundDeviceProfileSetting;
+  /** FINGER S1.1 zoom-adaptive 2× HD detail streaming */
+  fingerS11Enabled: boolean;
+  /** KIWAMI MOBILE CORE: dynamic resolution + vsync-divisor pacing + idle power saving */
+  adaptivePerformance: boolean;
+  /** Audio-derived haptic feedback (Android vibration) */
+  hapticsEnabled: boolean;
   cameraStyle: CameraStyleId;
   compactUi: boolean;
   /** Project KIWAMI-NEXT breakthrough engine toggles */
@@ -205,6 +213,10 @@ export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = {
   jsoundSpatialMode: '4d_audio_x',
   jsoundAmbience: true,
   jsoundSympathetic: true,
+  jsoundDeviceProfile: 'auto',
+  fingerS11Enabled: true,
+  adaptivePerformance: true,
+  hapticsEnabled: true,
   cameraStyle: 'cinematic',
   compactUi: false,
   bioPulseEnabled: true,
@@ -267,6 +279,38 @@ export interface RenderMetrics {
   jsoundWorkletActive: boolean;
   jsoundMaterialPair: string;
   jsoundLastEventJp: string;
+  // ★ JSound Engin 1.6 ★
+  jsoundDeviceProfile: JSoundDeviceProfileId;
+  jsoundLufsShortTerm: number;
+  jsoundLufsIntegrated: number;
+  jsoundLimiterGrDb: number;
+  jsoundVirtualBassDb: number;
+  jsoundRenderWorkers: number;
+  jsoundRenderHitPct: number;
+  jsoundRenderAvgMs: number;
+  jsoundRenderQuality: 'ultra' | 'pro' | 'lite';
+  jsoundRevealMainMs: number;
+  jsoundVoicesStolen: number;
+  // ★ FINGER S1.1 zoom-adaptive detail ★
+  fingerDetailTier: number;
+  fingerDetailLabelJp: string;
+  fingerTexRes: number;
+  fingerGeoScale: number;
+  fingerShaderOctaves: number;
+  fingerHdReady: boolean;
+  // ★ KIWAMI MOBILE CORE (POCO F7-first adaptive performance) ★
+  perfDeviceLabelJp: string;
+  perfPocoF7Class: boolean;
+  perfRefreshHz: number;
+  perfFpsCap: number;
+  perfRenderScale: number;
+  perfIdle: boolean;
+  perfThermal: boolean;
+  perfReasonJp: string;
+  perfShaderPrewarmMs: number;
+  avSyncLeadMs: number;
+  avSyncAudioLatencyMs: number;
+  avSyncScheduledLayers: number;
   // ★ Project KIWAMI-NEXT Live Multi-Engine Telemetry ★
   bioPulseBpm: number;
   bioPulseWave: number;
@@ -321,4 +365,55 @@ export function computeRenderDimensions(
   height = Math.max(240, Math.min(maxTextureSize, height - (height % 2)));
 
   return { width, height };
+}
+
+// =============================================================================
+// v1.6 one-tap quality presets (かんたん設定)
+// =============================================================================
+
+export type QualityPresetId = 'eco' | 'balanced' | 'max';
+
+export interface QualityPresetSpec {
+  id: QualityPresetId;
+  labelJp: string;
+  descriptionJp: string;
+  settings: Pick<GraphicsSettings, 'resolution' | 'fpsLimit' | 'shadowFlame' | 'jsoundQuality' | 'jhandMode'>;
+}
+
+export const QUALITY_PRESETS: Record<QualityPresetId, QualityPresetSpec> = {
+  eco: {
+    id: 'eco',
+    labelJp: '省電力',
+    descriptionJp: '発熱・電池を抑える（HD・60FPS・軽量影・軽量音響）',
+    settings: { resolution: 'hd', fpsLimit: 60, shadowFlame: 'flash', jsoundQuality: 'lite', jhandMode: 'biomech_pro' },
+  },
+  balanced: {
+    id: 'balanced',
+    labelJp: 'バランス',
+    descriptionJp: 'スマホにおすすめ（フルHD・60FPS・高品質音響）',
+    settings: { resolution: 'fhd', fpsLimit: 60, shadowFlame: 'flash', jsoundQuality: 'pro', jhandMode: 'biomech_ultra' },
+  },
+  max: {
+    id: 'max',
+    labelJp: '最高画質',
+    descriptionJp: 'PC向け（2K・FPS無制限・最上位の影と音響）',
+    settings: { resolution: '2k', fpsLimit: 0, shadowFlame: 'pro', jsoundQuality: 'ultra', jhandMode: 'biomech_ultra' },
+  },
+};
+
+/** Which preset (if any) the current settings correspond to. */
+export function detectQualityPreset(s: GraphicsSettings): QualityPresetId | null {
+  for (const p of Object.values(QUALITY_PRESETS)) {
+    const t = p.settings;
+    if (
+      s.resolution === t.resolution &&
+      s.fpsLimit === t.fpsLimit &&
+      s.shadowFlame === t.shadowFlame &&
+      s.jsoundQuality === t.jsoundQuality &&
+      s.jhandMode === t.jhandMode
+    ) {
+      return p.id;
+    }
+  }
+  return null;
 }

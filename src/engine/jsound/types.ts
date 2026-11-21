@@ -79,6 +79,10 @@ export interface Vec3 {
   z: number;
 }
 
+/** JSound 1.6 playback device: 'auto' resolves from the device (phone → built-in speaker). */
+export type JSoundDeviceProfileSetting = 'auto' | 'headphones' | 'phone_speaker' | 'pc_speakers';
+export type JSoundDeviceProfileId = Exclude<JSoundDeviceProfileSetting, 'auto'>;
+
 export interface JSoundSettings {
   enabled: boolean;
   quality: JSoundQualityMode;
@@ -86,6 +90,7 @@ export interface JSoundSettings {
   ambienceEnabled: boolean;
   sympatheticResonance: boolean;
   masterVolume: number; // 0..1
+  deviceProfile: JSoundDeviceProfileSetting;
 }
 
 export interface JSoundTelemetry {
@@ -118,6 +123,22 @@ export interface JSoundTelemetry {
   fdnActive: boolean;
   materialPairJp: string;
   lastAcousticEventJp: string;
+  // ★ JSound Engin 1.6 ★
+  deviceProfileSetting: JSoundDeviceProfileSetting;
+  deviceProfile: JSoundDeviceProfileId;
+  lufsShortTerm: number;
+  lufsIntegrated: number;
+  limiterGrDb: number;
+  bandGrDb: [number, number, number];
+  virtualBassDb: number;
+  clipEvents: number;
+  renderFarmWorkers: number;
+  renderFarmJobs: number;
+  renderFarmHitPct: number;
+  renderFarmAvgMs: number;
+  renderQuality: JSoundQualityMode;
+  revealMainThreadMs: number;
+  voicesStolen: number;
 }
 
 export interface ModalSpec {

@@ -358,13 +358,27 @@ export class Spatial4DProcessorGraph {
     this.applyMode(initialMode, ctx.currentTime, true);
   }
 
+  /** JSound 1.6 device-adaptive scaling of the headphone-oriented layers (see DEVICE_PROFILE_SPECS). */
+  private deviceLayerScale = 1.0;
+  private deviceTactileScale = 1.0;
+  private currentMode: JSoundSpatialMode = '4d_audio_x';
+
+  public setDeviceScales(layerScale: number, tactileScale: number, now: number): void {
+    this.deviceLayerScale = Math.max(0, Math.min(1.5, layerScale));
+    this.deviceTactileScale = Math.max(0, Math.min(1.5, tactileScale));
+    this.applyMode(this.currentMode, now);
+  }
+
   public applyMode(mode: JSoundSpatialMode, now: number, immediate = false): void {
+    this.currentMode = mode;
     const cfg = SPATIAL_4D_CONFIGS[mode];
     const tc = immediate ? 0.005 : 0.14;
-    this.extWetGain.gain.setTargetAtTime(cfg.externalizerWet, now, tc);
-    this.orbWetGain.gain.setTargetAtTime(cfg.orbitalWet, now, tc);
-    this.heightWetGain.gain.setTargetAtTime(cfg.heightAirWet, now, tc);
-    this.tactileWetGain.gain.setTargetAtTime(cfg.tactileSubWet, now, tc);
+    const ls = this.deviceLayerScale ?? 1.0;
+    const ts = this.deviceTactileScale ?? 1.0;
+    this.extWetGain.gain.setTargetAtTime(cfg.externalizerWet * ls, now, tc);
+    this.orbWetGain.gain.setTargetAtTime(cfg.orbitalWet * ls, now, tc);
+    this.heightWetGain.gain.setTargetAtTime(cfg.heightAirWet * ls, now, tc);
+    this.tactileWetGain.gain.setTargetAtTime(cfg.tactileSubWet * ts, now, tc);
     this.lfoAzimuth.frequency.setTargetAtTime(cfg.orbitalRateHz, now, tc);
     this.lfoElevation.frequency.setTargetAtTime(cfg.orbitalRateHz * 1.52, now, tc);
     this.orbDepthL.gain.setTargetAtTime(mode === '4d_audio_max' ? 0.36 : 0.24, now, tc);
