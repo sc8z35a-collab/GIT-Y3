@@ -54,6 +54,7 @@ import {
   enhanceMaterialWithFingerS1Shader,
   getFingerS1TextureSet,
 } from '../graphics/FingerS1Engine';
+import { S11HDTexture, S11HDTextureSet, S11TierSpec } from '../graphics/FingerS11DetailEngine';
 import { HandMaterialPreset } from '../graphics/GraphicsConfig';
 import { TextureAtlasLoader } from '../graphics/TextureAtlasLoader';
 
@@ -170,7 +171,27 @@ export class SculptedHandRig {
     uS1VolarCompress: { value: 0.42 },
     uS1Sweat: { value: 0.14 },
     uS1VascularPulse: { value: 0.35 },
+    uS11Enabled: { value: 1.0 },
+    uS11MaxOctave: { value: 4.0 },
+    uS11AlphaRough: { value: 0.0 },
   };
+
+  // ★ FINGER S1.1 zoom-adaptive detail: 2× tessellated LOD meshes + HD texture binding ★
+  private readonly lodEntries: Array<{
+    mesh: THREE.Mesh;
+    base: THREE.BufferGeometry;
+    makeHd: () => THREE.BufferGeometry;
+    hd: THREE.BufferGeometry | null;
+  }> = [];
+  private hdBuildCursor = 0;
+  private wantHdGeometry = false;
+  private hdGeometryActive = false;
+  private palmCoreMesh?: THREE.Mesh;
+  private palmSubcutaneousFieldHd?: SculptedPalmSubcutaneousField;
+  private s11Enabled = true;
+  private s11MaxOctave = 4;
+  private hdTextureSet: S11HDTextureSet | null = null;
+  private hdTexturesBound = false;
 
   // CHROMA-DERM & KERATIN OPTICS 1.0 nail-bed anisotropic optics & capillary refill uniforms
   private readonly nailUniforms: KeratinNailUniforms = {
@@ -668,14 +689,113 @@ export class SculptedHandRig {
     for (const vm of this.vellusHairMeshes) {
       vm.visible = showVellus;
     }
-    if (this.palmSubcutaneousField && this.lastDermaState) {
-      this.palmSubcutaneousField.applyState(this.lastDermaState, dermaActive);
+    const palmField = this.activePalmField();
+    if (palmField && this.lastDermaState) {
+      palmField.applyState(this.lastDermaState, dermaActive);
     }
 
     for (const obj of this.s1OnlyMeshes) obj.visible = s1;
     for (const obj of this.classicOnlyMeshes) obj.visible = !s1;
     // Hide mechanical horological medallions, metal pins & gimbal rings on living human skin!
     for (const obj of this.artisanDetailMeshes) obj.visible = !isOrganicLiving;
+  }
+
+  // ===========================================================================
+  // ★ FINGER S1.1 — Zoom-Adaptive Detail (geometry LOD streaming + HD texture binding) ★
+  // ===========================================================================
+
+  private activePalmField(): SculptedPalmSubcutaneousField | undefined {
+    return this.hdGeometryActive && this.palmSubcutaneousFieldHd ? this.palmSubcutaneousFieldHd : this.palmSubcutaneousField;
+  }
+
+  /**
+   * Apply a detail tier. Geometry upgrades are built incrementally (time-sliced in `update`) and
+   * swapped in all at once; HD textures bind only once every surface has streamed in, so the hand
+   * never shows a mix of S1.0 and S1.1 maps.
+   */
+  public setDetailTier(spec: S11TierSpec, hdTextures: S11HDTextureSet | null, enabled: boolean): void {
+    this.s11Enabled = enabled;
+    this.s11MaxOctave = enabled ? spec.maxOctave : 4;
+    this.s1Uniforms.uS11Enabled.value = enabled ? 1.0 : 0.0;
+    this.s1Uniforms.uS11MaxOctave.value = this.s11MaxOctave;
+    this.wantHdGeometry = enabled && spec.geometryScale > 1;
+    if (!this.wantHdGeometry && this.hdGeometryActive) this.swapLodGeometry(false);
+    this.hdTextureSet = enabled && spec.hdTextures ? hdTextures : null;
+    this.syncHdTextures();
+  }
+
+  /** Runtime octave cap from the GPU frame-budget governor (≤ the tier's own cap). */
+  public setDetailOctaveCap(maxOctave: number): void {
+    if (!this.s11Enabled) return;
+    this.s11MaxOctave = maxOctave;
+    this.s1Uniforms.uS11MaxOctave.value = maxOctave;
+  }
+
+  public getDetailState(): { geometryHd: boolean; texturesHd: boolean; maxOctave: number; hdBuildProgress: number } {
+    const built = this.lodEntries.reduce((n, e) => n + (e.hd ? 1 : 0), 0);
+    return {
+      geometryHd: this.hdGeometryActive,
+      texturesHd: this.hdTexturesBound,
+      maxOctave: this.s11MaxOctave,
+      hdBuildProgress: this.lodEntries.length > 0 ? built / this.lodEntries.length : 1,
+    };
+  }
+
+  /** Build HD twins within a per-frame time budget; swap everything in once complete. */
+  private stepHdGeometryBuild(budgetMs: number): void {
+    if (!this.wantHdGeometry || this.hdGeometryActive) return;
+    const t0 = performance.now();
+    while (this.hdBuildCursor < this.lodEntries.length) {
+      const e = this.lodEntries[this.hdBuildCursor];
+      if (!e.hd) e.hd = e.makeHd();
+      this.hdBuildCursor++;
+      if (performance.now() - t0 > budgetMs) return;
+    }
+    this.swapLodGeometry(true);
+  }
+
+  private swapLodGeometry(hd: boolean): void {
+    for (const e of this.lodEntries) {
+      const g = hd ? e.hd : e.base;
+      if (g) e.mesh.geometry = g;
+    }
+    this.hdGeometryActive = hd;
+    if (this.lastDermaState) {
+      this.activePalmField()?.applyState(this.lastDermaState, this.fingerS1Enabled && this.dermaTensorEnabled);
+    }
+  }
+
+  private syncHdTextures(): void {
+    const set = this.hdTextureSet;
+    const complete = Boolean(set && set.finger && set.palm && set.micro && set.nail);
+    const useHd = complete && this.currentPreset === 'living_skin';
+    const base = getFingerS1TextureSet();
+    const bind = (
+      mat: THREE.MeshPhysicalMaterial | undefined,
+      hd: S11HDTexture | undefined,
+      map: THREE.Texture,
+      normal: THREE.Texture,
+      rough: THREE.Texture | null
+    ): void => {
+      if (!mat) return;
+      if (useHd && hd) {
+        mat.map = hd.albedoRough;
+        mat.normalMap = hd.normalHeight;
+        if (rough) mat.roughnessMap = hd.albedoRough;
+      } else {
+        mat.map = map;
+        mat.normalMap = normal;
+        if (rough) mat.roughnessMap = rough;
+      }
+    };
+    if (this.currentPreset === 'living_skin') {
+      bind(this.primaryMat, set?.palm, base.palmAlbedoMap, base.palmNormalMap, base.palmRoughnessMap);
+      bind(this.fingerMat, set?.finger, base.fingerAlbedoMap, base.fingerNormalMap, base.fingerRoughnessMap);
+      bind(this.s1JointCapsuleMat, set?.micro, base.microSkinAlbedoMap, base.microSkinNormalMap, base.microSkinRoughnessMap);
+      bind(this.nailMat, set?.nail, base.nailAlbedoMap, base.nailNormalMap, null);
+    }
+    this.hdTexturesBound = useHd;
+    this.s1Uniforms.uS11AlphaRough.value = useHd ? 1.0 : 0.0;
   }
 
   public setFingerS1Enabled(enabled: boolean): void {
@@ -732,6 +852,7 @@ export class SculptedHandRig {
     this.createMaterials(preset);
     this.applyMaterialsToMeshes();
     this.syncVisibilityForMode();
+    this.syncHdTextures();
   }
 
   public setKinesisMode(mode: JHandQualityMode): void {
@@ -784,6 +905,12 @@ export class SculptedHandRig {
     return m;
   }
 
+  /** FINGER S1.1: register a mesh whose 2×-tessellated twin is built lazily for the HD tier. */
+  private regLod<T extends THREE.Mesh>(mesh: T, makeHd: () => THREE.BufferGeometry): T {
+    this.lodEntries.push({ mesh, base: mesh.geometry, makeHd, hd: null });
+    return mesh;
+  }
+
   /**
    * Build Forearm DRUJ, Ulnar Styloid Head, Volar FCR/PL Flexor Tendons,
    * and Two-Row Carpal Wrist (Radiocarpal + Midcarpal)!
@@ -792,7 +919,7 @@ export class SculptedHandRig {
     const s = this.mirrorSign;
 
     // FINGER S1.0 Seamless Organic Forearm & Wrist Sculpt (zero harsh cylinder caps!)
-    const s1WristMesh = this.regSeamlessSkin(createFingerS1ForearmWristGeo());
+    const s1WristMesh = this.regLod(this.regSeamlessSkin(createFingerS1ForearmWristGeo()), () => createFingerS1ForearmWristGeo(2));
     this.forearmPivot.add(s1WristMesh);
     this.s1OnlyMeshes.push(s1WristMesh);
 
@@ -884,7 +1011,12 @@ export class SculptedHandRig {
     const s = this.mirrorSign;
 
     // 1A. FINGER S1.0 Continuous Sculpted Anatomical Palm Body (concave hollow + dorsal arch!)
-    const s1PalmCore = this.regPrimary(createFingerS1SculptedPalmGeo(s));
+    const s1PalmCore = this.regLod(this.regPrimary(createFingerS1SculptedPalmGeo(s)), () => {
+      const g = createFingerS1SculptedPalmGeo(s, 2);
+      this.palmSubcutaneousFieldHd = new SculptedPalmSubcutaneousField(g, s);
+      return g;
+    });
+    this.palmCoreMesh = s1PalmCore;
     s1PalmCore.position.set(0.014 * s, 0.001, 0.108);
     this.midcarpalPivot.add(s1PalmCore);
     this.s1OnlyMeshes.push(s1PalmCore);
@@ -1081,12 +1213,12 @@ export class SculptedHandRig {
     parent.add(mcp);
 
     // ---- MCP JOINT: FINGER S1.0 Seamless Capsule + 3-Layer Dynamic Wrinkle Stack vs Classic Ball ----
-    const s1McpCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 1.04));
+    const s1McpCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 1.04)), () => createFingerS1JointCapsuleGeo(baseRadius * 1.04, 2));
     mcp.add(s1McpCap);
-    const mcpWrinkleStack = this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseRadius * 1.03));
+    const mcpWrinkleStack = this.regLod(this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseRadius * 1.03)), () => createFingerS1KnuckleWrinkleStackGeo(baseRadius * 1.03, 2));
     mcpWrinkleStack.position.set(0, 0.0008, 0.0015);
     mcp.add(mcpWrinkleStack);
-    const s1Phal1 = this.regFinger(createFingerS1PhalanxGeo(l1, baseRadius * 1.03, baseRadius * 0.9, false));
+    const s1Phal1 = this.regLod(this.regFinger(createFingerS1PhalanxGeo(l1, baseRadius * 1.03, baseRadius * 0.9, false)), () => createFingerS1PhalanxGeo(l1, baseRadius * 1.03, baseRadius * 0.9, false, false, 2));
     mcp.add(s1Phal1);
     if (this.vellusMaterial) {
       const fVellus = createFingerDorsalVellusField(s1Phal1.geometry, this.vellusMaterial, 34);
@@ -1122,12 +1254,12 @@ export class SculptedHandRig {
     pip.position.set(0, 0, l1);
     mcp.add(pip);
 
-    const s1PipCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 0.9));
+    const s1PipCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 0.9)), () => createFingerS1JointCapsuleGeo(baseRadius * 0.9, 2));
     pip.add(s1PipCap);
-    const pipWrinkleStack = this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseRadius * 0.89));
+    const pipWrinkleStack = this.regLod(this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseRadius * 0.89)), () => createFingerS1KnuckleWrinkleStackGeo(baseRadius * 0.89, 2));
     pipWrinkleStack.position.set(0, 0.0008, 0.001);
     pip.add(pipWrinkleStack);
-    const s1Phal2 = this.regFinger(createFingerS1PhalanxGeo(l2, baseRadius * 0.88, baseRadius * 0.79, false));
+    const s1Phal2 = this.regLod(this.regFinger(createFingerS1PhalanxGeo(l2, baseRadius * 0.88, baseRadius * 0.79, false)), () => createFingerS1PhalanxGeo(l2, baseRadius * 0.88, baseRadius * 0.79, false, false, 2));
     pip.add(s1Phal2);
     this.s1OnlyMeshes.push(s1PipCap, pipWrinkleStack, s1Phal2);
 
@@ -1152,21 +1284,21 @@ export class SculptedHandRig {
     dip.position.set(0, 0, l2);
     pip.add(dip);
 
-    const s1DipCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 0.78));
+    const s1DipCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseRadius * 0.78)), () => createFingerS1JointCapsuleGeo(baseRadius * 0.78, 2));
     dip.add(s1DipCap);
-    const s1Phal3 = this.regFinger(createFingerS1PhalanxGeo(l3, baseRadius * 0.78, baseRadius * 0.68, true));
+    const s1Phal3 = this.regLod(this.regFinger(createFingerS1PhalanxGeo(l3, baseRadius * 0.78, baseRadius * 0.68, true)), () => createFingerS1PhalanxGeo(l3, baseRadius * 0.78, baseRadius * 0.68, true, false, 2));
     dip.add(s1Phal3);
     // Solid 3D dual-curvature anatomical lunula nail slab + raised 3D eponychium cuticle arch!
-    const s1Nail = new THREE.Mesh(
-      createFingerS1NailPlateGeo(baseRadius * 1.18, l3 * 0.64),
-      this.nailMat
+    const s1Nail = this.regLod(
+      new THREE.Mesh(createFingerS1NailPlateGeo(baseRadius * 1.18, l3 * 0.64), this.nailMat),
+      () => createFingerS1NailPlateGeo(baseRadius * 1.18, l3 * 0.64, 0.0018, 2)
     );
     s1Nail.position.set(0, baseRadius * 0.46, l3 * 0.56);
     s1Nail.rotation.x = 0.09;
     this.nailMeshes.push(s1Nail);
     dip.add(s1Nail);
 
-    const s1Cuticle = this.regSeamlessSkin(createFingerS1CuticleArchGeo(baseRadius * 1.18, l3 * 0.64));
+    const s1Cuticle = this.regLod(this.regSeamlessSkin(createFingerS1CuticleArchGeo(baseRadius * 1.18, l3 * 0.64)), () => createFingerS1CuticleArchGeo(baseRadius * 1.18, l3 * 0.64, 2));
     s1Cuticle.position.copy(s1Nail.position);
     s1Cuticle.rotation.copy(s1Nail.rotation);
     dip.add(s1Cuticle);
@@ -1222,9 +1354,9 @@ export class SculptedHandRig {
 
     const lMeta = 0.095;
     // FINGER S1.0 Thumb CMC + Metacarpal
-    const s1CmcCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 1.1));
+    const s1CmcCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 1.1)), () => createFingerS1JointCapsuleGeo(baseR * 1.1, 2));
     cmc.add(s1CmcCap);
-    const s1ThumbMeta = this.regFinger(createFingerS1PhalanxGeo(lMeta, baseR * 1.12, baseR * 0.96, false, true));
+    const s1ThumbMeta = this.regLod(this.regFinger(createFingerS1PhalanxGeo(lMeta, baseR * 1.12, baseR * 0.96, false, true)), () => createFingerS1PhalanxGeo(lMeta, baseR * 1.12, baseR * 0.96, false, true, 2));
     cmc.add(s1ThumbMeta);
     this.s1OnlyMeshes.push(s1CmcCap, s1ThumbMeta);
 
@@ -1241,12 +1373,12 @@ export class SculptedHandRig {
     cmc.add(mcp);
     const lProx = 0.074;
 
-    const s1TMcpCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 0.94));
+    const s1TMcpCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 0.94)), () => createFingerS1JointCapsuleGeo(baseR * 0.94, 2));
     mcp.add(s1TMcpCap);
-    const mcpWrinkleStack = this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseR * 0.93));
+    const mcpWrinkleStack = this.regLod(this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseR * 0.93)), () => createFingerS1KnuckleWrinkleStackGeo(baseR * 0.93, 2));
     mcpWrinkleStack.position.set(0, 0.0008, 0.001);
     mcp.add(mcpWrinkleStack);
-    const s1ThumbProx = this.regFinger(createFingerS1PhalanxGeo(lProx, baseR * 0.96, baseR * 0.86, false, true));
+    const s1ThumbProx = this.regLod(this.regFinger(createFingerS1PhalanxGeo(lProx, baseR * 0.96, baseR * 0.86, false, true)), () => createFingerS1PhalanxGeo(lProx, baseR * 0.96, baseR * 0.86, false, true, 2));
     mcp.add(s1ThumbProx);
     if (this.vellusMaterial) {
       const tVellus = createFingerDorsalVellusField(s1ThumbProx.geometry, this.vellusMaterial, 24);
@@ -1272,22 +1404,22 @@ export class SculptedHandRig {
     mcp.add(ip);
     const lDist = 0.064;
 
-    const s1TIpCap = this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 0.83));
+    const s1TIpCap = this.regLod(this.regS1Joint(createFingerS1JointCapsuleGeo(baseR * 0.83)), () => createFingerS1JointCapsuleGeo(baseR * 0.83, 2));
     ip.add(s1TIpCap);
-    const ipWrinkleStack = this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseR * 0.82));
+    const ipWrinkleStack = this.regLod(this.regS1Joint(createFingerS1KnuckleWrinkleStackGeo(baseR * 0.82)), () => createFingerS1KnuckleWrinkleStackGeo(baseR * 0.82, 2));
     ipWrinkleStack.position.set(0, 0.0008, 0.001);
     ip.add(ipWrinkleStack);
-    const s1ThumbDist = this.regFinger(createFingerS1PhalanxGeo(lDist, baseR * 0.86, baseR * 0.74, true, true));
+    const s1ThumbDist = this.regLod(this.regFinger(createFingerS1PhalanxGeo(lDist, baseR * 0.86, baseR * 0.74, true, true)), () => createFingerS1PhalanxGeo(lDist, baseR * 0.86, baseR * 0.74, true, true, 2));
     ip.add(s1ThumbDist);
-    const s1ThumbNail = new THREE.Mesh(
-      createFingerS1NailPlateGeo(baseR * 1.32, lDist * 0.64),
-      this.nailMat
+    const s1ThumbNail = this.regLod(
+      new THREE.Mesh(createFingerS1NailPlateGeo(baseR * 1.32, lDist * 0.64), this.nailMat),
+      () => createFingerS1NailPlateGeo(baseR * 1.32, lDist * 0.64, 0.0018, 2)
     );
     s1ThumbNail.position.set(0, baseR * 0.49, lDist * 0.54);
     s1ThumbNail.rotation.x = 0.08;
     this.nailMeshes.push(s1ThumbNail);
     ip.add(s1ThumbNail);
-    const s1ThumbCuticle = this.regSeamlessSkin(createFingerS1CuticleArchGeo(baseR * 1.32, lDist * 0.64));
+    const s1ThumbCuticle = this.regLod(this.regSeamlessSkin(createFingerS1CuticleArchGeo(baseR * 1.32, lDist * 0.64)), () => createFingerS1CuticleArchGeo(baseR * 1.32, lDist * 0.64, 2));
     s1ThumbCuticle.position.copy(s1ThumbNail.position);
     s1ThumbCuticle.rotation.copy(s1ThumbNail.rotation);
     ip.add(s1ThumbCuticle);
@@ -1449,7 +1581,7 @@ export class SculptedHandRig {
 
     const derma = evaluateDermaTensorState(solved, this.lastPulseWave, rawClench);
     this.lastDermaState = derma;
-    this.palmSubcutaneousField?.applyState(derma, this.fingerS1Enabled && this.dermaTensorEnabled);
+    this.activePalmField()?.applyState(derma, this.fingerS1Enabled && this.dermaTensorEnabled);
 
     this.s1Uniforms.uS1DorsalStrain.value = derma.dorsalFlexStrain;
     this.s1Uniforms.uS1VolarCompress.value = derma.volarCreaseDepth;
@@ -1624,6 +1756,8 @@ export class SculptedHandRig {
   public update(dt: number): void {
     const safeDt = Math.min(dt, 0.05);
     this.lastFrameDt = safeDt;
+    // FINGER S1.1: stream 2× tessellated geometry in ~3 ms slices (no frame hitch)
+    if (this.wantHdGeometry && !this.hdGeometryActive) this.stepHdGeometryBuild(3);
     this.idlePhase += safeDt * 1.85;
     this.recoilPulse = Math.max(0, this.recoilPulse - safeDt * 4.4);
 
@@ -1786,5 +1920,8 @@ export class SculptedHandRig {
       vm.geometry.dispose();
     }
     this.vellusMaterial?.dispose();
+    for (const e of this.lodEntries) {
+      e.hd?.dispose();
+    }
   }
 }

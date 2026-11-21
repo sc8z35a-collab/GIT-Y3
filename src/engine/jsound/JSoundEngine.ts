@@ -1,6 +1,19 @@
 /**
- * ★ JSound Engin 1.5 — 16ch 3OA Ambisonics × 2D Kirchhoff-Love FDTD × Quantum AudioWorklet × 768kHz (-134 dB) ★
+ * ★ JSound Engin 1.6 — Zero-Jank Render Farm × KIWAMI MASTER 16 × Device-Adaptive Playback ★
  *
+ * New in 1.6 (see docs/JSOUND_ENGIN_1_6.md):
+ *   A. Predictive Render Farm: every timing-critical physical model (2D-FDTD clash, taiko, rin bells,
+ *      finale chord…) is rendered in a Web Worker pool — just-in-time at decision time (≥0.3 s before
+ *      the reveal) plus a background pool — so the "PON!" frame performs zero DSP on the main thread
+ *      (1.5 spent ~450–650 ms there on Ultra). A budget governor adapts render quality per device.
+ *   B. KIWAMI MASTER 16 AudioWorklet: 4× polyphase FIR true-peak detection + provably safe min-hold
+ *      look-ahead limiter (no hard clipping, >2× lower THD than 1.5), LR4 3-band dynamics,
+ *      Chebyshev missing-fundamental virtual bass, speaker protection, BS.1770-4 M/S/I loudness.
+ *   C. Device-adaptive playback (イヤホン / スマホ本体 / PCスピーカー): HRTF + full bass only where it
+ *      helps (headphones); virtual bass, excursion protection and loudness tuning on phone speakers.
+ *   D. Priority voice manager: click-free stealing of ambient voices instead of dropping a clash.
+ *
+ * Carried over from 1.5:
  * Complete 22-Stage Research-Grade Web Audio 3OA/4D Physical & Mastering Architecture (zero external audio):
  *   1. 63-Tap Kaiser(beta=13.2) Linear-Phase Half-Band FIR (-134.1 dB alias suppression, -0.016 dB @ 19.2 kHz!)
  *      with 16×OS (768 kHz!) ultra-sharp transient attacks & 8×OS (384 kHz) across 70 Calibrated Physical Materials
@@ -82,7 +95,28 @@ import {
   synthesizeRinBellNote,
 } from './ModalSynthesizer';
 import { AcousticProbeSnapshot } from './AcousticProbeEngine';
-import { QuantumMasterWorkletHost, STAGE_INDEX_MAP } from './QuantumMasterWorklet';
+import { STAGE_INDEX_MAP } from './QuantumMasterWorklet';
+import {
+  DEVICE_PROFILE_SPECS,
+  Master16Config,
+  Master16WorkletHost,
+  resolveDeviceProfile,
+} from './QuantumMaster16';
+import { JSoundRenderFarm } from './JSoundRenderFarm';
+import { computeRevealSchedule } from '../mobile/KiwamiMobileCore';
+import { extractHapticPattern, vibrate } from '../mobile/HapticSync';
+import {
+  PlannedLayer,
+  RenderedAudio,
+  SynthesisBudgetGovernor,
+  VoicePriorityManager,
+  planClashLayers,
+  planComboFlourish,
+  planOverdriveExtras,
+  planSpiritCharge,
+  planVictoryChord,
+  runRenderJob,
+} from './RenderFarm16';
 import {
   SPATIAL_4D_CONFIGS,
   Spatial4DProcessorGraph,
@@ -98,6 +132,8 @@ import {
 import {
   ACOUSTIC_MATERIALS,
   AuditionInstrumentId,
+  JSoundDeviceProfileId,
+  JSoundDeviceProfileSetting,
   JSoundQualityMode,
   JSoundSettings,
   JSoundSpatialMode,
@@ -105,6 +141,9 @@ import {
   STAGE_ACOUSTIC_PROFILES,
   Vec3,
 } from './types';
+
+/** linear-actuator spin-up + vibrate() dispatch latency (ms) */
+const HAPTIC_SPINUP_MS = 18;
 
 const FOLEY_LABEL_JP: Record<HandFoleyType, string> = {
   knuckle_snap: '関節マイクロ打音',
@@ -140,6 +179,7 @@ export class JSoundEngine {
     ambienceEnabled: true,
     sympatheticResonance: true,
     masterVolume: 0.92,
+    deviceProfile: 'auto',
   };
 
   private ctx: AudioContext | null = null;
@@ -164,7 +204,34 @@ export class JSoundEngine {
 
   private sideWidthGain!: GainNode;
   private spatial4D!: Spatial4DProcessorGraph;
-  private quantumMaster!: QuantumMasterWorkletHost;
+  private master16!: Master16WorkletHost;
+  private resolvedProfile: JSoundDeviceProfileId = 'pc_speakers';
+
+  // ★ JSound 1.6 Zero-Jank Predictive Render Farm + main-thread fallback governor ★
+  private renderFarm: JSoundRenderFarm | null = null;
+  private renderWorkerBudget = 3;
+  private readonly syncGovernor = new SynthesisBudgetGovernor({ budgetMs: 40 });
+  private roundQuality: JSoundQualityMode | null = null;
+  private roundQualityTimer = 0;
+  private poolPrefetchTimer = 0;
+  private revealMainThreadMs = 0;
+  private readonly voiceManager = new VoicePriorityManager(48);
+  private voiceSerial = 0;
+
+  // ★ JSound 1.6 Predictive Latency-Compensated Reveal Scheduling + audio-derived haptics ★
+  private scheduledReveal: {
+    roundId: number;
+    targetCtx: number;
+    revealPerfMs: number;
+    keys: Set<string>;
+    sources: AudioBufferSourceNode[];
+    hapticFired: boolean;
+  } | null = null;
+  private roundSerial = 0;
+  private visualLatencySec = 0.025;
+  private hapticsEnabled = true;
+  private hapticTimer = 0;
+  public avSync = { scheduledLayers: 0, lateLayers: 0, audioLatencyMs: 0, leadMs: 0 };
   private proximityEq!: BiquadFilterNode;
   private probeAirLpf!: BiquadFilterNode;
   private probeWetScale = 1.0;
@@ -188,9 +255,7 @@ export class JSoundEngine {
   // Living 3D Spatial Soundscape Scheduler
   private soundscapeTimer = 0;
 
-  // Voice, rate-limiting & listener-delta tracking
-  private activeVoices = 0;
-  private readonly maxVoices = 48;
+  // Rate-limiting & listener-delta tracking
   private seedCounter = 20261119;
   private lastJointFoleyMs = 0;
   private lastHoverMs = 0;
@@ -198,6 +263,7 @@ export class JSoundEngine {
   private lastLisFwd: Vec3 = { x: 0, y: -0.52, z: -0.85 };
 
   constructor() {
+    this.resolvedProfile = resolveDeviceProfile(this.settings.deviceProfile, this.detectEnvironment());
     if (typeof window !== 'undefined') {
       const unlock = (): void => {
         this.unlocked = true;
@@ -311,7 +377,51 @@ export class JSoundEngine {
   }
 
   private getTargetSideWidth(): number {
-    return SPATIAL_4D_CONFIGS[this.settings.spatialMode].sideWidth;
+    return SPATIAL_4D_CONFIGS[this.settings.spatialMode].sideWidth * DEVICE_PROFILE_SPECS[this.resolvedProfile].sideWidthScale;
+  }
+
+  // ===========================================================================
+  // ★ JSound 1.6 — Device-Adaptive Playback Profiles ★
+  // ===========================================================================
+
+  private detectEnvironment(): { coarsePointer: boolean; maxScreenSidePx: number } {
+    if (typeof window === 'undefined') return { coarsePointer: false, maxScreenSidePx: 1920 };
+    const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    const side = window.screen
+      ? Math.max(window.screen.width || 0, window.screen.height || 0)
+      : Math.max(window.innerWidth, window.innerHeight);
+    return { coarsePointer: coarse, maxScreenSidePx: side || Math.max(window.innerWidth, window.innerHeight) };
+  }
+
+  /** Choose イヤホン / スマホ本体 / PCスピーカー (or 'auto'). */
+  public setDeviceProfile(setting: JSoundDeviceProfileSetting): void {
+    this.settings.deviceProfile = setting;
+    this.resolvedProfile = resolveDeviceProfile(setting, this.detectEnvironment());
+    if (this.ctx && this.initializedGraph) {
+      const now = this.ctx.currentTime;
+      this.sideWidthGain.gain.setTargetAtTime(this.getTargetSideWidth(), now, 0.08);
+      const spec = DEVICE_PROFILE_SPECS[this.resolvedProfile];
+      this.spatial4D.setDeviceScales(spec.spatialLayerScale, spec.tactileSubScale, now);
+      this.syncMaster16();
+    }
+  }
+
+  public getDeviceProfile(): JSoundDeviceProfileId {
+    return this.resolvedProfile;
+  }
+
+  private buildMaster16Config(): Master16Config {
+    const modeCfg = SPATIAL_4D_CONFIGS[this.settings.spatialMode];
+    const eqComp = Math.max(0, Math.min(1, (0.88 - this.settings.masterVolume) * 1.4));
+    return {
+      fdnWet: this.settings.quality === 'lite' ? 0.0 : modeCfg.fdnWet,
+      fdnFeedback: this.currentStage === 'onsen' || this.currentStage === 'salon' ? 0.74 : 0.64,
+      fdnDamping: this.currentStage === 'zashiki' ? 0.44 : 0.28,
+      sympatheticGain: this.settings.sympatheticResonance && this.settings.quality !== 'lite' ? 0.055 : 0.0,
+      sympatheticStageIndex: STAGE_INDEX_MAP[this.currentStage],
+      equalLoudnessComp: eqComp,
+      ...DEVICE_PROFILE_SPECS[this.resolvedProfile].master,
+    };
   }
 
   /**
@@ -427,21 +537,11 @@ export class JSoundEngine {
     // 5. ★ JSound Engin 1.4 — 4D Audio & 4D Audio MAX Holographic Field Rack ★
     this.spatial4D = new Spatial4DProcessorGraph(ctx, this.settings.spatialMode);
 
-    // 6. Studio Glue Bus Compressor
-    const busComp = ctx.createDynamicsCompressor();
-    busComp.threshold.value = -12.5;
-    busComp.knee.value = 14;
-    busComp.ratio.value = 2.2;
-    busComp.attack.value = 0.008;
-    busComp.release.value = 0.13;
-
-    // 7. Look-Ahead Style True-Peak Protective Limiter (-0.5 dBFS ceiling for sparkling dynamics)
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -0.5;
-    limiter.knee.value = 0;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.001;
-    limiter.release.value = 0.045;
+    // 6–7. (1.6) Glue compression + true-peak limiting now live inside the KIWAMI MASTER 16 worklet
+    //      (3-band LR4 dynamics + 4× FIR min-hold look-ahead limiter); a DynamicsCompressor safety
+    //      chain only runs until the worklet is registered or where AudioWorklet is unavailable.
+    const deviceSpec = DEVICE_PROFILE_SPECS[this.resolvedProfile];
+    this.spatial4D.setDeviceScales(deviceSpec.spatialLayerScale, deviceSpec.tactileSubScale, ctx.currentTime);
 
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = this.settings.enabled ? this.settings.masterVolume : 0.0;
@@ -469,18 +569,9 @@ export class JSoundEngine {
     this.convGainB.connect(subHpf);
     this.ambienceBus.connect(subHpf);
 
-    // 6.5 ★ JSound Engin 1.5 — Real-Time AudioWorklet Master (8ch Unitary FDN + 13-String Sympathetic + 4×OS True-Peak + LUFS) ★
-    const modeCfg = SPATIAL_4D_CONFIGS[this.settings.spatialMode];
-    const eqComp = Math.max(0, Math.min(1, (0.88 - this.settings.masterVolume) * 1.4));
-    this.quantumMaster = new QuantumMasterWorkletHost(ctx, {
-      fdnWet: this.settings.quality === 'lite' ? 0.0 : modeCfg.fdnWet,
-      fdnFeedback: this.currentStage === 'onsen' || this.currentStage === 'salon' ? 0.74 : 0.64,
-      fdnDamping: this.currentStage === 'zashiki' ? 0.44 : 0.28,
-      sympatheticGain: this.settings.sympatheticResonance && this.settings.quality !== 'lite' ? 0.055 : 0.0,
-      sympatheticStageIndex: STAGE_INDEX_MAP[this.currentStage],
-      equalLoudnessComp: eqComp,
-      truePeakCeiling: 0.955,
-    });
+    // 6.5 ★ JSound Engin 1.6 — KIWAMI MASTER 16 AudioWorklet (FDN + sympathetic + virtual bass +
+    //      speaker protection + LR4 3-band dynamics + 4× FIR true-peak limiter + BS.1770-4 M/S/I) ★
+    this.master16 = new Master16WorkletHost(ctx, this.buildMaster16Config());
 
     subHpf.connect(warmthShelf);
     warmthShelf.connect(mudCleanup);
@@ -488,14 +579,16 @@ export class JSoundEngine {
     presenceBell.connect(crystalAirShelf);
     crystalAirShelf.connect(tapeShaper);
     msMerge.connect(this.spatial4D.input);
-    this.spatial4D.output.connect(busComp);
-    busComp.connect(this.quantumMaster.input);
-    this.quantumMaster.output.connect(limiter);
-    limiter.connect(this.masterGain);
+    this.spatial4D.output.connect(this.master16.input);
+    this.master16.output.connect(this.masterGain);
     this.masterGain.connect(this.analyser);
     this.analyser.connect(ctx.destination);
 
     this.setListenerPose({ x: 0, y: 1.55, z: 2.35 }, { x: 0, y: -0.52, z: -0.85 });
+
+    // Spin up the render-farm workers and pre-render the next round in the background
+    this.ensureFarm();
+    this.schedulePoolPrefetch(700);
   }
 
   private toAudioBuffer(ctx: AudioContext, left: Float32Array, right?: Float32Array): AudioBuffer {
@@ -633,7 +726,7 @@ export class JSoundEngine {
 
   private spawnStageSoundscapeActor(): void {
     const ctx = this.ctx;
-    if (!ctx || this.activeVoices > this.maxVoices - 6) return;
+    if (!ctx || this.voiceManager.count > this.voiceManager.maxVoices - 6) return;
 
     const spec = STAGE_SOUNDSCAPE_SPECS[this.currentStage];
     const r = Math.random();
@@ -658,6 +751,7 @@ export class JSoundEngine {
     this.playSpatialBuffer(buf, pos, {
       gain: chosen.gain,
       reverbScale: 1.25,
+      priority: 0,
     });
   }
 
@@ -807,13 +901,19 @@ export class JSoundEngine {
       trajectory4D?: Spatial4DTrajectoryKind;
       trajectoryRadius?: number;
       trajectoryDir?: 1 | -1;
+      /** JSound 1.6 voice priority: 0 ambience · 1 foley/UI (default) · 2 score/ornament · 3 critical clash */
+      priority?: number;
+      /** JSound 1.6: absolute AudioContext start time (predictive latency-compensated scheduling) */
+      startAtCtx?: number;
     } = {}
-  ): void {
+  ): AudioBufferSourceNode | null {
     const ctx = this.ctx;
-    if (!ctx || !this.initializedGraph || !this.settings.enabled) return;
-    if (this.activeVoices >= this.maxVoices) return;
+    if (!ctx || !this.initializedGraph || !this.settings.enabled) return null;
 
-    const startAt = ctx.currentTime + (options.delaySec ?? 0);
+    const startAt =
+      options.startAtCtx !== undefined
+        ? Math.max(ctx.currentTime, options.startAtCtx)
+        : ctx.currentTime + (options.delaySec ?? 0);
     const baseRate = options.playbackRate ?? 1.0;
     const modeCfg = SPATIAL_4D_CONFIGS[this.settings.spatialMode];
     const is4DMode =
@@ -826,6 +926,29 @@ export class JSoundEngine {
 
     const voiceGain = ctx.createGain();
     voiceGain.gain.setValueAtTime(options.gain ?? 0.9, startAt);
+
+    // ★ JSound 1.6 Priority Voice Manager: steal the oldest least-important voice with a 12 ms fade ★
+    const voiceId = `v${this.voiceSerial++}`;
+    let voiceStopped = false;
+    const allocated = this.voiceManager.allocate({
+      id: voiceId,
+      priority: options.priority ?? 1,
+      startedAt: ctx.currentTime,
+      stop: (fadeSec: number) => {
+        if (voiceStopped) return;
+        voiceStopped = true;
+        const t = ctx.currentTime;
+        try {
+          voiceGain.gain.cancelScheduledValues(t);
+          voiceGain.gain.setValueAtTime(voiceGain.gain.value, t);
+          voiceGain.gain.linearRampToValueAtTime(0, t + fadeSec);
+          src.stop(t + fadeSec + 0.005);
+        } catch {
+          // source already ended
+        }
+      },
+    });
+    if (!allocated) return null;
 
     // Distance-Adaptive ISO 9613-1 Air-Absorption Filter (farther sounds naturally warm & roll off HF!)
     const dist = Math.hypot(
@@ -846,7 +969,11 @@ export class JSoundEngine {
     let pinnaFilter: BiquadFilterNode | null = null;
 
     const panner = ctx.createPanner();
-    const useHrtf = this.settings.quality !== 'lite' && this.settings.spatialMode !== 'focused';
+    // 1.6: HRTF coloration only helps on headphones; speakers get clean equal-power panning
+    const useHrtf =
+      DEVICE_PROFILE_SPECS[this.resolvedProfile].useHrtf &&
+      this.settings.quality !== 'lite' &&
+      this.settings.spatialMode !== 'focused';
     panner.panningModel = useHrtf ? 'HRTF' : 'equalpower';
     panner.distanceModel = 'inverse';
     panner.refDistance = 1.6;
@@ -952,9 +1079,8 @@ export class JSoundEngine {
       wetTap.connect(this.reverbSendBus);
     }
 
-    this.activeVoices++;
     src.onended = () => {
-      this.activeVoices = Math.max(0, this.activeVoices - 1);
+      this.voiceManager.release(voiceId);
       src.disconnect();
       voiceGain.disconnect();
       airLpf?.disconnect();
@@ -964,6 +1090,7 @@ export class JSoundEngine {
     };
 
     src.start(startAt);
+    return src;
   }
 
   // ===========================================================================
@@ -987,27 +1114,18 @@ export class JSoundEngine {
     }
   }
 
-  private syncQuantumMaster(): void {
-    if (!this.quantumMaster) return;
-    const modeCfg = SPATIAL_4D_CONFIGS[this.settings.spatialMode];
-    const eqComp = Math.max(0, Math.min(1, (0.88 - this.settings.masterVolume) * 1.4));
-    this.quantumMaster.updateConfig({
-      fdnWet: this.settings.quality === 'lite' ? 0.0 : modeCfg.fdnWet,
-      fdnFeedback: this.currentStage === 'onsen' || this.currentStage === 'salon' ? 0.74 : 0.64,
-      fdnDamping: this.currentStage === 'zashiki' ? 0.44 : 0.28,
-      sympatheticGain:
-        this.settings.sympatheticResonance && this.settings.quality !== 'lite' ? 0.055 : 0.0,
-      sympatheticStageIndex: STAGE_INDEX_MAP[this.currentStage],
-      equalLoudnessComp: eqComp,
-    });
+  private syncMaster16(): void {
+    if (!this.master16) return;
+    this.master16.updateConfig(this.buildMaster16Config());
   }
 
   public setQualityMode(mode: JSoundQualityMode): void {
     if (this.settings.quality === mode) return;
     this.settings.quality = mode;
+    this.invalidateRenderPool();
     if (this.ctx && this.initializedGraph) {
       this.applyStageAcoustics(this.currentStage, false);
-      this.syncQuantumMaster();
+      this.syncMaster16();
       if (this.settings.ambienceEnabled) {
         if (mode === 'lite') this.stopSoundscapeScheduler();
         else this.scheduleNextSoundscapeActor();
@@ -1034,13 +1152,13 @@ export class JSoundEngine {
           0.1
         );
       }
-      this.syncQuantumMaster();
+      this.syncMaster16();
     }
   }
 
   public setSympatheticResonance(enabled: boolean): void {
     this.settings.sympatheticResonance = enabled;
-    this.syncQuantumMaster();
+    this.syncMaster16();
   }
 
   /**
@@ -1104,9 +1222,10 @@ export class JSoundEngine {
   public setStage(stageId: StageId): void {
     if (this.currentStage === stageId) return;
     this.currentStage = stageId;
+    this.invalidateRenderPool();
     if (this.ctx && this.initializedGraph) {
       this.applyStageAcoustics(stageId, false);
-      this.syncQuantumMaster();
+      this.syncMaster16();
       if (this.settings.ambienceEnabled) {
         this.startOrCrossfadeAmbience();
       }
@@ -1114,8 +1233,10 @@ export class JSoundEngine {
   }
 
   public setHandMaterials(playerMat: HandMaterialPreset, npcMat: HandMaterialPreset): void {
+    if (this.playerMaterial === playerMat && this.npcMaterial === npcMat) return;
     this.playerMaterial = playerMat;
     this.npcMaterial = npcMat;
+    this.invalidateRenderPool();
   }
 
   public setListenerPose(pos: Vec3, forward: Vec3): void {
@@ -1145,6 +1266,307 @@ export class JSoundEngine {
       l.upY.value = 1;
       l.upZ.value = 0;
     }
+  }
+
+  // ===========================================================================
+  // ★ JSOUND 1.6 — ZERO-JANK PREDICTIVE RENDER FARM ★
+  // ===========================================================================
+
+  /**
+   * Worker budget from the device fingerprint (POCO F7: 3 on the Cortex-A720 cluster, leaving the
+   * Cortex-X4 prime core to the main/render thread). Applied when the farm is first created.
+   */
+  public setRenderWorkerBudget(workers: number): void {
+    this.renderWorkerBudget = Math.max(1, Math.min(4, Math.round(workers) || 1));
+  }
+
+  private ensureFarm(): JSoundRenderFarm | null {
+    if (!this.renderFarm && typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+      try {
+        this.renderFarm = new JSoundRenderFarm({ maxWorkers: this.renderWorkerBudget });
+      } catch {
+        this.renderFarm = null;
+      }
+    }
+    return this.renderFarm && this.renderFarm.available ? this.renderFarm : null;
+  }
+
+  /** Quality used for physical-model renders (user setting, lowered by the device budget governor). */
+  private currentRenderQuality(): JSoundQualityMode {
+    if (this.roundQuality) return this.roundQuality;
+    const farm = this.ensureFarm();
+    return farm
+      ? farm.governor.effectiveQuality(this.settings.quality)
+      : this.syncGovernor.effectiveQuality(this.settings.quality);
+  }
+
+  private planParams(): { quality: JSoundQualityMode; sampleRate: number; seedBase: number } {
+    return {
+      quality: this.currentRenderQuality(),
+      sampleRate: this.ctx ? this.ctx.sampleRate : 48000,
+      seedBase: this.nextSeed(),
+    };
+  }
+
+  private planClash(outcome: 'WIN' | 'LOSS' | 'DRAW', winnerMove: Move, isMatchPoint: boolean, variant: number): PlannedLayer[] {
+    const pp = this.planParams();
+    return planClashLayers({
+      outcome,
+      winnerMove,
+      isMatchPoint,
+      variant,
+      playerMat: this.playerMaterial,
+      npcMat: this.npcMaterial,
+      tableMat: STAGE_ACOUSTIC_PROFILES[this.currentStage].tableMaterial,
+      quality: pp.quality,
+      sampleRate: pp.sampleRate,
+      seedBase: pp.seedBase,
+    });
+  }
+
+  /**
+   * Called at decision time (the player's tap, ≥0.32 s before the reveal): renders exactly the layers
+   * the reveal, Overdrive, streak flourish, spirit cue and match finale will need, in parallel workers.
+   */
+  public prepareRoundSounds(o: {
+    outcome: 'WIN' | 'LOSS' | 'DRAW';
+    winnerMove: Move;
+    isMatchPoint: boolean;
+    overdrive: boolean;
+    streak: number;
+    matchWinner: 'player' | 'npc' | null;
+    spiritWillCharge: boolean;
+    /** seconds until the reveal frame (known in advance from the timeline) */
+    revealInSec?: number;
+  }): void {
+    const ctx = this.ensureReady();
+    if (!ctx || !this.initializedGraph) return;
+    const farm = this.ensureFarm();
+    this.cancelScheduledReveal();
+    // Freeze the render quality for this round so prepare-time and reveal-time cache keys agree
+    window.clearTimeout(this.roundQualityTimer);
+    this.roundQuality = null;
+    this.roundQuality = this.currentRenderQuality();
+    this.roundQualityTimer = window.setTimeout(() => {
+      this.roundQuality = null;
+    }, 4500);
+    if (!farm) return;
+
+    const layers: PlannedLayer[] = [
+      ...this.planClash(o.outcome, o.winnerMove, o.isMatchPoint || o.overdrive, this.clashArticulationIdx),
+    ];
+    if (o.overdrive) layers.push(...planOverdriveExtras(o.outcome, this.planParams()));
+    if (o.outcome === 'WIN' && o.streak >= 2) layers.push(...planComboFlourish(o.streak, this.planParams()));
+    if (o.spiritWillCharge) layers.push(...planSpiritCharge(1.0, false, this.planParams()));
+    const finale = o.matchWinner ? planVictoryChord(o.matchWinner === 'player', this.planParams()) : [];
+    // Critical layers first so they are rendered before ornaments
+    layers.sort((a, b) => Number(b.critical) - Number(a.critical));
+
+    // ★ Predictive Latency-Compensated Reveal Scheduling: the reveal frame time is known now, so each
+    //   reveal layer is started on the AudioContext clock at t_reveal + visual latency − output latency
+    //   (Bluetooth earbuds add 150–250 ms) the moment its buffer is ready — heard exactly when seen.
+    if (o.revealInSec !== undefined && o.revealInSec > 0.05) {
+      const nowPerf = performance.now();
+      const revealPerfMs = nowPerf + o.revealInSec * 1000;
+      const audioLat = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+      const ts = typeof ctx.getOutputTimestamp === 'function' ? ctx.getOutputTimestamp() : null;
+      const targetCtx = computeRevealSchedule({
+        revealPerfMs,
+        outputTimestamp:
+          ts && typeof ts.contextTime === 'number' && typeof ts.performanceTime === 'number'
+            ? { contextTime: ts.contextTime, performanceTime: ts.performanceTime }
+            : null,
+        ctxNow: ctx.currentTime,
+        nowPerfMs: nowPerf,
+        audioLatencySec: audioLat,
+        visualLatencySec: this.visualLatencySec,
+      });
+      this.avSync.audioLatencyMs = Math.round(audioLat * 1000);
+      this.avSync.leadMs = Math.round((audioLat - this.visualLatencySec) * 1000);
+      const roundId = ++this.roundSerial;
+      this.scheduledReveal = { roundId, targetCtx, revealPerfMs, keys: new Set(), sources: [], hapticFired: false };
+      for (const layer of layers) {
+        void farm
+          .request(layer.key, layer.job, 'high')
+          .then((r) => this.trySchedulePreRendered(roundId, layer, r))
+          .catch(() => undefined);
+      }
+    } else {
+      for (const layer of layers) void farm.request(layer.key, layer.job, 'high').catch(() => undefined);
+    }
+    for (const layer of finale) void farm.request(layer.key, layer.job, 'high').catch(() => undefined);
+  }
+
+  /** Start a pre-rendered reveal layer on the audio clock if it is still ahead of its target time. */
+  private trySchedulePreRendered(roundId: number, layer: PlannedLayer, r: RenderedAudio): void {
+    const sr = this.scheduledReveal;
+    const ctx = this.ctx;
+    if (!sr || sr.roundId !== roundId || !ctx || sr.keys.has(layer.key)) return;
+    const startAt = sr.targetCtx + (layer.delaySec ?? 0);
+    if (startAt - ctx.currentTime < 0.012) return; // too late to pre-schedule: the reveal cue plays it
+    this.renderFarm?.take(layer.key);
+    const buf = this.toAudioBuffer(ctx, r.left, r.right ?? undefined);
+    const src = this.playSpatialBuffer(buf, layer.pos, {
+      gain: layer.gain,
+      reverbScale: layer.reverbScale,
+      startAtCtx: startAt,
+      endPos: layer.endPos,
+      trajectory4D: layer.trajectory4D,
+      trajectoryRadius: layer.trajectoryRadius,
+      travelSec: layer.travelSec,
+      enableDoppler: layer.enableDoppler,
+      priority: layer.priority,
+    });
+    if (!src) return;
+    sr.keys.add(layer.key);
+    sr.sources.push(src);
+    this.avSync.scheduledLayers++;
+    if (layer.key.startsWith('clash|') && !sr.hapticFired) {
+      sr.hapticFired = true;
+      this.scheduleHaptic(r.left, sr.revealPerfMs);
+    }
+  }
+
+  /** Cancel pre-scheduled reveal audio (round aborted, PV started, match reset). */
+  public cancelScheduledReveal(): void {
+    const sr = this.scheduledReveal;
+    this.scheduledReveal = null;
+    window.clearTimeout(this.hapticTimer);
+    if (!sr || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    for (const src of sr.sources) {
+      try {
+        src.stop(now + 0.01);
+      } catch {
+        // already ended
+      }
+    }
+  }
+
+  /** Display pipeline latency (compositor + scan-out) used for A/V alignment. */
+  public setVisualLatency(sec: number): void {
+    this.visualLatencySec = Math.max(0, Math.min(0.08, sec));
+  }
+
+  public setHapticsEnabled(enabled: boolean): void {
+    this.hapticsEnabled = enabled;
+  }
+
+  /** Haptic pattern extracted from the clash PCM, fired on the reveal frame (minus motor latency). */
+  private scheduleHaptic(pcm: Float32Array, revealPerfMs: number): void {
+    if (!this.hapticsEnabled || !this.ctx) return;
+    const pattern = extractHapticPattern(pcm, this.ctx.sampleRate, { strength: 0.9 });
+    if (pattern.length === 0) return;
+    window.clearTimeout(this.hapticTimer);
+    // The motor should peak when the reveal frame is *seen* (reveal + scan-out latency); a linear
+    // actuator needs ≈ 18 ms (incl. vibrate() dispatch) to spin up, so fire that much earlier.
+    const delay = Math.max(0, revealPerfMs + this.visualLatencySec * 1000 - HAPTIC_SPINUP_MS - performance.now());
+    this.hapticTimer = window.setTimeout(() => vibrate(pattern), delay);
+  }
+
+  /** Background pool: pre-render the core layers of all 9 possible next-round outcomes. */
+  private schedulePoolPrefetch(delayMs = 1400): void {
+    if (typeof window === 'undefined') return;
+    window.clearTimeout(this.poolPrefetchTimer);
+    this.poolPrefetchTimer = window.setTimeout(() => {
+      const farm = this.ensureFarm();
+      if (!farm || !this.ctx || !this.settings.enabled || document.hidden) return;
+      const variant = this.clashArticulationIdx;
+      for (const outcome of ['WIN', 'LOSS', 'DRAW'] as const) {
+        for (const mv of [ROCK, SCISSORS, PAPER] as const) {
+          for (const layer of this.planClash(outcome, mv, false, variant)) {
+            if (layer.critical) farm.prefetch(layer.key, layer.job, 'low');
+          }
+        }
+      }
+    }, delayMs);
+  }
+
+  private invalidateRenderPool(): void {
+    this.renderFarm?.clearReady();
+    this.roundQuality = null;
+    if (this.initializedGraph) this.schedulePoolPrefetch(900);
+  }
+
+  private playRenderedLayer(r: RenderedAudio, layer: PlannedLayer, lateSec: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const buf = this.toAudioBuffer(ctx, r.left, r.right ?? undefined);
+    this.playSpatialBuffer(buf, layer.pos, {
+      gain: layer.gain,
+      reverbScale: layer.reverbScale,
+      delaySec: Math.max(0, (layer.delaySec ?? 0) - lateSec),
+      endPos: layer.endPos,
+      trajectory4D: layer.trajectory4D,
+      trajectoryRadius: layer.trajectoryRadius,
+      travelSec: layer.travelSec,
+      enableDoppler: layer.enableDoppler,
+      priority: layer.priority,
+    });
+  }
+
+  private playLayerOnMainThread(layer: PlannedLayer): void {
+    const q = this.syncGovernor.effectiveQuality(layer.job.quality);
+    const t0 = performance.now();
+    const r = runRenderJob({ ...layer.job, quality: q });
+    const ms = performance.now() - t0;
+    this.syncGovernor.report(q, ms);
+    this.revealMainThreadMs += ms;
+    this.playRenderedLayer(r, layer, 0);
+  }
+
+  /**
+   * Play planned layers: ready buffers play instantly; layers still rendering in a worker play the
+   * moment they arrive (delay-compensated) unless hopelessly late; without workers, fall back to
+   * governor-limited main-thread synthesis.
+   */
+  private playPlannedLayers(layers: PlannedLayer[]): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const farm = this.ensureFarm();
+    const t0 = performance.now();
+    this.revealMainThreadMs = 0;
+    const sr = this.scheduledReveal;
+    for (const layer of layers) {
+      if (sr && sr.keys.has(layer.key)) continue; // already started sample-accurately on the audio clock
+      if (sr && layer.key.startsWith('clash|')) this.avSync.lateLayers++;
+      if (!farm) {
+        if (layer.critical || this.settings.quality !== 'lite' || this.voiceManager.count < 40) {
+          this.playLayerOnMainThread(layer);
+        }
+        continue;
+      }
+      const ready = farm.take(layer.key);
+      if (ready) {
+        this.playRenderedLayer(ready, layer, 0);
+        if (layer.key.startsWith('clash|') && this.hapticsEnabled && !(sr && sr.hapticFired)) {
+          const pattern = extractHapticPattern(ready.left, ctx.sampleRate, { strength: 0.9 });
+          if (pattern.length) vibrate(pattern);
+        }
+        continue;
+      }
+      const pending = farm.inflight(layer.key) ?? farm.request(layer.key, layer.job, 'high');
+      const askedAt = performance.now();
+      const maxLateMs = layer.critical ? 520 : 220;
+      pending
+        .then((r) => {
+          farm.take(layer.key);
+          const lateMs = performance.now() - askedAt;
+          if (lateMs <= maxLateMs) this.playRenderedLayer(r, layer, lateMs / 1000);
+          else farm.noteLateArrival();
+        })
+        .catch(() => {
+          if (layer.critical) this.playLayerOnMainThread(layer);
+        });
+    }
+    this.revealMainThreadMs += Math.max(0, performance.now() - t0 - this.revealMainThreadMs);
+  }
+
+  /** Pre-render the Overdrive engage cue once the spirit gauge is full (called by the game loop). */
+  public prewarmSpiritCharge(): void {
+    const farm = this.ensureFarm();
+    if (!farm || !this.ctx) return;
+    for (const layer of planSpiritCharge(1.0, true, this.planParams())) farm.prefetch(layer.key, layer.job, 'low');
   }
 
   // ===========================================================================
@@ -1620,169 +2042,10 @@ export class JSoundEngine {
         ? '双刃一閃 × 和紙裂断×締太鼓'
         : '包摂掌打 × 編木×一絃琴・4D包囲';
 
-    const tableMat = STAGE_ACOUSTIC_PROFILES[this.currentStage].tableMaterial;
-    const clash = synthesizeDualMaterialClash(
-      this.playerMaterial,
-      this.npcMaterial,
-      tableMat,
-      winnerMove,
-      outcome,
-      ctx.sampleRate,
-      this.settings.quality,
-      this.nextSeed(),
-      articulationVariant
-    );
-
-    // 1. Primary Dual-Material Contact Impact dead-center on the arena tabletop
-    this.playSpatialBuffer(
-      this.toAudioBuffer(ctx, clash.left, clash.right),
-      { x: 0, y: 0.26, z: 0.08 },
-      { gain: 0.9, reverbScale: 1.18 }
-    );
-
-    // 2. Matchup-Specific Physical Acoustic Signature Layer (rotating multi-instrument articulation + 4D motion!)
-    if (outcome === 'DRAW') {
-      const drum =
-        articulationVariant % 2 === 0
-          ? synthesizeKotsuzumi(ctx.sampleRate, {
-              variant: 'pon_rise',
-              velocity: 0.92,
-              quality: this.settings.quality,
-              seed: this.nextSeed(),
-            })
-          : synthesizeOtsuzumi(ctx.sampleRate, 0.92, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, drum.left, drum.right), { x: 0, y: 0.42, z: -0.15 }, {
-        gain: 0.56,
-        reverbScale: 1.12,
-      });
-    } else if (winnerMove === ROCK) {
-      // Heavy Odaiko / Shime-Daiko slam (+ Bronze Dora or Thunder-Taiko on decisive strikes!)
-      const taiko = isMatchDecidingPoint
-        ? synthesizeTaikoDrum('odaiko', ctx.sampleRate, 1.25, this.settings.quality, this.nextSeed())
-        : articulationVariant % 2 === 0
-        ? synthesizeTaikoDrum('shime', ctx.sampleRate, 1.02, this.settings.quality, this.nextSeed())
-        : synthesizeShimeDaiko(ctx.sampleRate, 1.05, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, taiko.left, taiko.right), { x: 0, y: 0.22, z: -0.2 }, {
-        gain: isMatchDecidingPoint ? 0.7 : 0.56,
-        reverbScale: 1.28,
-      });
-      if (isMatchDecidingPoint || articulationVariant % 3 === 0) {
-        const dora = synthesizeDoraGong(ctx.sampleRate, 0.65, this.settings.quality, this.nextSeed());
-        this.playSpatialBuffer(this.toAudioBuffer(ctx, dora.left, dora.right), { x: -0.35, y: 0.65, z: -0.6 }, {
-          gain: 0.3,
-          reverbScale: 1.48,
-          delaySec: 0.03,
-          trajectory4D: 'orbit_360',
-          trajectoryRadius: 1.5,
-          travelSec: 1.45,
-        });
-      }
-    } else if (winnerMove === SCISSORS) {
-      // Crisp Washi Paper fiber slice/tear + fast overhead Yumi/Shime-Daiko snap!
-      const tear = synthesizeWashiTear(ctx.sampleRate, 1.0, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, tear.left, tear.right), { x: 0, y: 0.34, z: 0.1 }, {
-        gain: 0.62,
-        reverbScale: 0.92,
-        delaySec: 0.014,
-        trajectory4D: 'stereo_sweep',
-        trajectoryRadius: 1.1,
-        travelSec: 0.26,
-      });
-      if (articulationVariant % 2 === 1) {
-        const shime = synthesizeShimeDaiko(ctx.sampleRate, 0.85, this.settings.quality, this.nextSeed());
-        this.playSpatialBuffer(this.toAudioBuffer(ctx, shime.left, shime.right), { x: 0.2, y: 0.45, z: -0.18 }, {
-          gain: 0.4,
-          reverbScale: 1.05,
-        });
-      }
-    } else {
-      // Paper envelops Rock: warm Kotsuzumi drop + Binzasara 4D wrap / Ichigenkin silk shimmer!
-      const kotsu = synthesizeKotsuzumi(ctx.sampleRate, {
-        variant: 'pon_drop',
-        velocity: 0.84,
-        quality: this.settings.quality,
-        seed: this.nextSeed(),
-      });
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, kotsu.left, kotsu.right), { x: 0, y: 0.36, z: -0.1 }, {
-        gain: 0.48,
-        reverbScale: 1.08,
-      });
-      if (articulationVariant % 2 === 0) {
-        const ichi = synthesizeIchigenkin(
-          outcome === 'WIN' ? 392.0 : 293.66,
-          ctx.sampleRate,
-          1.15,
-          0.65,
-          this.settings.quality,
-          this.nextSeed()
-        );
-        this.playSpatialBuffer(this.toAudioBuffer(ctx, ichi.left, ichi.right), { x: 0.28, y: 0.56, z: -0.35 }, {
-          gain: 0.28,
-          reverbScale: 1.32,
-          delaySec: 0.035,
-          trajectory4D: 'overhead_arc',
-          trajectoryRadius: 1.35,
-          travelSec: 1.05,
-        });
-      } else {
-        const binz = synthesizeBinzasara(ctx.sampleRate, 0.78, this.settings.quality, this.nextSeed());
-        this.playSpatialBuffer(this.toAudioBuffer(ctx, binz.left, binz.right), { x: 0, y: 0.52, z: -0.22 }, {
-          gain: 0.34,
-          reverbScale: 1.18,
-          delaySec: 0.025,
-          trajectory4D: 'overhead_arc',
-          trajectoryRadius: 1.45,
-          travelSec: 0.62,
-        });
-      }
-    }
-
-    // 3. Gold-leaf Kagura-Suzu / Shakujo overhead 4D sparkle on WIN or decisive clash!
-    if (outcome === 'WIN' || isMatchDecidingPoint) {
-      const suzu =
-        articulationVariant % 3 === 2
-          ? synthesizeShakujo(ctx.sampleRate, isMatchDecidingPoint ? 0.85 : 0.55, this.settings.quality, this.nextSeed())
-          : synthesizeSuzuShimmer(ctx.sampleRate, isMatchDecidingPoint ? 0.85 : 0.52, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, suzu.left, suzu.right), { x: 0, y: 0.75, z: -0.1 }, {
-        gain: 0.28,
-        reverbScale: 1.3,
-        delaySec: 0.035,
-        trajectory4D: 'spiral_ascend',
-        trajectoryRadius: 1.35,
-        travelSec: 0.95,
-      });
-    }
-
-    // 4. Hand-Hammered Stereo Japanese Temple Rin-Bell Outcome Harmony
-    const notes =
-      outcome === 'WIN'
-        ? [523.25, 659.25, 783.99]
-        : outcome === 'LOSS'
-        ? [392.0, 311.13]
-        : [440.0, 587.33];
-
-    notes.forEach((hz, idx) => {
-      const bell = synthesizeRinBellNote(
-        hz,
-        ctx.sampleRate,
-        outcome === 'WIN' ? 1.55 : 1.1,
-        outcome === 'WIN' ? 0.58 : 0.42,
-        this.settings.quality,
-        this.nextSeed()
-      );
-      this.playSpatialBuffer(
-        this.toAudioBuffer(ctx, bell.left, bell.right),
-        { x: (idx - 1) * 0.48, y: 0.78, z: -0.35 },
-        {
-          gain: outcome === 'WIN' ? 0.34 : 0.26,
-          reverbScale: 1.4,
-          delaySec: 0.04 + idx * 0.055,
-          trajectory4D: outcome === 'WIN' && idx === notes.length - 1 ? 'overhead_arc' : undefined,
-          trajectoryRadius: 1.4,
-          travelSec: 1.25,
-        }
-      );
-    });
+    // 1.6: identical layer stack to 1.5 (dual-material 2D-FDTD clash + matchup signature + suzu +
+    // rin-bell harmony) — but rendered by the worker farm ahead of time instead of on this frame.
+    this.playPlannedLayers(this.planClash(outcome, winnerMove, isMatchDecidingPoint, articulationVariant));
+    this.schedulePoolPrefetch(1600);
   }
 
   /**
@@ -1794,103 +2057,7 @@ export class JSoundEngine {
     this.lastAcousticEventJp = playerWon
       ? '大勝利・4D梵鐘×十三絃箏×龍笛×神楽鈴'
       : '終局・4D胡弓×尺八×銅鑼×梵鐘';
-
-    // 1. Sacred Bonsho Temple Bronze Bell anchor with majestic 4D 360° envelopment!
-    const bonsho = synthesizeBonshoBell(
-      playerWon ? 130.81 : 110.0,
-      ctx.sampleRate,
-      2.8,
-      playerWon ? 0.88 : 0.65,
-      this.settings.quality,
-      this.nextSeed()
-    );
-    this.playSpatialBuffer(this.toAudioBuffer(ctx, bonsho.left, bonsho.right), { x: 0, y: 1.15, z: -1.1 }, {
-      gain: 0.46,
-      reverbScale: 1.68,
-      trajectory4D: 'orbit_360',
-      trajectoryRadius: 1.85,
-      travelSec: 2.5,
-      enableDoppler: false,
-    });
-
-    if (playerWon) {
-      // 2. Celebratory Japanese Hirajoshi Pentatonic Koto Glissando!
-      const koto = synthesizeKotoArpeggio(
-        [293.66, 329.63, 440.0, 523.25, 587.33, 659.25, 880.0],
-        0.072,
-        ctx.sampleRate,
-        0.78,
-        this.nextSeed()
-      );
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, koto.left, koto.right), { x: 0, y: 0.65, z: -0.4 }, {
-        gain: 0.48,
-        reverbScale: 1.48,
-        delaySec: 0.08,
-      });
-
-      // 3. Imperial Gagaku Ryuteki soaring celebratory note + 4D Spiral-Ascending Kagura-Suzu Cascade!
-      const ry = synthesizeRyutekiPhrase(587.33, ctx.sampleRate, 1.5, 0.58, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, ry.left, ry.right), { x: -0.35, y: 0.95, z: -0.6 }, {
-        gain: 0.32,
-        reverbScale: 1.58,
-        delaySec: 0.22,
-        trajectory4D: 'overhead_arc',
-        trajectoryRadius: 1.65,
-        travelSec: 1.4,
-      });
-
-      const suzu = synthesizeSuzuShimmer(ctx.sampleRate, 0.92, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, suzu.left, suzu.right), { x: 0, y: 0.9, z: -0.2 }, {
-        gain: 0.36,
-        reverbScale: 1.52,
-        delaySec: 0.16,
-        trajectory4D: 'spiral_ascend',
-        trajectoryRadius: 1.55,
-        travelSec: 1.4,
-      });
-
-      // 4. Radiant Rin-Bell + Bronze Dotaku Chime Major Triad!
-      [523.25, 659.25, 783.99, 1046.5].forEach((hz, idx) => {
-        const bell = synthesizeRinBellNote(hz, ctx.sampleRate, 2.35, 0.72, this.settings.quality, this.nextSeed());
-        this.playSpatialBuffer(
-          this.toAudioBuffer(ctx, bell.left, bell.right),
-          { x: (idx - 1.5) * 0.55, y: 0.88, z: -0.45 },
-          { gain: 0.38, reverbScale: 1.55, delaySec: 0.1 + idx * 0.095 }
-        );
-      });
-    } else {
-      // Dignified Bowed Kokyu + Shakuhachi Bamboo Breath + Bronze Dora + Muted Rin-Bell Minor Descent
-      const kokyu = synthesizeKokyu(329.63, ctx.sampleRate, 1.85, 0.62, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, kokyu.left, kokyu.right), { x: -0.25, y: 0.82, z: -0.55 }, {
-        gain: 0.34,
-        reverbScale: 1.52,
-        delaySec: 0.08,
-        trajectory4D: 'overhead_arc',
-        trajectoryRadius: 1.45,
-        travelSec: 1.65,
-        enableDoppler: false,
-      });
-      const shaku = synthesizeShakuhachiBreath(293.66, ctx.sampleRate, 1.9, 0.58, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, shaku.left, shaku.right), { x: 0.25, y: 0.85, z: -0.6 }, {
-        gain: 0.4,
-        reverbScale: 1.5,
-        delaySec: 0.16,
-      });
-      const dora = synthesizeDoraGong(ctx.sampleRate, 0.55, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, dora.left, dora.right), { x: 0.35, y: 0.9, z: -0.9 }, {
-        gain: 0.3,
-        reverbScale: 1.6,
-        delaySec: 0.06,
-      });
-      [329.63, 293.66, 220.0].forEach((hz, idx) => {
-        const bell = synthesizeRinBellNote(hz, ctx.sampleRate, 2.1, 0.52, this.settings.quality, this.nextSeed());
-        this.playSpatialBuffer(
-          this.toAudioBuffer(ctx, bell.left, bell.right),
-          { x: (idx - 1) * 0.5, y: 0.82, z: -0.45 },
-          { gain: 0.3, reverbScale: 1.55, delaySec: idx * 0.11 }
-        );
-      });
-    }
+    this.playPlannedLayers(planVictoryChord(playerWon, this.planParams()));
   }
 
   // ===========================================================================
@@ -1901,96 +2068,20 @@ export class JSoundEngine {
   public playSpiritCharge(level: number, engagedOverdrive = false): void {
     const ctx = this.ensureReady();
     if (!ctx) return;
-    const sr = ctx.sampleRate;
-    const clamped = Math.max(0.15, Math.min(1.0, level));
     this.lastAcousticEventJp = engagedOverdrive
       ? '極一撃・4D雅楽笙 × 法螺貝 × 抜刀 × 雷太鼓'
       : '気迫高揚・4D雅楽笙';
-
-    const notes = engagedOverdrive
-      ? [440.0, 493.88, 587.33, 659.25, 739.99, 880.0]
-      : [440.0, 523.25, 659.25, 783.99];
-    const sho = synthesizeShoCluster(notes, sr, engagedOverdrive ? 1.55 : 0.72, 0.52 + clamped * 0.32, this.nextSeed());
-    this.playSpatialBuffer(this.toAudioBuffer(ctx, sho.left, sho.right), { x: 0, y: 0.78, z: -0.5 }, {
-      gain: engagedOverdrive ? 0.52 : 0.34,
-      reverbScale: 1.52,
-      trajectory4D: engagedOverdrive ? 'spiral_ascend' : undefined,
-      trajectoryRadius: 1.6,
-      travelSec: 1.45,
-      enableDoppler: false,
-    });
-
-    if (engagedOverdrive) {
-      const katana = synthesizeKatanaDraw(sr, 0.98, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(
-        this.toAudioBuffer(ctx, katana.left, katana.right),
-        { x: -0.65, y: 0.34, z: 0.25 },
-        {
-          gain: 0.56,
-          reverbScale: 1.15,
-          endPos: { x: 0.35, y: 0.44, z: -0.1 },
-          trajectory4D: 'converge_impact',
-          trajectoryRadius: 1.5,
-          travelSec: 0.48,
-          enableDoppler: true,
-        }
-      );
-      const horagai = synthesizeHoragai(220.0, sr, 1.45, 0.6, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, horagai.left, horagai.right), { x: 0.4, y: 0.95, z: -0.85 }, {
-        gain: 0.32,
-        reverbScale: 1.58,
-        delaySec: 0.06,
-      });
-      const thunder = synthesizeThunderTaiko(sr, 0.82, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, thunder.left, thunder.right), { x: 0, y: 0.35, z: -0.55 }, {
-        gain: 0.48,
-        reverbScale: 1.25,
-        delaySec: 0.08,
-      });
-    }
+    this.playPlannedLayers(planSpiritCharge(level, engagedOverdrive, this.planParams()));
+    if (!engagedOverdrive) this.prewarmSpiritCharge();
   }
 
   /** Overdrive (極一撃) Signature 4D Acoustic Climax: Tamahagane Katana + Tsugaru Shamisen + Yumi Arrow + Dora + Thunder */
   public playOverdriveClash(outcome: 'WIN' | 'LOSS' | 'DRAW', winnerMove: Move): void {
     const ctx = this.ensureReady();
     if (!ctx) return;
-    const sr = ctx.sampleRate;
     this.playClashImpact(outcome, winnerMove, true);
     this.lastAcousticEventJp = '極一撃炸裂・4D玉鋼 × 弓矢 × 津軽三味線 × 銅鑼';
-
-    const katana = synthesizeKatanaDraw(sr, 1.08, this.settings.quality, this.nextSeed());
-    this.playSpatialBuffer(
-      this.toAudioBuffer(ctx, katana.left, katana.right),
-      { x: -0.7, y: 0.4, z: 0.25 },
-      {
-        gain: 0.46,
-        reverbScale: 1.25,
-        endPos: { x: 0.7, y: 0.45, z: -0.25 },
-        trajectory4D: 'overhead_arc',
-        trajectoryRadius: 1.65,
-        travelSec: 0.46,
-        enableDoppler: true,
-      }
-    );
-
-    const dora = synthesizeDoraGong(sr, 0.85, this.settings.quality, this.nextSeed());
-    this.playSpatialBuffer(this.toAudioBuffer(ctx, dora.left, dora.right), { x: -0.35, y: 0.72, z: -0.55 }, {
-      gain: 0.34,
-      reverbScale: 1.52,
-      delaySec: 0.03,
-      trajectory4D: 'orbit_360',
-      trajectoryRadius: 1.75,
-      travelSec: 1.6,
-      enableDoppler: false,
-    });
-
-    const shamNotes = outcome === 'WIN' ? [220.0, 293.66, 329.63, 440.0] : [220.0, 196.0, 164.81];
-    const sham = synthesizeShamisenPhrase(shamNotes, sr, 0.072, 0.94, this.settings.quality, this.nextSeed());
-    this.playSpatialBuffer(this.toAudioBuffer(ctx, sham.left, sham.right), { x: 0.18, y: 0.5, z: -0.22 }, {
-      gain: 0.46,
-      reverbScale: 1.22,
-      delaySec: 0.05,
-    });
+    this.playPlannedLayers(planOverdriveExtras(outcome, this.planParams()));
   }
 
   /** Feint (牽制) Tactile 4D Acoustic Cue: Sensu Folding Fan Snap + Kyudo Yumi Twang + Shamisen */
@@ -2029,49 +2120,9 @@ export class JSoundEngine {
   public playComboFlourish(streak: number): void {
     const ctx = this.ensureReady();
     if (!ctx || streak < 2) return;
-    const sr = ctx.sampleRate;
     this.lastAcousticEventJp =
       streak >= 5 ? `${streak}連勝・4D錫杖 × 鞨鼓 × 能管` : `${streak}連勝・4D祭鉦 × 龍笛`;
-
-    const gong = synthesizeAtarigane(sr, streak >= 3 ? 'open' : 'damped', 0.82, this.settings.quality, this.nextSeed());
-    this.playSpatialBuffer(this.toAudioBuffer(ctx, gong.left, gong.right), { x: 0.35, y: 0.68, z: -0.35 }, {
-      gain: 0.34,
-      reverbScale: 1.25,
-      delaySec: 0.09,
-    });
-
-    if (streak >= 3) {
-      const flute =
-        streak >= 5
-          ? synthesizeNokan(880.0, sr, 1.2, 0.66, this.nextSeed())
-          : streak % 2 === 1
-          ? synthesizeRyutekiPhrase(587.33, sr, 1.15, 0.68, this.nextSeed())
-          : synthesizeShinobuePhrase(783.99, sr, 1.05, 0.66, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, flute.left, flute.right), { x: -0.25, y: 0.88, z: -0.45 }, {
-        gain: 0.36,
-        reverbScale: 1.42,
-        delaySec: 0.14,
-        trajectory4D: 'overhead_arc',
-        trajectoryRadius: 1.45,
-        travelSec: 1.05,
-      });
-    }
-    if (streak >= 4) {
-      const biwa = synthesizeBiwaStrum(146.83, sr, 0.88, 1.65, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, biwa.left, biwa.right), { x: 0, y: 0.48, z: -0.3 }, {
-        gain: 0.38,
-        reverbScale: 1.32,
-        delaySec: 0.06,
-      });
-    }
-    if (streak >= 5) {
-      const kakko = synthesizeKakkoRoll(sr, 0.78, this.settings.quality, this.nextSeed());
-      this.playSpatialBuffer(this.toAudioBuffer(ctx, kakko.left, kakko.right), { x: 0.25, y: 0.42, z: -0.35 }, {
-        gain: 0.34,
-        reverbScale: 1.15,
-        delaySec: 0.1,
-      });
-    }
+    this.playPlannedLayers(planComboFlourish(streak, this.planParams()));
   }
 
   /** Blitz 3-Second Countdown Tick (LRU Cached Camphor Mokugyo -> Urgent Brass Atarigane) */
@@ -2545,10 +2596,12 @@ export class JSoundEngine {
     const nJp = ACOUSTIC_MATERIALS[this.npcMaterial].labelJp;
     const cacheHitRatePct =
       this.cacheQueries > 0 ? Math.round((this.cacheHits / this.cacheQueries) * 100) : 0;
-    const qm = this.quantumMaster?.metrics;
+    const qm = this.master16?.metrics;
+    const farmStats = this.renderFarm?.getStats();
+    const farmQueries = farmStats ? farmStats.poolHits + farmStats.poolMisses : 0;
 
     return {
-      engineName: 'JSound Engin 1.5',
+      engineName: 'JSound Engin 1.6',
       enabled: this.settings.enabled,
       quality: this.settings.quality,
       spatialMode: this.settings.spatialMode,
@@ -2565,7 +2618,7 @@ export class JSoundEngine {
       instrumentCount: 44,
       materialCount: 70,
       cacheHitRatePct,
-      activeVoices: this.activeVoices,
+      activeVoices: this.voiceManager.count,
       sampleRate: nativeSr,
       peakDb,
       rmsDb,
@@ -2577,12 +2630,36 @@ export class JSoundEngine {
       fdnActive: this.settings.quality !== 'lite' && SPATIAL_4D_CONFIGS[this.settings.spatialMode].fdnWet > 0,
       materialPairJp: `${pJp} × ${nJp}`,
       lastAcousticEventJp: this.lastAcousticEventJp,
+      deviceProfileSetting: this.settings.deviceProfile,
+      deviceProfile: this.resolvedProfile,
+      lufsShortTerm: qm ? qm.lufsShortTerm : -70,
+      lufsIntegrated: qm ? qm.lufsIntegrated : -70,
+      limiterGrDb: qm ? qm.limiterGrDb : 0,
+      bandGrDb: qm ? [qm.bandLowGrDb, qm.bandMidGrDb, qm.bandHighGrDb] : [0, 0, 0],
+      virtualBassDb: qm ? qm.virtualBassDb : -90,
+      clipEvents: qm ? qm.clipEvents : 0,
+      renderFarmWorkers: farmStats ? farmStats.workers : 0,
+      renderFarmJobs: farmStats ? farmStats.jobsRendered : 0,
+      renderFarmHitPct: farmQueries > 0 && farmStats ? Math.round((farmStats.poolHits / farmQueries) * 100) : 0,
+      renderFarmAvgMs: farmStats ? Math.round(farmStats.avgWorkerMs) : 0,
+      renderQuality: this.currentRenderQuality(),
+      revealMainThreadMs: Math.round(this.revealMainThreadMs * 10) / 10,
+      voicesStolen: this.voiceManager.stolenCount,
     };
+  }
+
+  /** Reset the BS.1770-4 integrated loudness history (new match). */
+  public resetLoudnessHistory(): void {
+    this.master16?.resetLoudness();
   }
 
   public dispose(): void {
     this.stopSoundscapeScheduler();
-    this.quantumMaster?.dispose();
+    window.clearTimeout(this.poolPrefetchTimer);
+    window.clearTimeout(this.roundQualityTimer);
+    this.master16?.dispose();
+    this.renderFarm?.dispose();
+    this.renderFarm = null;
     if (this.ambienceSource) {
       try {
         this.ambienceSource.stop();

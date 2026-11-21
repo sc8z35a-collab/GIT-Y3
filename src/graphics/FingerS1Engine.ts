@@ -30,6 +30,7 @@
 
 import * as THREE from 'three';
 import { HandMaterialPreset } from './GraphicsConfig';
+import { S11_GLSL_COMMON, S11_GLSL_MAP, S11_GLSL_NORMAL, S11_GLSL_ROUGHNESS } from './FingerS11DetailEngine';
 
 // =============================================================================
 // 1. EXACT CLOSED-FORM ANALYTICAL 2ND-ORDER HARMONIC SPRING (Framerate-Invariant!)
@@ -829,10 +830,12 @@ export function createFingerS1PhalanxGeo(
   baseR: number,
   tipR: number,
   isDistal: boolean,
-  isThumb = false
+  isThumb = false,
+  detail = 1
 ): THREE.BufferGeometry {
-  const radialSegs = 40;
-  const axialSegs = 28;
+  // FINGER S1.1: `detail = 2` doubles tessellation on both axes (4× vertices) for the HD tier
+  const radialSegs = Math.round(40 * detail);
+  const axialSegs = Math.round(28 * detail);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -970,9 +973,9 @@ export function createFingerS1PhalanxGeo(
  * Seamless Organic Anatomical Forearm/Wrist Sculpt (replaces sharp-edged cylinder on FINGER S1.0):
  * Smooth carpal narrowing, gentle radial/ulnar extensor contours, and clean UV mapping on dorsal half.
  */
-export function createFingerS1ForearmWristGeo(): THREE.BufferGeometry {
-  const radialSegs = 40;
-  const axialSegs = 20;
+export function createFingerS1ForearmWristGeo(detail = 1): THREE.BufferGeometry {
+  const radialSegs = Math.round(40 * detail);
+  const axialSegs = Math.round(20 * detail);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -1026,8 +1029,8 @@ export function createFingerS1ForearmWristGeo(): THREE.BufferGeometry {
  * Seamless Anatomical Joint Capsule (replaces doll-like spherical balls!):
  * UV poles rotated laterally (±X) so dorsal skin has ZERO polar pinching even at 100× zoom!
  */
-export function createFingerS1JointCapsuleGeo(radius: number): THREE.BufferGeometry {
-  const geo = new THREE.SphereGeometry(radius, 30, 22);
+export function createFingerS1JointCapsuleGeo(radius: number, detail = 1): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(radius, Math.round(30 * detail), Math.round(22 * detail));
   // Rotate UV poles to ±X lateral sides so dorsal (+Y) & volar (-Y) skin has clean uniform grid UVs!
   geo.rotateZ(Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -1066,9 +1069,9 @@ export function createFingerS1JointCapsuleGeo(radius: number): THREE.BufferGeome
  * Sits naturally over the dorsal skin of MCP & PIP joints:
  *  - Ultra-smooth C² feathered envelope tucks cleanly beneath the capsule skin so ZERO border seam appears!
  */
-export function createFingerS1KnuckleWrinkleStackGeo(radius: number): THREE.BufferGeometry {
-  const segsU = 30;
-  const segsV = 24;
+export function createFingerS1KnuckleWrinkleStackGeo(radius: number, detail = 1): THREE.BufferGeometry {
+  const segsU = Math.round(30 * detail);
+  const segsV = Math.round(24 * detail);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -1088,7 +1091,9 @@ export function createFingerS1KnuckleWrinkleStackGeo(radius: number): THREE.Buff
       // 3 fine concentric elliptical dorsal skin-fold ridges!
       const ellipseDist = Math.hypot(sinP * 0.76, zNorm * 1.0);
       const wrinkleWave = Math.cos(ellipseDist * Math.PI * 5.4) * 0.5 + 0.5;
-      const r = radius * (0.93 + env * (0.068 + 0.028 * wrinkleWave));
+      // S1.1 HD: secondary micro-fold harmonic (2.3× frequency) that a 1× mesh cannot represent
+      const microFold = detail > 1 ? (Math.cos(ellipseDist * Math.PI * 12.4 + sinP * 1.7) * 0.5 + 0.5) * 0.008 : 0;
+      const r = radius * (0.93 + env * (0.068 + 0.028 * wrinkleWave + microFold));
 
       const x = sinP * r * 1.05;
       const y = cosP * r * 0.9;
@@ -1124,9 +1129,14 @@ export function createFingerS1KnuckleWrinkleStackGeo(radius: number): THREE.Buff
  * UV: u = 0..1 across width, v = 0 cuticle/lunula -> 1 distal free edge.
  * Eliminates paper-thin sheet artifacts even under 200× macro inspection!
  */
-export function createFingerS1NailPlateGeo(width: number, length: number, thickness = 0.0018): THREE.BufferGeometry {
-  const segU = 26;
-  const segV = 22;
+export function createFingerS1NailPlateGeo(
+  width: number,
+  length: number,
+  thickness = 0.0018,
+  detail = 1
+): THREE.BufferGeometry {
+  const segU = Math.round(26 * detail);
+  const segV = Math.round(22 * detail);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -1239,9 +1249,9 @@ export function createFingerS1NailPlateGeo(width: number, length: number, thickn
  * 3D Micro-Sculpted Anatomical Proximal Cuticle Arch (Eponychium Rim) & Lateral Nail Fold!
  * Flush low-profile biological skin collar lapping seamlessly over the embedded nail matrix root!
  */
-export function createFingerS1CuticleArchGeo(width: number, length: number): THREE.BufferGeometry {
-  const segArc = 26;
-  const segTube = 10;
+export function createFingerS1CuticleArchGeo(width: number, length: number, detail = 1): THREE.BufferGeometry {
+  const segArc = Math.round(26 * detail);
+  const segTube = Math.round(10 * detail);
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -1325,8 +1335,8 @@ export function createFingerS1CuticleArchGeo(width: number, length: number): THR
  *  - Smooth continuous dorsal arch driven live by DERMA-TENSOR 1.0 subcutaneous tendons & veins,
  *  - Clean anatomical carpal wrist taper and radial-ulnar silhouette!
  */
-export function createFingerS1SculptedPalmGeo(mirrorSign: number): THREE.BufferGeometry {
-  const geo = new THREE.SphereGeometry(0.125, 52, 40);
+export function createFingerS1SculptedPalmGeo(mirrorSign: number, detail = 1): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(0.125, Math.round(52 * detail), Math.round(40 * detail));
   const pos = geo.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const ux = pos.getX(i) / 0.125; // -1..1
@@ -1379,6 +1389,10 @@ export interface FingerS1ShaderUniforms {
   uS1VolarCompress: { value: number }; // 0.24..1.0 volar palmar flexion crease depth (counter-phase!)
   uS1Sweat: { value: number }; // 0..1 J-BioPulse sebum/perspiration micro-sheen
   uS1VascularPulse: { value: number }; // 0..1 live arterial systolic PPG pulse wave
+  // ★ FINGER S1.1 zoom-adaptive detail ★
+  uS11Enabled: { value: number }; // 1.0 = MICRO-DERMA FRACTAL 2.0 drives the main PBR normal
+  uS11MaxOctave: { value: number }; // 4 (tier 0) … 8 (tier 3)
+  uS11AlphaRough: { value: number }; // 1.0 when HD albedo-alpha roughness maps are bound
 }
 
 /**
@@ -1405,7 +1419,7 @@ export function enhanceMaterialWithFingerS1Shader(
       : 0.08;
   uniforms.uS1SkinMode.value = skinMode;
 
-  mat.customProgramCacheKey = () => `finger_s1_optical_v3_derma_chroma_${preset}`;
+  mat.customProgramCacheKey = () => `finger_s11_optical_v4_derma_chroma_${preset}`;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uS1Enabled = uniforms.uS1Enabled;
     shader.uniforms.uS1SkinMode = uniforms.uS1SkinMode;
@@ -1417,6 +1431,9 @@ export function enhanceMaterialWithFingerS1Shader(
     shader.uniforms.uS1VolarCompress = uniforms.uS1VolarCompress;
     shader.uniforms.uS1Sweat = uniforms.uS1Sweat;
     shader.uniforms.uS1VascularPulse = uniforms.uS1VascularPulse;
+    shader.uniforms.uS11Enabled = uniforms.uS11Enabled;
+    shader.uniforms.uS11MaxOctave = uniforms.uS11MaxOctave;
+    shader.uniforms.uS11AlphaRough = uniforms.uS11AlphaRough;
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -1578,8 +1595,14 @@ export function enhanceMaterialWithFingerS1Shader(
           float microCrystal = m3 > 0.01 ? ( s1Noise2( pM * 14500.0 ) - 0.5 ) * 0.24 * m3 : 0.0;
           return 0.5 + latheLines + fineGrain + microCrystal;
         }
+        ${S11_GLSL_COMMON}
         `
       )
+      // ★ FINGER S1.1: evaluate the 8-octave analytic relief once, modulate albedo / roughness,
+      //   and drive three.js's MAIN PBR normal (sun, IBL & clearcoat all see the micro relief) ★
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${S11_GLSL_MAP}`)
+      .replace('#include <roughnessmap_fragment>', S11_GLSL_ROUGHNESS)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${S11_GLSL_NORMAL}`)
       .replace(
         '#include <dithering_fragment>',
         /* glsl */ `
@@ -1592,7 +1615,10 @@ export function enhanceMaterialWithFingerS1Shader(
           vec3 s1MicroN = s1N;
           float s1MicroCavity = 1.0;
           float s1MicroFlakeSheen = 0.0;
-          if ( uS1DermaEnabled > 0.5 ) {
+          if ( s11Active > 0.5 ) {
+            // S1.1 already perturbed the main normal analytically: reuse it (view -> world)
+            s1MicroN = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
+          } else if ( uS1DermaEnabled > 0.5 ) {
             vec3 dPosX = dFdx( vS1WorldPos );
             vec3 dPosY = dFdy( vS1WorldPos );
             float pxWorldSize = max( length( dPosX ), length( dPosY ) );

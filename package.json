@@ -1,9 +1,9 @@
 {
   "name": "janken-kiwami-3d",
-  "version": "1.0.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
-  "description": "High-Resolution Photorealistic 3D Rock-Scissors-Paper featuring JNV1.0 Cognitive NPC Core, KHDR Pipeline, and Shadow Flame 1.0 Flash/Pro",
+  "description": "Photorealistic 3D Rock-Scissors-Paper: mobile-first UI tuned for POCO F7 (KIWAMI MOBILE CORE: 120 Hz vsync-divisor pacing, dynamic resolution, thermal hold, HUD-aware optical centre, audio-derived haptics), JSound Engin 1.6 (zero-jank worker render farm, KIWAMI MASTER 16 true-peak/multiband/virtual-bass worklet, device-adaptive playback), FINGER S1.1 zoom-adaptive 2x HD hand detail, JNV1.0 NPC core, KHDR, Shadow Flame",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
@@ -14,7 +14,10 @@
     "test:khdr5k": "tsx src/graphics/runPhoto5KTest.ts",
     "test:nexttech": "tsx src/engine/runNextTechTest.ts",
     "test:handdetail": "tsx src/engine/handdetail/runHandDetailTest.ts",
-    "test:all": "npm run test:jnv1 && npm run test:jhand && npm run test:jsound && npm run test:khdr5k && npm run test:nexttech && npm run test:handdetail"
+    "test:all": "npm run test:jnv1 && npm run test:jhand && npm run test:jsound && npm run test:jsound16 && npm run test:khdr5k && npm run test:nexttech && npm run test:handdetail && npm run test:fingers11 && npm run test:mobilecore",
+    "test:jsound16": "tsx src/engine/jsound/runJSound16Test.ts",
+    "test:fingers11": "tsx src/engine/handdetail/runFingerS11Test.ts",
+    "test:mobilecore": "tsx src/engine/mobile/runMobileCoreTest.ts"
   },
   "dependencies": {
     "three": "^0.174.0"

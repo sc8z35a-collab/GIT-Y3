@@ -2,6 +2,22 @@
 
 提供された建築・素材テクスチャアトラスから自動切り出し＋PBR（法線・粗さマップ）合成した5つの写実的3D舞台で戦う、**非ネオン・高精細3Dじゃんけんゲーム**です。
 
+## v1.6 の新機能（POCO F7 を大前提に最適化）
+
+- **スマホ向けにわかりやすくしたUI**：縦画面を基準にしたレイアウト、下から出てくる設定シート（下にスワイプで閉じる）、今やることを示すステータス表示、最初の遊び方ガイド、親指で押しやすい「手」ボタン（触れた瞬間に反応し、短くバイブ）、画面右の縦型拡大鏡
+- **端末適応エンジン「KIWAMI MOBILE CORE 1.0」** ([詳細設計書](docs/KIWAMI_MOBILE_CORE_1_0.md))
+  - Adreno 825 と 120Hz 表示から **POCO F7 級**を自動で判定し、FHD・120fps・HD 手肌の事前生成・音声ワーカー3本で始める
+  - **ジャダーの出ない 120→60→40fps 段**だけを使う閉ループ・フレームペーサー＋**動的解像度**（上げるときは試行し、失敗したら戻して待ち時間を倍に）
+  - **発熱を検知して45秒冷却**、待機中は 60Hz に落として省電力、**HUDを避けたカメラ中心**（斜め投影で、手をボタン列に隠さない）
+- **次世代音響エンジン「JSound Engin 1.6」** ([詳細設計書](docs/JSOUND_ENGIN_1_6.md))
+  - **ゼロ・ジャンク予測レンダーファーム**：27種類の物理合成を Web Worker で先に計算し、「ポン！」の瞬間のDSP計算を0に
+  - **遅延を補正した予約再生**：Bluetooth イヤホンの遅延まで補正して、手が見えた瞬間に音が届く。同じ波形からバイブも作る
+  - **KIWAMI MASTER 16**（AudioWorklet）：4×FIR トゥルーピーク検出（誤差 0.021dB）、強制クリップ不要の先読みリミッター（+18dBFS 入力でも −1.000dBFS）、LR4 3バンド・ダイナミクス、チェビシェフ仮想低音、BS.1770-4 ラウドネス計
+  - **再生機器に合わせた音作り**（イヤホン / スマホ本体スピーカー / PCスピーカー）
+- **ズーム倍率で細かさが変わる「FINGER S1.1」** ([詳細設計書](docs/FINGER_S1_1.md))
+  - 2.5× / 12× / 90× で HD 2× → 超精細 → 顕微（17µm）に切り替え（チラつき防止つき）
+  - 2048² HD テクスチャ（画素数4倍、指紋の隆線 14→38本）、三角形4倍のメッシュ（形が飛ばない切り替え）、8段の解析的な肌の凹凸をメインの PBR 法線に
+
 ## 主な搭載技術（v1.5 極 / JSound Engin 1.5 × Project KIWAMI-NEXT）
 
 - **次世代物理音響エンジン「JSound Engin 1.5」** ([詳細設計書](docs/JSOUND_ENGIN_1_5.md))
@@ -41,6 +57,11 @@ npm run dev
 # TypeScript型チェック + 本番ビルド
 npm run build
 
-# 全6エンジン一括検証（JNV1.0 + JHand 36掌形 + JSound 1.5 3OA/2D-FDTD/768kHz + KHDR 1.1 5K 48-bit PNG + KIWAMI-NEXT 5大革新 + 手の細部2革新 DERMA-TENSOR/CHROMA-DERM）
+# 全エンジン一括検証（JNV1.0 + JHand 36掌形 + JSound 1.5/1.6 + KHDR 1.1 5K 48-bit PNG + KIWAMI-NEXT 5大革新 + 手の細部2革新 + FINGER S1.1 + KIWAMI MOBILE CORE）
 npm run test:all
+
+# v1.6 の個別検証
+npm run test:jsound16     # JSound Engin 1.6（16項目）
+npm run test:fingers11    # FINGER S1.1（11項目）
+npm run test:mobilecore   # KIWAMI MOBILE CORE（26項目）
 ```

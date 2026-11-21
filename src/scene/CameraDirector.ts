@@ -643,7 +643,10 @@ export class CameraDirector {
     this.camera.aspect = this.aspect;
     if (this.aspect < 0.72) {
       this.baseFov = 52;
-      this.portraitScale = 1.44;
+      // Continuous pull-back for tall 20:9 phones (POCO F7 portrait ≈ 0.45–0.5): the horizontal field
+      // shrinks with the aspect, so dolly back (≤ 1.3×) to keep both hands on screen; the HUD-aware
+      // optical centre (GameScene.setHudOcclusion) supplies the vertical room.
+      this.portraitScale = 1.44 * Math.min(1.3, Math.max(1, Math.sqrt(0.62 / this.aspect)));
     } else if (this.aspect < 0.98) {
       this.baseFov = 46;
       this.portraitScale = 1.14;
